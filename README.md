@@ -35,16 +35,27 @@ const tree = parser.parse('cat <<EOF; echo done\n$(date)\nEOF\n');
 ```sh
 mise install
 bun install --frozen-lockfile
-bun run tree-sitter generate
+bun run build/ci
 bun run test
 script/parse-examples
 ```
 
-`bun run test` runs the corpus in `test/corpus`, the Node.js binding test, and a check that real-world scripts
-cloned into `examples/` fail to parse exactly as listed in `script/known-failures.txt`; the first run clones them,
-which takes a few minutes. The example repositories are pinned to commits in `script/parse-examples`. After a
-grammar change or a moved pin alters that list, `script/parse-examples` rewrites it; review its diff before
-committing.
+`bun run test` runs:
+
+- the corpus in `test/corpus`;
+- the Node.js binding test;
+- a check that real-world scripts cloned into `examples/` fail to parse exactly as listed in
+  `script/known-failures.txt`. The first run clones them, which takes a few minutes. The example repositories are
+  pinned to commits in `script/parse-examples`. After a grammar change or a moved pin alters that list,
+  `script/parse-examples` rewrites it; review its diff before committing;
+- a differential test (`test/unit/differential.test.ts`, with helpers in `test/helpers/differential`) that generates
+  scripts and runs them with the bash that `mise.toml` pins. It checks that the syntax tree shows exactly the commands
+  bash runs, with as many words and the same value for each word without expansions, and that the tree has no
+  `ERROR` or `MISSING` node for a script bash accepts. A failure prints the seed; `DIFFERENTIAL_SEED` and
+  `DIFFERENTIAL_CASES` run other or more scripts. It loads the Node.js addon, which `bun run build/ci` rebuilds after
+  regenerating the parser;
+- a performance check (`test/unit/performance.test.ts`) that a 240 KB line parses in linear time, since consumers
+  parse untrusted scripts.
 
 ### References
 

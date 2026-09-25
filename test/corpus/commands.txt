@@ -702,3 +702,178 @@ coproc name { echo hi; } 2>&1
     redirect: (file_redirect
       descriptor: (file_descriptor)
       destination: (word))))
+
+================================================================================
+Line continuations after a blank separate words
+================================================================================
+
+echo a \
+b
+echo 'a' \
+"b" \
+$x
+echo \
+b
+echo a \
+\
+b
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (raw_string)
+    argument: (string
+      (string_content))
+    argument: (simple_expansion
+      (variable_name)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Backquotes end at a backquote inside single quotes
+================================================================================
+
+echo "`: '`"; echo a; echo "`'`"
+x=`: '`; echo b
+echo `echo 'a\`b'` 'c`d'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution
+        (command
+          name: (command_name
+            (word))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)))
+    argument: (raw_string)))
+
+================================================================================
+Backslashes in single quotes inside backquotes
+================================================================================
+
+echo `echo '\' foo`
+echo `echo 'C:\' bar`
+echo `echo '\\' baz`
+echo `echo 'a\`b' qux`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (word)))))
+
+================================================================================
+Consecutive line continuations inside a word
+================================================================================
+
+echo a\
+\
+b
+echo a \
+\
+b
+echo a\
+\
+$x
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (simple_expansion
+        (variable_name)))))

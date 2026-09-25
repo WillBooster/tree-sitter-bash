@@ -57,6 +57,9 @@ typedef struct {
     // A heredoc body ended right before a `${ list; }` closer; the newline that ended the command's
     // line began the body, so a terminator is still owed before the `}`.
     bool terminator_owed;
+    // The last token of this scanner was a line continuation that ended a line; nothing concatenates at
+    // the start of the next one.
+    bool after_line_break;
 } Scanner;
 
 static inline uint16_t current_depth(Scanner *scanner) {
@@ -120,7 +123,7 @@ static unsigned decode_varint(const char *in, unsigned available, int32_t *c) {
     return 0;
 }
 
-// Serialized layout: backtick depth, the owed-terminator flag, the closers of the open substitutions
+// Serialized layout: backtick depth, the owed-terminator and line-break flags, the closers of the open substitutions
 // (uint16 count, then one byte each), and heredoc count, then per heredoc its flags, depth (uint16),
 // delimiter length (uint16), and the delimiter as varints.
 #define HEREDOC_HEADER_SIZE (3 + 2 * sizeof(uint16_t))
@@ -147,6 +150,7 @@ static void scanner_reset(Scanner *scanner) {
     scanner->backtick_depth = 0;
     array_clear(&scanner->closers);
     scanner->terminator_owed = false;
+    scanner->after_line_break = false;
 }
 
 // The body being read: the most deeply nested started heredoc.
@@ -799,12 +803,52 @@ static bool scan_name_or_extglob_prefix(TSLexer *lexer, const bool *valid_symbol
     return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
 }
 
+// Marks the current position and reports whether a reserved word that ends or continues a compound
+// command (`then`, `do`, `done`, `fi`, `esac`, `else`, `elif`, `}`) starts here.
+static bool at_closing_reserved_word(TSLexer *lexer) {
+    static const char *const words[] = {"then", "do", "done", "fi", "esac", "else", "elif", "}"};
+    lexer->mark_end(lexer);
+    char word[5];
+    uint32_t length = 0;
+    for (;;) {
+        if (lexer->lookahead == '\\') {
+            // Bash joins a backslash-newline before it checks where the word ends (`then\` + newline).
+            advance(lexer);
+            if (lexer->lookahead == '\r') {
+                advance(lexer);
+            }
+            if (lexer->lookahead != '\n') {
+                return false;
+            }
+            advance(lexer);
+        } else if (length < sizeof(word) && (iswlower(lexer->lookahead) || lexer->lookahead == '}')) {
+            word[length++] = (char)lexer->lookahead;
+            advance(lexer);
+        } else {
+            break;
+        }
+    }
+    if (length == 0 || length == sizeof(word) ||
+        !(lexer->eof(lexer) || iswspace(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
+        return false;
+    }
+    for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++) {
+        if (strlen(words[i]) == length && strncmp(words[i], word, length) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool error_recovery = valid_symbols[ERROR_RECOVERY];
     // Tokens that must touch the previous one (concatenation, an empty assignment value) are decided
     // by the character right after it, even when blanks are skipped below to find a newline.
     int32_t first = lexer->lookahead;
     bool at_eof = lexer->eof(lexer);
+    // Kept only if this call returns a token, so the flag lasts until the scanner's next token.
+    bool after_line_break = scanner->after_line_break;
+    scanner->after_line_break = false;
 
     if (scanner->terminator_owed) {
         scanner->terminator_owed = false;
@@ -870,7 +914,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return scan_heredoc_start(scanner, lexer);
     }
 
-    if (valid_symbols[CONCAT]) {
+    // A line continuation after a blank separates words, so nothing concatenates at the start of the
+    // next line. The column costs a scan back to the line start, so it is computed only right after
+    // such a continuation and only where a concatenation could start; a concatenation then clears the
+    // flag, which bounds the scans to one per continuation.
+    if (valid_symbols[CONCAT] && !at_eof && !iswspace(first) && !is_metacharacter(first) &&
+        !(after_line_break && lexer->get_column(lexer) == 0)) {
         int32_t c = first;
         if (c == '\\' && lexer->lookahead == '\\') {
             // A backslash-newline joins lines, so the word continues only if the next line does.
@@ -891,27 +940,41 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             }
             advance(lexer);
             lexer->mark_end(lexer);
-            c = lexer->lookahead;
-            // The word continues only if the next line does; otherwise the continuation itself is the
-            // token, so that whatever follows it is lexed as it would be without it.
-            lexer->result_symbol = LINE_CONTINUATION;
-            if (lexer->eof(lexer) || iswspace(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
-                return true;
-            }
-            if (c == '\\') {
-                // Another continuation is whitespace too; an escaped character continues the word.
+            // Bash removes every backslash-newline before it splits words, so further continuations
+            // right after this one are part of the token (`a\` + `\` + `b` is `ab`).
+            for (;;) {
+                c = lexer->lookahead;
+                if (c != '\\') {
+                    break;
+                }
                 advance(lexer);
                 if (lexer->lookahead == '\r') {
                     advance(lexer);
                 }
-                if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
+                if (lexer->eof(lexer)) {
+                    lexer->mark_end(lexer);
+                    lexer->result_symbol = LINE_CONTINUATION;
                     return true;
                 }
+                if (lexer->lookahead != '\n') {
+                    // An escaped character continues the word.
+                    lexer->result_symbol = CONCAT;
+                    return true;
+                }
+                advance(lexer);
+                lexer->mark_end(lexer);
             }
-            lexer->result_symbol = CONCAT;
+            // The word continues only if the next line does; otherwise the continuations themselves are
+            // the token, so that whatever follows them is lexed as it would be without them.
+            if (lexer->eof(lexer) || iswspace(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
+                scanner->after_line_break = true;
+                lexer->result_symbol = LINE_CONTINUATION;
+            } else {
+                lexer->result_symbol = CONCAT;
+            }
             return true;
         }
-        if (!at_eof && !iswspace(c) && !is_metacharacter(c) && !(c == '`' && scanner->backtick_depth > 0)) {
+        if (c != '`' || scanner->backtick_depth == 0) {
             lexer->result_symbol = CONCAT;
             return true;
         }
@@ -964,6 +1027,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
                 advance(lexer);
                 lexer->mark_end(lexer);
+                scanner->after_line_break = true;
                 lexer->result_symbol = LINE_CONTINUATION;
                 return true;
             }
@@ -988,6 +1052,37 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         }
         discard_unstarted_heredocs(scanner);
         lexer->result_symbol = end;
+        return true;
+    }
+
+    // Bash ends backquotes at the first unescaped backquote, even inside single quotes (`echo '`),
+    // and then reports the unterminated quote when it runs the substitution. So a quote that the next
+    // backquote cuts short closes the substitution there when it may close, and otherwise is skipped
+    // up to the backquote, which then cannot be parsed; the quote never hides the text after it.
+    if (scanner->backtick_depth > 0 && lexer->lookahead == '\'') {
+        advance(lexer);
+        while (!lexer->eof(lexer) && lexer->lookahead != '\'' && lexer->lookahead != '`') {
+            // A backslash escapes a backquote or a backslash for finding the end of the backquotes; the
+            // quote itself stays literal, so `'\'` still ends at its second quote.
+            bool backslash = lexer->lookahead == '\\';
+            advance(lexer);
+            if (backslash && (lexer->lookahead == '`' || lexer->lookahead == '\\')) {
+                advance(lexer);
+            }
+        }
+        if (lexer->lookahead != '`') {
+            return false;
+        }
+        if (valid_symbols[BACKTICK_CLOSE]) {
+            advance(lexer);
+            lexer->mark_end(lexer);
+            scanner->backtick_depth--;
+            discard_unstarted_heredocs(scanner);
+            lexer->result_symbol = BACKTICK_CLOSE;
+            return true;
+        }
+        lexer->mark_end(lexer);
+        lexer->result_symbol = LINE_CONTINUATION;
         return true;
     }
 
@@ -1044,6 +1139,15 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return lexer->eof(lexer) || !(starts_quoted_expansion(c) || c == '\'' || c == '"');
     }
 
+    // Bash reads a reserved word right after a compound command without a separator (`if (x) then`,
+    // `{ (y) }`), so a zero-width terminator is returned before one there. After a word, the reserved
+    // word would be an argument instead; a possible concatenation shows that a word just ended. This
+    // check comes last because it consumes input even when it finds no reserved word.
+    if (valid_symbols[NEWLINE] && !valid_symbols[CONCAT] && at_closing_reserved_word(lexer)) {
+        lexer->result_symbol = NEWLINE;
+        return true;
+    }
+
     return false;
 }
 
@@ -1070,7 +1174,7 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
     Scanner *scanner = (Scanner *)payload;
     unsigned size = 0;
     buffer[size++] = (char)scanner->backtick_depth;
-    buffer[size++] = (char)scanner->terminator_owed;
+    buffer[size++] = (char)(scanner->terminator_owed | scanner->after_line_break << 1);
     uint16_t closer_count = (uint16_t)scanner->closers.size;
     memcpy(&buffer[size], &closer_count, sizeof(closer_count));
     size += sizeof(closer_count);
@@ -1104,7 +1208,8 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
     }
     unsigned size = 0;
     scanner->backtick_depth = (uint8_t)buffer[size++];
-    scanner->terminator_owed = buffer[size++];
+    scanner->terminator_owed = buffer[size] & 1;
+    scanner->after_line_break = (buffer[size++] & 2) != 0;
     uint16_t closer_count;
     memcpy(&closer_count, &buffer[size], sizeof(closer_count));
     size += sizeof(closer_count);
