@@ -34,7 +34,7 @@ clone() {
     git -C "$dir" checkout -q -f --detach "$3"
   fi
   git -C "$dir" reset -q --hard
-  git -C "$dir" clean -q -f -d -x
+  git -C "$dir" clean -q -ffdx
 }
 
 cd "$(dirname "$0")/.."
