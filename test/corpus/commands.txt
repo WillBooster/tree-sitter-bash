@@ -792,3 +792,52 @@ echo `echo 'a\`b'` 'c`d'
           (word))
         argument: (raw_string)))
     argument: (raw_string)))
+
+================================================================================
+Backslashes in single quotes inside backquotes
+================================================================================
+
+echo `echo '\' foo`
+echo `echo 'C:\' bar`
+echo `echo '\\' baz`
+echo `echo 'a\`b' qux`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (word)))))

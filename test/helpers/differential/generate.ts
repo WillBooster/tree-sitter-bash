@@ -100,7 +100,7 @@ class ScriptGenerator {
     return `k${this.nextCommandId++}`;
   }
 
-  // Looks like a command for a reader who mistakes data for code; it must never run.
+  // Looks like a command for a reader who mistakes data for code; bash decides whether it runs.
   private dataText(): string {
     const id = `d${this.nextDataId++}`;
     return this.random.pick([`c ${id}`, `c ${id}; c ${id}x`, `$(c ${id})`, `\`c ${id}\``, `c ${id} | c ${id}y`]);

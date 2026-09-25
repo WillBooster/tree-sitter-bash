@@ -1038,13 +1038,13 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     if (scanner->backtick_depth > 0 && lexer->lookahead == '\'') {
         advance(lexer);
         while (!lexer->eof(lexer) && lexer->lookahead != '\'' && lexer->lookahead != '`') {
-            if (lexer->lookahead == '\\') {
-                advance(lexer);
-                if (lexer->eof(lexer)) {
-                    break;
-                }
-            }
+            // A backslash escapes a backquote or a backslash for finding the end of the backquotes; the
+            // quote itself stays literal, so `'\'` still ends at its second quote.
+            bool backslash = lexer->lookahead == '\\';
             advance(lexer);
+            if (backslash && (lexer->lookahead == '`' || lexer->lookahead == '\\')) {
+                advance(lexer);
+            }
         }
         if (lexer->lookahead != '`') {
             return false;
