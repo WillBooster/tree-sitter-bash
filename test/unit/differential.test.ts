@@ -4,7 +4,8 @@ import { isAddonStale, Oracle } from '../helpers/differential/compare.js';
 import { generateScript } from '../helpers/differential/generate.js';
 
 // Generated scripts are run by bash (mise.toml pins it) and parsed by the grammar; every command bash
-// runs must appear in the tree with the same words, and no other. DIFFERENTIAL_SEED and
+// runs must appear in the tree with as many words and the same value for each word without
+// expansions, and no other command may. DIFFERENTIAL_SEED and
 // DIFFERENTIAL_CASES explore further locally.
 const FirstSeed = Number(process.env.DIFFERENTIAL_SEED ?? 1);
 const Cases = Number(process.env.DIFFERENTIAL_CASES ?? 2000);
@@ -28,7 +29,9 @@ test('uses bash 5.2 or later as the oracle', () => {
 test('parses generated scripts into the commands bash runs', () => {
   const mismatches: string[] = [];
   let invalid = 0;
+  let runs = 0;
   for (let seed = FirstSeed; seed < FirstSeed + Cases && mismatches.length < MaxReportedMismatches; seed++) {
+    runs++;
     const script = generateScript(seed);
     const outcome = oracle.compare(script);
     if (outcome.kind === 'invalid') invalid++;
@@ -39,6 +42,7 @@ test('parses generated scripts into the commands bash runs', () => {
     }
   }
   expect(mismatches.join('\n\n')).toBe('');
-  // The generator writes valid bash; many rejected scripts would mean it no longer tests anything.
-  expect(invalid).toBeLessThan(Cases / 20);
+  // The generator writes valid bash; many rejected scripts would mean it no longer tests anything. A
+  // few hundred scripts are needed for the rate to mean anything.
+  if (runs >= 200) expect(invalid).toBeLessThan(runs / 20);
 }, 600_000);
