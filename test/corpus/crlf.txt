@@ -78,6 +78,31 @@ echo z
     argument: (word)))
 
 ================================================================================
+Heredoc delimiter line joined across CRLF lines
+================================================================================
+
+cat <<EOF
+EO\
+F
+echo z
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
 Backslash before a lone CR in a heredoc body
 ================================================================================
 
