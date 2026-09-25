@@ -418,7 +418,9 @@ class ScriptGenerator {
           this.emit(')"');
           break;
         }
-        this.emit(`<<< ${this.random.pick(['word', `'${this.dataText().replaceAll("'", '')}'`, '"x y"'])}`);
+        // A backquote ends backquotes even inside single quotes.
+        const data = this.dataText().replaceAll(this.inBackquotes ? /['`]/gu : /'/gu, '');
+        this.emit(`<<< ${this.random.pick(['word', `'${data}'`, '"x y"'])}`);
         break;
       }
       default: {
