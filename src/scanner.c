@@ -217,7 +217,8 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             at_line_start = false;
             lexer->mark_end(lexer);
             // Like bash, compare the delimiter with the line after joining backslash-newlines and
-            // then stripping the leading tabs of `<<-`.
+            // then stripping the leading tabs of `<<-`. As elsewhere in the grammar, CRLF counts as a
+            // newline.
             bool consumed = false;
             bool escaped = false;
             uint32_t matched = 0;
