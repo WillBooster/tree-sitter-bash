@@ -806,9 +806,23 @@ static bool at_closing_reserved_word(TSLexer *lexer) {
     lexer->mark_end(lexer);
     char word[5];
     uint32_t length = 0;
-    while (length < sizeof(word) && (iswlower(lexer->lookahead) || lexer->lookahead == '}')) {
-        word[length++] = (char)lexer->lookahead;
-        advance(lexer);
+    for (;;) {
+        if (lexer->lookahead == '\\') {
+            // Bash joins a backslash-newline before it reads the word (`th\` + `en`).
+            advance(lexer);
+            if (lexer->lookahead == '\r') {
+                advance(lexer);
+            }
+            if (lexer->lookahead != '\n') {
+                return false;
+            }
+            advance(lexer);
+        } else if (length < sizeof(word) && (iswlower(lexer->lookahead) || lexer->lookahead == '}')) {
+            word[length++] = (char)lexer->lookahead;
+            advance(lexer);
+        } else {
+            break;
+        }
     }
     if (length == 0 || length == sizeof(word) ||
         !(lexer->eof(lexer) || iswspace(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {

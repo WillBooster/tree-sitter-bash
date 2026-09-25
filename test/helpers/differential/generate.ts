@@ -4,8 +4,8 @@ import { Random } from './random.js';
 // defines, and in which every such command runs exactly once. Comparing the commands bash runs with
 // the commands the syntax tree shows then checks where the parser draws the line between code and
 // data (heredoc bodies, quotes, comments, substitutions) and how it splits words. Text that looks
-// like a command but is data (`c d7` inside quotes, heredoc bodies, comments) uses ids that must
-// never run.
+// like a command uses `d` ids; whether one runs (a substitution in an unquoted heredoc body) or not
+// (quotes, comments, quoted heredoc bodies) is left to bash.
 export function generateScript(seed: number): string {
   return new ScriptGenerator(seed).script();
 }

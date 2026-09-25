@@ -533,3 +533,34 @@ case a in a) echo >(x) esac;; esac
             name: (command_name
               (word))))
         argument: (word)))))
+
+================================================================================
+Line continuations around reserved words after compound commands
+================================================================================
+
+if (:)then\
+ echo a; fi
+for x in 1; do (echo b) \
+done
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (subshell
+      (command
+        name: (command_name
+          (word))))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    body: (do_group
+      (subshell
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))))
