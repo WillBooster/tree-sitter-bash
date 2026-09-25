@@ -948,6 +948,172 @@ echo after
     argument: (word)))
 
 ================================================================================
+Heredoc delimiter line joined by backslash-newlines
+================================================================================
+
+cat <<EOF
+EO\
+F
+echo a
+cat <<EOF
+\
+EOF
+echo b
+cat <<-EOF
+	\
+	EOF
+echo c
+cat <<EOF
+EOF\
+
+echo d
+x=$(cat <<EOF
+EO\
+F)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))))))
+
+================================================================================
+Heredoc lines that do not join into the delimiter
+================================================================================
+
+cat <<'EOF'
+EO\
+F
+EOF
+cat <<EOF
+\EOF
+EOF\
+X
+\\
+EOF
+echo after
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc lines that match the delimiter only after an escape or an interior tab
+================================================================================
+
+cat <<EOF
+EOF\\
+echo body
+EOF
+cat <<-EOF
+E	OF
+echo body
+	EOF
+echo after
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
 Heredocs inside function substitutions
 ================================================================================
 

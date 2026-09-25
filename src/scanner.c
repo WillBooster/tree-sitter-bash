@@ -216,21 +216,43 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
         if (at_line_start) {
             at_line_start = false;
             lexer->mark_end(lexer);
-            bool consumed_tabs = false;
-            if (heredoc->allows_indent) {
-                while (lexer->lookahead == '\t') {
-                    advance(lexer);
-                    consumed_tabs = true;
-                }
-            }
+            // Like bash, compare the delimiter with the line after joining backslash-newlines and
+            // then stripping the leading tabs of `<<-`. As elsewhere in the grammar, CRLF counts as a
+            // newline.
+            bool consumed = false;
+            bool escaped = false;
             uint32_t matched = 0;
             // At the end of input the lookahead is 0, which a delimiter holding NUL would otherwise match.
-            while (matched < heredoc->delimiter.size && !lexer->eof(lexer) &&
-                   lexer->lookahead == *array_get(&heredoc->delimiter, matched)) {
-                advance(lexer);
-                matched++;
+            for (;;) {
+                if (matched == 0 && heredoc->allows_indent && lexer->lookahead == '\t') {
+                    advance(lexer);
+                    consumed = true;
+                } else if (lexer->lookahead == '\\' && !heredoc->is_raw) {
+                    advance(lexer);
+                    consumed = true;
+                    bool escaped_cr = lexer->lookahead == '\r';
+                    if (escaped_cr) {
+                        advance(lexer);
+                    }
+                    if (lexer->lookahead != '\n' || lexer->eof(lexer)) {
+                        // An escape rather than a line continuation: the escaped character, which is
+                        // the CR itself when no LF follows it, is content.
+                        if (!escaped_cr && !lexer->eof(lexer)) {
+                            advance(lexer);
+                        }
+                        escaped = true;
+                        break;
+                    }
+                    advance(lexer);
+                } else if (matched < heredoc->delimiter.size && !lexer->eof(lexer) &&
+                           lexer->lookahead == *array_get(&heredoc->delimiter, matched)) {
+                    advance(lexer);
+                    matched++;
+                } else {
+                    break;
+                }
             }
-            if (lexer->lookahead == '\r') {
+            if (!escaped && lexer->lookahead == '\r') {
                 advance(lexer);
             }
             // Inside a substitution, bash also ends the body at a delimiter directly followed by the
@@ -238,7 +260,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             bool ends_line = lexer->lookahead == '\n' || lexer->eof(lexer) ||
                              (scanner->closers.size > 0 && lexer->lookahead == *array_back(&scanner->closers)) ||
                              (lexer->lookahead == '`' && scanner->backtick_depth > 0);
-            if (matched == heredoc->delimiter.size && ends_line) {
+            if (!escaped && matched == heredoc->delimiter.size && ends_line) {
                 if (did_advance) {
                     lexer->result_symbol = HEREDOC_CONTENT;
                     return true;
@@ -251,7 +273,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             }
             // The characters read while trying the delimiter are content; an empty attempt must not
             // count, or a zero-width content token would repeat forever.
-            did_advance = did_advance || consumed_tabs || matched > 0;
+            did_advance = did_advance || consumed || matched > 0;
             continue;
         }
 
@@ -274,11 +296,14 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 advance(lexer);
                 did_advance = true;
                 if (!heredoc->is_raw && !lexer->eof(lexer)) {
-                    // A backslash-newline joins lines before the delimiter comparison.
+                    // A backslash-newline joins lines before the delimiter comparison. A CR without an
+                    // LF after it is the escaped character itself.
                     if (lexer->lookahead == '\r') {
                         advance(lexer);
-                    }
-                    if (!lexer->eof(lexer)) {
+                        if (lexer->lookahead == '\n') {
+                            advance(lexer);
+                        }
+                    } else if (!lexer->eof(lexer)) {
                         advance(lexer);
                     }
                 }
