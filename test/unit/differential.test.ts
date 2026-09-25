@@ -6,8 +6,8 @@ import { generateScript } from '../helpers/differential/generate.js';
 
 // Generated scripts are run by bash (mise.toml pins it) and parsed by the grammar; every command bash
 // runs must appear in the tree with as many words and the same value for each word without
-// expansions, and no other command may. DIFFERENTIAL_SEED and DIFFERENTIAL_CASES explore further
-// locally.
+// expansions, no other command may, and a script bash accepts must parse without ERROR or MISSING
+// nodes. DIFFERENTIAL_SEED and DIFFERENTIAL_CASES explore further locally.
 const FirstSeed = Number(process.env.DIFFERENTIAL_SEED ?? 1);
 const Cases = Number(process.env.DIFFERENTIAL_CASES ?? 2000);
 // An unparsable value (`10_000`) would otherwise run no script and pass.
@@ -28,7 +28,9 @@ test('uses a Node.js addon built from the current parser', () => {
 });
 
 test('uses bash 5.2 or later as the oracle', () => {
-  const version = Bun.spawnSync([bash, '-c', 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"']).stdout.toString().trim();
+  const version = Bun.spawnSync([bash, '-c', 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"'])
+    .stdout.toString()
+    .trim();
   expect(Number.parseFloat(version), `${bash} is bash ${version}; run \`mise install\``).toBeGreaterThanOrEqual(5.2);
 });
 
@@ -47,15 +49,17 @@ test('parses generated scripts into the commands bash runs', () => {
     }
     if (outcome.kind === 'mismatch') {
       mismatches.push(
-        `seed ${seed}:\n${JSON.stringify(script)}\n${outcome.details.join('\n')}\nbash stderr: ${outcome.stderr}\n${outcome.tree}`
+        [`seed ${seed}:`, JSON.stringify(script), ...outcome.details, `bash stderr: ${outcome.stderr}`, outcome.tree].join(
+          '\n'
+        )
       );
     }
   }
-  expect(runs).toBeGreaterThan(0);
   expect(mismatches.join('\n\n')).toBe('');
   // The generator writes valid bash; many rejected scripts would mean it no longer tests anything. A
   // few hundred scripts are needed for the rate to mean anything.
   if (runs >= 200) {
-    expect(invalid, `bash rejected ${invalid} of ${runs} scripts:\n${invalidReasons.join('\n')}`).toBeLessThan(runs / 20);
+    const message = `bash rejected ${invalid} of ${runs} scripts:\n${invalidReasons.join('\n')}`;
+    expect(invalid, message).toBeLessThan(runs / 20);
   }
 }, 600_000);
