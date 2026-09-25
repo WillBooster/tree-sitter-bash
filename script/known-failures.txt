@@ -1,10 +1,8 @@
 examples/bash/examples/shellmath/shellmath.sh
 examples/bash/tests/arith.tests
 examples/bash/tests/array.tests
-examples/bash/tests/case.tests
 examples/bash/tests/comsub-posix.tests
 examples/bash/tests/comsub2.tests
-examples/bash/tests/cond.tests
 examples/bash/tests/errors.tests
 examples/bash/tests/parser.tests
 examples/bash/tests/posixexp.tests
@@ -12,14 +10,12 @@ examples/bash/tests/posixexp2.tests
 examples/bash/tests/quote.tests
 examples/bash/tests/quotearray.tests
 examples/wild-corpus/cloud/sandstorm/install.sh
-examples/wild-corpus/distro/portage/bin/misc-functions.sh
 examples/wild-corpus/esoteric/CmdlineGL/share/examples/FlightSim.sh
 examples/wild-corpus/esoteric/CmdlineGL/share/examples/Robot.sh
 examples/wild-corpus/esoteric/make-a-lisp-bash/core.sh
 examples/wild-corpus/esoteric/shasm/shasm.sh
 examples/wild-corpus/exp/shootout/timing.sh
 examples/wild-corpus/freebsd-11.1/crypto/openssl/util/bat.sh
-examples/wild-corpus/freebsd-11.1/gnu/usr.bin/binutils/ld/genscripts.sh
 examples/wild-corpus/freebsd-11.1/tools/tools/shlib-compat/test/regress.sh
 examples/wild-corpus/freebsd-11.1/usr.bin/apply/tests/regress.sh
 examples/wild-corpus/freebsd-11.1/usr.bin/calendar/tests/regress.sh
@@ -35,7 +31,6 @@ examples/wild-corpus/freebsd-11.1/usr.bin/tr/tests/regress.sh
 examples/wild-corpus/freebsd-11.1/usr.bin/uudecode/tests/regress.sh
 examples/wild-corpus/freebsd-11.1/usr.bin/uuencode/tests/regress.sh
 examples/wild-corpus/freebsd-11.1/usr.bin/xargs/tests/regress.sh
-examples/wild-corpus/freebsd-11.1/usr.sbin/manctl/manctl.sh
 examples/wild-corpus/git/t/t0200/test.sh
 examples/wild-corpus/gnu/glibc-2.23/posix/globtest.sh
 examples/wild-corpus/gnu/glibc-2.23/posix/tst-getconf.sh
@@ -120,11 +115,9 @@ examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/types.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/variables.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/vartree1.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/vartree2.sh
-examples/wild-corpus/illumos-gate/usr/src/lib/libshell/misc/buildksh93.sh
 examples/wild-corpus/illumos-gate/usr/src/test/os-tests/tests/pf_key/acquire-spray.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/env/illumos.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/gk/cshrc.sh
-examples/wild-corpus/illumos-gate/usr/src/tools/gk/gen_make.machines.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/gk/login.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/scripts/bldenv.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/scripts/nightly.sh

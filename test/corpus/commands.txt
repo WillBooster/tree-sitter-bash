@@ -702,3 +702,44 @@ coproc name { echo hi; } 2>&1
     redirect: (file_redirect
       descriptor: (file_descriptor)
       destination: (word))))
+
+================================================================================
+Line continuations after a blank separate words
+================================================================================
+
+echo a \
+b
+echo 'a' \
+"b" \
+$x
+echo \
+b
+echo a \
+\
+b
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (raw_string)
+    argument: (string
+      (string_content))
+    argument: (simple_expansion
+      (variable_name)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)))

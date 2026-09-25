@@ -96,6 +96,11 @@ module.exports = grammar({
     $._command_statement,
   ],
 
+  // Until `;;` or `esac`, a case item's statements may belong to a middle item or to the last one.
+  conflicts: $ => [
+    [$._statements, $._last_case_item],
+  ],
+
   word: $ => $.word,
 
   rules: {
@@ -425,8 +430,9 @@ module.exports = grammar({
       field('terminator', choice(';;', ';&', ';;&')),
     ),
 
-    // Only the last item may omit its terminator.
-    _last_case_item: $ => seq($._case_patterns, optional($._statements)),
+    // Only the last item may omit its terminator, but its statements still end before `esac`, which is
+    // otherwise an argument (`a) echo esac`).
+    _last_case_item: $ => seq($._case_patterns, optional($._terminated_statements)),
 
     _case_patterns: $ => seq(
       optional('('),

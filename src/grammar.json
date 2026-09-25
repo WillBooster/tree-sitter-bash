@@ -2193,7 +2193,7 @@
           "members": [
             {
               "type": "SYMBOL",
-              "name": "_statements"
+              "name": "_terminated_statements"
             },
             {
               "type": "BLANK"
@@ -4612,7 +4612,12 @@
       "name": "_line_continuation"
     }
   ],
-  "conflicts": [],
+  "conflicts": [
+    [
+      "_statements",
+      "_last_case_item"
+    ]
+  ],
   "precedences": [],
   "externals": [
     {

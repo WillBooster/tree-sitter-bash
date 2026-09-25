@@ -393,3 +393,143 @@ in a b; do c; done
       (command
         name: (command_name
           (word))))))
+
+================================================================================
+Reserved words right after compound commands
+================================================================================
+
+if (true) then echo a; fi
+while ((0)) do :; done
+if [[ a ]] then :; fi
+for x in 1; do (echo a) done
+f() { (echo a) }
+{ { echo a; } }
+if true; then if true; then :; fi fi
+case a in a) (x) esac
+for x in 1; do (echo a)done
+echo done fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (subshell
+      (command
+        name: (command_name
+          (word))))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (while_statement
+    condition: (arithmetic_command
+      (number))
+    body: (do_group
+      (command
+        name: (command_name
+          (word)))))
+  (if_statement
+    condition: (test_command
+      (word))
+    consequence: (command
+      name: (command_name
+        (word))))
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    body: (do_group
+      (subshell
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))))
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (subshell
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))))
+  (compound_statement
+    (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (if_statement
+    condition: (command
+      name: (command_name
+        (word)))
+    consequence: (if_statement
+      condition: (command
+        name: (command_name
+          (word)))
+      consequence: (command
+        name: (command_name
+          (word)))))
+  (case_statement
+    value: (word)
+    (case_item
+      pattern: (word)
+      (subshell
+        (command
+          name: (command_name
+            (word))))))
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    body: (do_group
+      (subshell
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Esac as an argument in a case item
+================================================================================
+
+case a in a) echo esac;; esac
+case a in
+  a) echo x esac
+esac
+case a in a) echo >(x) esac;; esac
+
+--------------------------------------------------------------------------------
+
+(program
+  (case_statement
+    value: (word)
+    (case_item
+      pattern: (word)
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (case_statement
+    value: (word)
+    (case_item
+      pattern: (word)
+      (command
+        name: (command_name
+          (word))
+        argument: (word)
+        argument: (word))))
+  (case_statement
+    value: (word)
+    (case_item
+      pattern: (word)
+      (command
+        name: (command_name
+          (word))
+        argument: (process_substitution
+          (command
+            name: (command_name
+              (word))))
+        argument: (word)))))

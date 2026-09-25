@@ -799,6 +799,29 @@ static bool scan_name_or_extglob_prefix(TSLexer *lexer, const bool *valid_symbol
     return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
 }
 
+// Marks the current position and reports whether a reserved word that ends or continues a compound
+// command (`then`, `do`, `done`, `fi`, `esac`, `else`, `elif`, `}`) starts here.
+static bool at_closing_reserved_word(TSLexer *lexer) {
+    static const char *const words[] = {"then", "do", "done", "fi", "esac", "else", "elif", "}"};
+    lexer->mark_end(lexer);
+    char word[5];
+    uint32_t length = 0;
+    while (length < sizeof(word) && (iswlower(lexer->lookahead) || lexer->lookahead == '}')) {
+        word[length++] = (char)lexer->lookahead;
+        advance(lexer);
+    }
+    if (length == 0 || length == sizeof(word) ||
+        !(lexer->eof(lexer) || iswspace(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
+        return false;
+    }
+    for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++) {
+        if (strlen(words[i]) == length && strncmp(words[i], word, length) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool error_recovery = valid_symbols[ERROR_RECOVERY];
     // Tokens that must touch the previous one (concatenation, an empty assignment value) are decided
@@ -870,7 +893,10 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return scan_heredoc_start(scanner, lexer);
     }
 
-    if (valid_symbols[CONCAT]) {
+    // A token that ends a line (a line continuation after a blank, a heredoc body) separates words, so
+    // nothing concatenates at the start of a line. The column is checked only where a concatenation
+    // could start, since computing it costs a scan back to the line start.
+    if (valid_symbols[CONCAT] && !at_eof && !iswspace(first) && lexer->get_column(lexer) != 0) {
         int32_t c = first;
         if (c == '\\' && lexer->lookahead == '\\') {
             // A backslash-newline joins lines, so the word continues only if the next line does.
@@ -1042,6 +1068,15 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         int32_t c = lexer->lookahead;
         lexer->result_symbol = BARE_DOLLAR;
         return lexer->eof(lexer) || !(starts_quoted_expansion(c) || c == '\'' || c == '"');
+    }
+
+    // Bash reads a reserved word right after a compound command without a separator (`if (x) then`,
+    // `{ (y) }`), so a zero-width terminator is returned before one there. After a word, the reserved
+    // word would be an argument instead; a possible concatenation shows that a word just ended. This
+    // check comes last because it consumes input even when it finds no reserved word.
+    if (valid_symbols[NEWLINE] && !valid_symbols[CONCAT] && at_closing_reserved_word(lexer)) {
+        lexer->result_symbol = NEWLINE;
+        return true;
     }
 
     return false;
