@@ -49,8 +49,8 @@ script/parse-examples
   pinned to commits in `script/parse-examples`. After a grammar change or a moved pin alters that list,
   `script/parse-examples` rewrites it; review its diff before committing;
 - a differential test (`test/helpers/differential`) that generates scripts, runs them with the bash that
-  `mise.toml` pins, and checks that the syntax tree shows exactly the commands bash runs, with the same words. A
-  failure prints the seed; `DIFFERENTIAL_SEED` and `DIFFERENTIAL_CASES` run other or more scripts. It loads the
+  `mise.toml` pins, and checks that the syntax tree shows exactly the commands bash runs, with as many words and
+  the same value for each word without expansions. A failure prints the seed; `DIFFERENTIAL_SEED` and `DIFFERENTIAL_CASES` run other or more scripts. It loads the
   Node.js addon, which `bun run build/ci` rebuilds after regenerating the parser.
 
 ### References
