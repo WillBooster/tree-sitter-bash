@@ -230,12 +230,14 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 } else if (lexer->lookahead == '\\' && !heredoc->is_raw) {
                     advance(lexer);
                     consumed = true;
-                    if (lexer->lookahead == '\r') {
+                    bool escaped_cr = lexer->lookahead == '\r';
+                    if (escaped_cr) {
                         advance(lexer);
                     }
                     if (lexer->lookahead != '\n' || lexer->eof(lexer)) {
-                        // An escape rather than a line continuation: the escaped character is content.
-                        if (!lexer->eof(lexer)) {
+                        // An escape rather than a line continuation: the escaped character, which is
+                        // the CR itself when no LF follows it, is content.
+                        if (!escaped_cr && !lexer->eof(lexer)) {
                             advance(lexer);
                         }
                         escaped = true;
@@ -294,11 +296,14 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 advance(lexer);
                 did_advance = true;
                 if (!heredoc->is_raw && !lexer->eof(lexer)) {
-                    // A backslash-newline joins lines before the delimiter comparison.
+                    // A backslash-newline joins lines before the delimiter comparison. A CR without an
+                    // LF after it is the escaped character itself.
                     if (lexer->lookahead == '\r') {
                         advance(lexer);
-                    }
-                    if (!lexer->eof(lexer)) {
+                        if (lexer->lookahead == '\n') {
+                            advance(lexer);
+                        }
+                    } else if (!lexer->eof(lexer)) {
                         advance(lexer);
                     }
                 }

@@ -76,3 +76,43 @@ echo z
     name: (command_name
       (word))
     argument: (word)))
+
+================================================================================
+Backslash before a lone CR in a heredoc body
+================================================================================
+
+cat <<EOF
+\\
+EOF
+echo T
+EOF
+cat <<EOF
+x \\
+EOF
+echo T
+EOF
+echo after
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
