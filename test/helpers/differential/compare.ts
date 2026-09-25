@@ -61,7 +61,7 @@ export class Oracle {
     } finally {
       // Removed per run, so cleanup time does not grow with the number of scripts.
       fs.rmSync(scriptPath, { force: true });
-      fs.rmSync(logPath, { force: true, recursive: true });
+      fs.rmSync(logPath, { force: true, maxRetries: 3, recursive: true });
     }
   }
 
@@ -79,11 +79,17 @@ export class Oracle {
       stdout: 'ignore',
       timeout: 10_000,
     });
-    if (run.exitCode === null) {
-      // Subshells are forks that keep the script path in their arguments.
-      Bun.spawnSync(['pkill', '-f', scriptPath]);
-      return { kind: 'invalid', reason: 'bash timed out' };
+    // `wait` covers jobs but not process substitutions, which may still be running `c`. Subshells are
+    // forks that keep the script path in their arguments.
+    const deadline = Date.now() + 10_000;
+    while (Bun.spawnSync(['pgrep', '-f', scriptPath]).exitCode === 0) {
+      if (run.exitCode === null || Date.now() > deadline) {
+        Bun.spawnSync(['pkill', '-f', scriptPath]);
+        return { kind: 'invalid', reason: 'bash timed out' };
+      }
+      Bun.sleepSync(10);
     }
+    if (run.exitCode === null) return { kind: 'invalid', reason: 'bash timed out' };
     // Any error means that some command did not run as generated; `bash -n` also skips the bodies of
     // command substitutions, whose syntax errors show up only here. `time` reports, warnings about
     // heredocs that reach the end of input, and the unterminated quote of a generated `"`: '`"` are
