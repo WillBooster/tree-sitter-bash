@@ -11,7 +11,8 @@ const Bash = require(AddonPath) as Parser.Language;
 
 // Rebuilding here would race with other test files loading the addon, so a stale one is reported.
 export function isAddonStale(): boolean {
-  const sources = ['parser.c', 'scanner.c'].map((name) => fs.statSync(path.join(Root, 'src', name)).mtimeMs);
+  // src/parser.c is generated from grammar.js, so an edit to the grammar alone also makes the addon stale.
+  const sources = ['grammar.js', 'src/parser.c', 'src/scanner.c'].map((name) => fs.statSync(path.join(Root, name)).mtimeMs);
   return Math.max(...sources) > fs.statSync(AddonPath).mtimeMs;
 }
 

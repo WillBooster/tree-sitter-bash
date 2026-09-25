@@ -24,7 +24,7 @@ const oracle = new Oracle(bash);
 afterAll(() => oracle.dispose());
 
 test('uses a Node.js addon built from the current parser', () => {
-  expect(isAddonStale(), 'src/ changed after the addon was built; run `bun run build/ci`').toBe(false);
+  expect(isAddonStale(), 'grammar.js or src/ changed after the addon was built; run `bun run build/ci`').toBe(false);
 });
 
 test('uses bash 5.2 or later as the oracle', () => {
