@@ -1,25 +1,53 @@
 #!/usr/bin/env bash
 
+# Parses real-world scripts cloned into examples/ and rewrites script/known-failures.txt, the list of
+# files that fail to parse. With --check, fails instead when that list would change.
+
 set -euo pipefail
 
+check=false
+if [[ ${1-} == --check ]]; then
+  check=true
+fi
+
+# Each example repository is pinned to a commit so that the list of failures changes only with the grammar.
+# Moving a pin requires running this script without --check to update the list. The checkouts under
+# examples/ belong to this script: local changes there are discarded so that the pinned files are parsed.
+# The hosts occasionally answer with a server error, so each fetch is retried in place.
 clone() {
-  if [[ -d examples/$1 ]]; then
-    git -C "examples/$1" fetch origin "$3:$3" -f -u --depth=1
-  else
-    git clone "$2" "examples/$1" -b "$3" --single-branch --depth=1
+  local dir=examples/$1
+  if [[ $(git -C "$dir" rev-parse HEAD 2> /dev/null) != "$3" ]]; then
+    if [[ ! -d $dir/.git ]]; then
+      rm -rf "$dir"
+      git init -q "$dir"
+    fi
+    local attempt
+    for attempt in 1 2 3 4; do
+      if git -C "$dir" fetch -q --depth=1 "$2" "$3"; then
+        break
+      fi
+      if [[ $attempt == 4 ]]; then
+        return 1
+      fi
+      sleep $((attempt * 15))
+    done
+    git -C "$dir" checkout -q -f --detach "$3"
   fi
+  git -C "$dir" reset -q --hard
+  git -C "$dir" clean -q -ffdx
 }
 
 cd "$(dirname "$0")/.."
 
-clone bash-it https://github.com/Bash-it/bash-it master
-clone bash https://git.savannah.gnu.org/git/bash.git master
-clone gentoo https://anongit.gentoo.org/git/repo/gentoo.git master
-clone wild-corpus https://github.com/oilshell/wild-corpus main
+clone bash-it https://github.com/Bash-it/bash-it 4725d29db8c0ac8c21df47664b28539f3b8fce94
+clone bash https://git.savannah.gnu.org/git/bash.git 9c465866b7d849378369ef700cbe2965aa9691e3
+clone gentoo https://anongit.gentoo.org/git/repo/gentoo.git d9c807b69fa4e45d10c1eafa680a1d01082d09a6
+clone wild-corpus https://github.com/oilshell/wild-corpus a6fe3886095ae03afd528aefe296a169738984bc
 
 files=$(mktemp)
 output=$(mktemp)
-trap 'rm -f "$files" "$output"' EXIT
+failures=$(mktemp)
+trap 'rm -f "$files" "$output" "$failures"' EXIT
 
 find examples -type f \( -name '*.sh' -or -path 'examples/bash-it/*.bash' -or -path 'examples/bash/*.tests' \
   -or -path 'examples/gentoo/*.eclass' \) \
@@ -41,4 +69,13 @@ if grep -q 'timed out' "$output"; then
   awk '/timed out/{print $1}' "$output" >&2
   exit 1
 fi
-awk '/ERROR|MISSING/{print $1}' "$output" | LC_ALL=C sort > script/known-failures.txt
+awk '/ERROR|MISSING/{print $1}' "$output" | LC_ALL=C sort > "$failures"
+if [[ $check == true ]]; then
+  if ! diff -u script/known-failures.txt "$failures" >&2; then
+    echo 'The files failing to parse differ from script/known-failures.txt (- fixed, + broken).' >&2
+    echo 'Run script/parse-examples to update the list after checking the diff.' >&2
+    exit 1
+  fi
+else
+  cp "$failures" script/known-failures.txt
+fi
