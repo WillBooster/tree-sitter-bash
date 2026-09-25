@@ -42,8 +42,9 @@ script/parse-examples
 
 `bun run test` runs the corpus in `test/corpus`, the Node.js binding test, and a check that real-world scripts
 cloned into `examples/` fail to parse exactly as listed in `script/known-failures.txt`; the first run clones them,
-which takes a few minutes. After a grammar change alters that list, `script/parse-examples` rewrites it; review
-its diff before committing.
+which takes a few minutes. The example repositories are pinned to commits in `script/parse-examples`. After a
+grammar change or a moved pin alters that list, `script/parse-examples` rewrites it; review its diff before
+committing.
 
 ### References
 
