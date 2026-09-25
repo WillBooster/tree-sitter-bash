@@ -36,15 +36,23 @@ const tree = parser.parse('cat <<EOF; echo done\n$(date)\nEOF\n');
 mise install
 bun install --frozen-lockfile
 bun run tree-sitter generate
+bunx node-gyp rebuild
 bun run test
 script/parse-examples
 ```
 
-`bun run test` runs the corpus in `test/corpus`, the Node.js binding test, and a check that real-world scripts
-cloned into `examples/` fail to parse exactly as listed in `script/known-failures.txt`; the first run clones them,
-which takes a few minutes. The example repositories are pinned to commits in `script/parse-examples`. After a
-grammar change or a moved pin alters that list, `script/parse-examples` rewrites it; review its diff before
-committing.
+`bun run test` runs:
+
+- the corpus in `test/corpus`;
+- the Node.js binding test;
+- a check that real-world scripts cloned into `examples/` fail to parse exactly as listed in
+  `script/known-failures.txt`. The first run clones them, which takes a few minutes. The example repositories are
+  pinned to commits in `script/parse-examples`. After a grammar change or a moved pin alters that list,
+  `script/parse-examples` rewrites it; review its diff before committing;
+- a differential test (`test/helpers/differential`) that generates scripts, runs them with the bash that `mise.toml` pins,
+  and checks that the syntax tree shows exactly the commands bash runs, with the same words. A failure prints the
+  seed; `DIFFERENTIAL_SEED` and `DIFFERENTIAL_CASES` run other or more scripts. It loads the Node.js addon, so
+  rebuild it with `bunx node-gyp rebuild` after changing the grammar.
 
 ### References
 
