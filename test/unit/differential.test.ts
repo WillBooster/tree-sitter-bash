@@ -1,14 +1,20 @@
 import { afterAll, expect, test } from 'bun:test';
+import assert from 'node:assert';
 
 import { isAddonStale, Oracle } from '../helpers/differential/compare.js';
 import { generateScript } from '../helpers/differential/generate.js';
 
 // Generated scripts are run by bash (mise.toml pins it) and parsed by the grammar; every command bash
 // runs must appear in the tree with as many words and the same value for each word without
-// expansions, and no other command may. DIFFERENTIAL_SEED and
-// DIFFERENTIAL_CASES explore further locally.
+// expansions, and no other command may. DIFFERENTIAL_SEED and DIFFERENTIAL_CASES explore further
+// locally.
 const FirstSeed = Number(process.env.DIFFERENTIAL_SEED ?? 1);
 const Cases = Number(process.env.DIFFERENTIAL_CASES ?? 2000);
+// An unparsable value (`10_000`) would otherwise run no script and pass.
+assert(
+  Number.isSafeInteger(FirstSeed) && Number.isSafeInteger(Cases) && Cases > 0,
+  'DIFFERENTIAL_SEED and DIFFERENTIAL_CASES must be integers, and DIFFERENTIAL_CASES positive'
+);
 const MaxReportedMismatches = 5;
 
 // `$BASH` is the executable itself: a version manager's shim would pick another bash in the scripts'
@@ -45,6 +51,7 @@ test('parses generated scripts into the commands bash runs', () => {
       );
     }
   }
+  expect(runs).toBeGreaterThan(0);
   expect(mismatches.join('\n\n')).toBe('');
   // The generator writes valid bash; many rejected scripts would mean it no longer tests anything. A
   // few hundred scripts are needed for the rate to mean anything.
