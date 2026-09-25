@@ -79,10 +79,12 @@ export class Oracle {
     // heredocs that reach the end of input, and the unterminated quote of a generated `"`: '`"` are
     // expected.
     const stderr = run.stderr.toString();
-    const errors = stderr
-      .split('\n')
-      .filter((line) => line && !/^(real|user|sys)\s|warning: here-document|looking for matching `''$/u.test(line));
-    if (errors.length > 0) return { kind: 'invalid', reason: stderr };
+    const lines = stderr.split('\n').filter((line) => line && !/^(real|user|sys)\s|warning: here-document/u.test(line));
+    // Each generated quote cut short by a backquote runs once and reports once; any other report means
+    // that a substitution body bash could not parse did not run.
+    const cutShortQuotes = script.split(/"`: '`"|"`'`"/u).length - 1;
+    const unterminated = lines.filter((line) => line.endsWith("looking for matching `''")).length;
+    if (lines.length > unterminated || unterminated > cutShortQuotes) return { kind: 'invalid', reason: stderr };
     const executed = readInvocations(logPath);
 
     const tree = parser.parse(script);
