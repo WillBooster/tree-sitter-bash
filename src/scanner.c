@@ -974,7 +974,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             }
             return true;
         }
-        if (!at_eof && !iswspace(c) && !is_metacharacter(c) && !(c == '`' && scanner->backtick_depth > 0)) {
+        if (c != '`' || scanner->backtick_depth == 0) {
             lexer->result_symbol = CONCAT;
             return true;
         }

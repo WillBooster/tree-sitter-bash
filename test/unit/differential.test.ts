@@ -29,12 +29,16 @@ test('uses bash 5.2 or later as the oracle', () => {
 test('parses generated scripts into the commands bash runs', () => {
   const mismatches: string[] = [];
   let invalid = 0;
+  const invalidReasons: string[] = [];
   let runs = 0;
   for (let seed = FirstSeed; seed < FirstSeed + Cases && mismatches.length < MaxReportedMismatches; seed++) {
     runs++;
     const script = generateScript(seed);
     const outcome = oracle.compare(script);
-    if (outcome.kind === 'invalid') invalid++;
+    if (outcome.kind === 'invalid') {
+      invalid++;
+      if (invalidReasons.length < 3) invalidReasons.push(`seed ${seed}: ${outcome.reason.trim()}`);
+    }
     if (outcome.kind === 'mismatch') {
       mismatches.push(
         `seed ${seed}:\n${JSON.stringify(script)}\n${outcome.details.join('\n')}\nbash stderr: ${outcome.stderr}\n${outcome.tree}`
@@ -44,5 +48,7 @@ test('parses generated scripts into the commands bash runs', () => {
   expect(mismatches.join('\n\n')).toBe('');
   // The generator writes valid bash; many rejected scripts would mean it no longer tests anything. A
   // few hundred scripts are needed for the rate to mean anything.
-  if (runs >= 200) expect(invalid).toBeLessThan(runs / 20);
+  if (runs >= 200) {
+    expect(invalid, `bash rejected ${invalid} of ${runs} scripts:\n${invalidReasons.join('\n')}`).toBeLessThan(runs / 20);
+  }
 }, 600_000);
