@@ -82,7 +82,7 @@ class ScriptGenerator {
 
   // A space between words, sometimes a tab or continued onto the next line.
   private space(): void {
-    if (this.random.chance(0.08) && !this.inBackquotes) this.emit(' \\\n');
+    if (this.random.chance(0.08) && !this.inBackquotes) this.emit(this.random.pick([' \\\n', ' \\\n\\\n']));
     else this.emit(this.random.pick([' ', ' ', ' ', '\t', '  ']));
   }
 
@@ -306,6 +306,7 @@ class ScriptGenerator {
             'x=y',
             '--opt=v',
             'ab\\\ncd',
+            'ab\\\n\\\ncd',
             '"a\\\nb"',
             "'a\\\nb'",
             'a\\\\',

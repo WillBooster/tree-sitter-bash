@@ -841,3 +841,39 @@ echo `echo 'a\`b' qux`
           (word))
         argument: (raw_string)
         argument: (word)))))
+
+================================================================================
+Consecutive line continuations inside a word
+================================================================================
+
+echo a\
+\
+b
+echo a \
+\
+b
+echo a\
+\
+$x
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (simple_expansion
+        (variable_name)))))

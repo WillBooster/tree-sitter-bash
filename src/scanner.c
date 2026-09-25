@@ -931,24 +931,36 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             }
             advance(lexer);
             lexer->mark_end(lexer);
-            c = lexer->lookahead;
-            // The word continues only if the next line does; otherwise the continuation itself is the
-            // token, so that whatever follows it is lexed as it would be without it.
-            lexer->result_symbol = LINE_CONTINUATION;
-            if (lexer->eof(lexer) || iswspace(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
-                return true;
-            }
-            if (c == '\\') {
-                // Another continuation is whitespace too; an escaped character continues the word.
+            // Bash removes every backslash-newline before it splits words, so further continuations
+            // right after this one are part of the token (`a\` + `\` + `b` is `ab`).
+            for (;;) {
+                c = lexer->lookahead;
+                if (c != '\\') {
+                    break;
+                }
                 advance(lexer);
                 if (lexer->lookahead == '\r') {
                     advance(lexer);
                 }
-                if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
+                if (lexer->eof(lexer)) {
+                    lexer->mark_end(lexer);
+                    lexer->result_symbol = LINE_CONTINUATION;
                     return true;
                 }
+                if (lexer->lookahead != '\n') {
+                    // An escaped character continues the word.
+                    lexer->result_symbol = CONCAT;
+                    return true;
+                }
+                advance(lexer);
+                lexer->mark_end(lexer);
             }
-            lexer->result_symbol = CONCAT;
+            // The word continues only if the next line does; otherwise the continuations themselves are
+            // the token, so that whatever follows them is lexed as it would be without them.
+            lexer->result_symbol =
+                lexer->eof(lexer) || iswspace(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)
+                    ? LINE_CONTINUATION
+                    : CONCAT;
             return true;
         }
         if (!at_eof && !iswspace(c) && !is_metacharacter(c) && !(c == '`' && scanner->backtick_depth > 0)) {
