@@ -4,9 +4,16 @@ import path from 'node:path';
 
 import Parser from 'tree-sitter';
 
+const Root = path.join(import.meta.dir, '../../..');
 // Bun cannot use node-gyp-build's lookup, so the addon that `bun install` builds is loaded directly.
-export const AddonPath = path.join(import.meta.dir, '../../../build/Release/tree_sitter_bash_binding.node');
+const AddonPath = path.join(Root, 'build/Release/tree_sitter_bash_binding.node');
 const Bash = require(AddonPath) as Parser.Language;
+
+// Rebuilding here would race with other test files loading the addon, so a stale one is reported.
+export function isAddonStale(): boolean {
+  const sources = ['parser.c', 'scanner.c'].map((name) => fs.statSync(path.join(Root, 'src', name)).mtimeMs);
+  return Math.max(...sources) > fs.statSync(AddonPath).mtimeMs;
+}
 
 const parser = new Parser();
 parser.setLanguage(Bash);

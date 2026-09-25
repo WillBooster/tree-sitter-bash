@@ -1,9 +1,6 @@
 import { afterAll, expect, test } from 'bun:test';
 
-import fs from 'node:fs';
-import path from 'node:path';
-
-import { AddonPath, Oracle } from '../helpers/differential/compare.js';
+import { isAddonStale, Oracle } from '../helpers/differential/compare.js';
 import { generateScript } from '../helpers/differential/generate.js';
 
 // Generated scripts are run by bash (mise.toml pins it) and parsed by the grammar; every command bash
@@ -19,10 +16,8 @@ const bash = Bun.spawnSync(['bash', '-c', 'echo "$BASH"']).stdout.toString().tri
 const oracle = new Oracle(bash);
 afterAll(() => oracle.dispose());
 
-test('uses the Node.js addon built from the current parser', () => {
-  const addon = fs.statSync(AddonPath).mtimeMs;
-  const sources = ['parser.c', 'scanner.c'].map((name) => fs.statSync(path.join(import.meta.dir, '../../src', name)).mtimeMs);
-  expect(Math.max(...sources), 'src/ changed after the addon was built; run `bunx node-gyp rebuild`').toBeLessThanOrEqual(addon);
+test('uses a Node.js addon built from the current parser', () => {
+  expect(isAddonStale(), 'src/ changed after the addon was built; run `bun run build/ci`').toBe(false);
 });
 
 test('uses bash 5.2 or later as the oracle', () => {

@@ -28,7 +28,7 @@
   ],
   "scripts": {
     "build-prebuilds": "prebuildify --napi --strip --name tree-sitter-bash",
-    "build/ci": "tree-sitter generate",
+    "build/ci": "tree-sitter generate && node-gyp rebuild",
     "cleanup": "bun wb lint --fix --format",
     "format": "bun wb lint --format",
     "install": "node-gyp-build",
