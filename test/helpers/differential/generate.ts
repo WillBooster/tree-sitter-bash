@@ -24,6 +24,9 @@ class ScriptGenerator {
   private inBackquotes = false;
   private heredocsDisabled = 0;
   private substitutionsDisabled = 0;
+  // Whether the last statement emitted is a compound command, after which bash reads a reserved
+  // word without a separator.
+  private endsWithCompound = false;
 
   constructor(seed: number) {
     this.random = new Random(seed);
@@ -132,34 +135,39 @@ class ScriptGenerator {
         this.emit('( ');
         this.list(depth + 1);
         this.emit(' )');
+        this.endsWithCompound = true;
         break;
       }
       case 'group': {
         this.emit('{ ');
         this.list(depth + 1);
-        this.emit('; }');
+        this.close('}');
+        this.endsWithCompound = true;
         break;
       }
       case 'if': {
         this.emit('if ');
-        this.simpleCommand(depth);
-        this.emit('; then ');
+        this.condition(depth);
+        this.close('then ');
         this.list(depth + 1);
-        this.emit('; fi');
+        this.close('fi');
+        this.endsWithCompound = true;
         break;
       }
       case 'for': {
         this.emit('for v in 1; do ');
         this.list(depth + 1);
-        this.emit('; done');
+        this.close('done');
+        this.endsWithCompound = true;
         break;
       }
       case 'while': {
         this.emit('while ');
-        this.simpleCommand(depth);
-        this.emit('; do ');
+        this.condition(depth);
+        this.close('do ');
         this.list(depth + 1);
         this.emit('; break; done');
+        this.endsWithCompound = true;
         break;
       }
       case 'case': {
@@ -169,31 +177,41 @@ class ScriptGenerator {
           this.emit(' ;;');
           this.newline();
           this.emit('esac');
+        } else if (this.endsWithCompound && this.random.chance(0.4)) {
+          // The last item needs no `;;` before `esac`.
+          this.emit(' esac');
         } else {
           this.emit(this.random.pick([' ;; esac', ';; esac']));
         }
+        this.endsWithCompound = true;
         break;
       }
       case 'function': {
         const name = `f${this.nextFunctionId++}`;
         this.emit(this.random.chance(0.5) ? `${name}() { ` : `function ${name} { `);
         this.list(depth + 1);
-        this.emit(`; }; ${name}`);
+        this.close('}');
+        this.emit(`; ${name}`);
+        this.endsWithCompound = false;
         break;
       }
       case 'else': {
         // The condition fails, so the else (or elif) branch runs.
         this.emit('if ! ');
         this.simpleCommand(depth);
+        this.emit('; then ');
+        this.emit(this.random.chance(0.5) ? ':' : '(:)');
+        this.endsWithCompound = this.output.endsWith(')');
         if (this.random.chance(0.5)) {
-          this.emit('; then :; else ');
+          this.close('else ');
         } else {
-          this.emit('; then :; elif ');
-          this.simpleCommand(depth);
-          this.emit('; then ');
+          this.close('elif ');
+          this.condition(depth);
+          this.close('then ');
         }
         this.list(depth + 1);
-        this.emit('; fi');
+        this.close('fi');
+        this.endsWithCompound = true;
         break;
       }
       case 'until': {
@@ -202,6 +220,7 @@ class ScriptGenerator {
         this.emit('; do ');
         this.list(depth + 1);
         this.emit('; break; done');
+        this.endsWithCompound = true;
         break;
       }
       case 'fallthrough': {
@@ -211,6 +230,7 @@ class ScriptGenerator {
         this.emit(this.random.pick([' ;& b) ', ' ;;& a) ']));
         this.list(depth + 1);
         this.emit(' ;; esac');
+        this.endsWithCompound = true;
         break;
       }
       case 'test': {
@@ -231,6 +251,7 @@ class ScriptGenerator {
         this.emit(`${array ? '(x ' : ''}${quoted ? '"$(' : '$('}`);
         this.substitutionBody(depth);
         this.emit(`${quoted ? ')"' : ')'}${array ? ' y)' : ''}`);
+        this.endsWithCompound = false;
         break;
       }
       default: {
@@ -249,6 +270,26 @@ class ScriptGenerator {
       }
       this.statement(depth);
     }
+  }
+
+  // A condition that succeeds: a simple command, or one in a subshell, after which `then` or `do`
+  // needs no separator.
+  private condition(depth: number): void {
+    if (this.random.chance(0.3)) {
+      this.emit('( ');
+      this.simpleCommand(depth);
+      this.emit(' )');
+      this.endsWithCompound = true;
+    } else {
+      this.simpleCommand(depth);
+    }
+  }
+
+  // Emits a reserved word that continues or ends a compound command, sometimes without a separator
+  // after a compound command, as bash allows (`(c k1) fi`, `(c k2)done`).
+  private close(word: string): void {
+    if (!this.endsWithCompound || this.random.chance(0.5)) this.emit(`; ${word}`);
+    else this.emit(this.output.endsWith(')') && this.random.chance(0.5) ? word : ` ${word}`);
   }
 
   // Bash 5.2 drops a `;` on the line after a heredoc inside a command substitution, so substitutions
@@ -270,6 +311,7 @@ class ScriptGenerator {
       this.space();
       this.redirection(depth);
     }
+    this.endsWithCompound = false;
   }
 
   // Every argument yields exactly one word for the command, so argument lists line up.
@@ -320,6 +362,12 @@ class ScriptGenerator {
         break;
       }
       case 5: {
+        if (this.random.chance(0.15)) {
+          // Bash ends backquotes at the backquote inside the quote and reports the unterminated quote
+          // when it runs the substitution; the text after it is still code.
+          this.emit(this.random.pick(['"`: \'`"', '"`\'`"']));
+          break;
+        }
         if (substitutions && this.random.chance(0.4)) {
           // Both expand, so the substitution runs.
           const [open, close] = this.random.pick([

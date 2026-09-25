@@ -75,10 +75,13 @@ export class Oracle {
       return { kind: 'invalid', reason: 'bash timed out' };
     }
     // Any error means that some command did not run as generated; `bash -n` also skips the bodies of
-    // command substitutions, whose syntax errors show up only here. `time` reports and warnings about
-    // heredocs that reach the end of input are expected.
+    // command substitutions, whose syntax errors show up only here. `time` reports, warnings about
+    // heredocs that reach the end of input, and the unterminated quote of a generated `"`: '`"` are
+    // expected.
     const stderr = run.stderr.toString();
-    const errors = stderr.split('\n').filter((line) => line && !/^(real|user|sys)\s|warning: here-document/u.test(line));
+    const errors = stderr
+      .split('\n')
+      .filter((line) => line && !/^(real|user|sys)\s|warning: here-document|looking for matching `''$/u.test(line));
     if (errors.length > 0) return { kind: 'invalid', reason: stderr };
     const executed = readInvocations(logPath);
 
