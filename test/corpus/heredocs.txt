@@ -1076,6 +1076,44 @@ echo after
     argument: (word)))
 
 ================================================================================
+Heredoc lines that match the delimiter only after an escape or an interior tab
+================================================================================
+
+cat <<EOF
+EOF\\
+echo body
+EOF
+cat <<-EOF
+E	OF
+echo body
+	EOF
+echo after
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
 Heredocs inside function substitutions
 ================================================================================
 
