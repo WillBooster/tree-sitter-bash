@@ -1,0 +1,24 @@
+{
+  "branches": [
+    "master"
+  ],
+  "preset": "conventionalcommits",
+  "plugins": [
+    "@semantic-release/commit-analyzer",
+    "@semantic-release/release-notes-generator",
+    [
+      "@semantic-release/exec",
+      {
+        "prepareCmd": "script/download-prebuilds && script/set-grammar-version ${nextRelease.version}"
+      }
+    ],
+    "@semantic-release/npm",
+    [
+      "@semantic-release/github",
+      {
+        "successCommentCondition": false,
+        "failCommentCondition": false
+      }
+    ]
+  ]
+}

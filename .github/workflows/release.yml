@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+  queue: max
+
+permissions: {}
+
+jobs:
+  # The version to release, which the prebuilds embed in their language metadata; empty when
+  # nothing is to be released.
+  version:
+    runs-on: ubuntu-latest
+    # semantic-release checks push access with `git push --dry-run` even in a dry run.
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: jdx/mise-action@v4.3.0
+      # The dry run needs no native build, so no dependency runs code with the write token.
+      - run: bun install --frozen-lockfile --ignore-scripts
+      - id: next
+        # `bash` adds pipefail, so a failing dry run fails the job instead of reading as no release.
+        shell: bash
+        run: |
+          version=$(bun run release-test 2>&1 | sed -n 's/.*The next release version is \([0-9][^ ]*\).*/\1/p' | tail -n 1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Native builds for the published package; `script/download-prebuilds` adds them to it.
+  prebuild:
+    needs: version
+    if: needs.version.outputs.version != ''
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jdx/mise-action@v4.3.0
+      - run: bun install --frozen-lockfile
+      - run: script/set-grammar-version "$VERSION"
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+      - run: bun run build-prebuilds
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: prebuilds-${{ matrix.runner }}
+          path: prebuilds
+          if-no-files-found: error
+
+  release:
+    needs: prebuild
+    permissions:
+      id-token: write
+      contents: write
+      actions: read
+    uses: WillBooster/reusable-workflows/.github/workflows/release.yml@main
+    with:
+      github_hosted_runner: true
+    secrets:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAKUMI_GUARD_TOKEN: ${{ secrets.TAKUMI_GUARD_TOKEN }}

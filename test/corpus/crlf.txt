@@ -1,0 +1,78 @@
+================================================================================
+Commands with CRLF line endings
+================================================================================
+
+A=one
+
+B=two
+echo $A
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (simple_expansion
+      (variable_name))))
+
+================================================================================
+Heredoc delimiter continued across CRLF lines
+================================================================================
+
+cat <<E\
+OF
+body
+EOF
+echo z
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc body line continued across CRLF lines
+================================================================================
+
+cat <<EOF
+hello \
+EOF
+world
+EOF
+echo z
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))

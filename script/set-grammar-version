@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+// Writes the release version into tree-sitter.json and into the language metadata of the generated
+// src/parser.c, neither of which semantic-release updates.
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+const version = process.argv[2];
+const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version ?? '');
+if (!match) throw new Error('Usage: script/set-grammar-version <major.minor.patch>');
+const [, major, minor, patch] = match;
+
+const root = path.join(__dirname, '..');
+const configFile = path.join(root, 'tree-sitter.json');
+const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
+config.metadata.version = version;
+fs.writeFileSync(configFile, `${JSON.stringify(config, null, 2)}\n`);
+
+const parserFile = path.join(root, 'src', 'parser.c');
+const parser = fs.readFileSync(parserFile, 'utf8');
+const metadata = /(\.metadata = \{\s*\.major_version = )\d+(,\s*\.minor_version = )\d+(,\s*\.patch_version = )\d+/;
+if (!metadata.test(parser)) throw new Error('src/parser.c has no language metadata block');
+fs.writeFileSync(parserFile, parser.replace(metadata, `$1${major}$2${minor}$3${patch}`));

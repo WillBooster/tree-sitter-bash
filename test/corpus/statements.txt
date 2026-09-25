@@ -1,0 +1,395 @@
+================================================================================
+If statements
+================================================================================
+
+if a; then
+  b
+elif c; then d
+else
+  e
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (command
+      name: (command_name
+        (word)))
+    consequence: (command
+      name: (command_name
+        (word)))
+    (elif_clause
+      condition: (command
+        name: (command_name
+          (word)))
+      consequence: (command
+        name: (command_name
+          (word))))
+    (else_clause
+      (command
+        name: (command_name
+          (word))))))
+
+================================================================================
+While and until loops
+================================================================================
+
+while a; do b; done
+until a
+do
+  b
+done
+
+--------------------------------------------------------------------------------
+
+(program
+  (while_statement
+    condition: (command
+      name: (command_name
+        (word)))
+    body: (do_group
+      (command
+        name: (command_name
+          (word)))))
+  (while_statement
+    condition: (command
+      name: (command_name
+        (word)))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))))))
+
+================================================================================
+For loops
+================================================================================
+
+for a in 1 "2" $3; do b; done
+for a
+do b; done
+select a in x y; do b; done
+for ((i = 0; i < 3; i++)); do c; done
+for ((;;)) { d; }
+
+--------------------------------------------------------------------------------
+
+(program
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    value: (string
+      (string_content))
+    value: (simple_expansion
+      (special_variable_name))
+    body: (do_group
+      (command
+        name: (command_name
+          (word)))))
+  (for_statement
+    variable: (variable_name)
+    body: (do_group
+      (command
+        name: (command_name
+          (word)))))
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    value: (word)
+    body: (do_group
+      (command
+        name: (command_name
+          (word)))))
+  (c_style_for_statement
+    initializer: (binary_expression
+      left: (variable_name)
+      right: (number))
+    condition: (binary_expression
+      left: (variable_name)
+      right: (number))
+    update: (postfix_expression
+      (variable_name))
+    body: (do_group
+      (command
+        name: (command_name
+          (word)))))
+  (c_style_for_statement
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))))))
+
+================================================================================
+Case statements
+================================================================================
+
+case $a in
+  x|y) b ;;
+  (z) c ;&
+  *.txt) d ;;&
+  *) e
+esac
+case a in esac
+
+--------------------------------------------------------------------------------
+
+(program
+  (case_statement
+    value: (simple_expansion
+      (variable_name))
+    (case_item
+      pattern: (word)
+      pattern: (word)
+      (command
+        name: (command_name
+          (word))))
+    (case_item
+      pattern: (word)
+      (command
+        name: (command_name
+          (word))))
+    (case_item
+      pattern: (word)
+      (command
+        name: (command_name
+          (word))))
+    (case_item
+      pattern: (word)
+      (command
+        name: (command_name
+          (word)))))
+  (case_statement
+    value: (word)))
+
+================================================================================
+Compound statements and subshells
+================================================================================
+
+{ a; b; }
+( c; d )
+{ e
+} > out
+( f ) 2>&1
+
+--------------------------------------------------------------------------------
+
+(program
+  (compound_statement
+    (command
+      name: (command_name
+        (word)))
+    (command
+      name: (command_name
+        (word))))
+  (subshell
+    (command
+      name: (command_name
+        (word)))
+    (command
+      name: (command_name
+        (word))))
+  (redirected_statement
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))))
+    redirect: (file_redirect
+      destination: (word)))
+  (redirected_statement
+    body: (subshell
+      (command
+        name: (command_name
+          (word))))
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))))
+
+================================================================================
+Arithmetic commands
+================================================================================
+
+(( i++ ))
+(( a = b + 1, c ))
+
+--------------------------------------------------------------------------------
+
+(program
+  (arithmetic_command
+    (postfix_expression
+      (variable_name)))
+  (arithmetic_command
+    (binary_expression
+      left: (binary_expression
+        left: (variable_name)
+        right: (binary_expression
+          left: (variable_name)
+          right: (number)))
+      right: (variable_name))))
+
+================================================================================
+Test commands
+================================================================================
+
+[[ -f x ]]
+[[ $a == b* && ( $c != d || ! -z $e ) ]]
+[[ $f =~ ^(a|b)+$ ]]
+[ -f x ]
+
+--------------------------------------------------------------------------------
+
+(program
+  (test_command
+    (unary_test
+      operator: (test_operator)
+      operand: (word)))
+  (test_command
+    (logical_test
+      (binary_test
+        left: (simple_expansion
+          (variable_name))
+        operator: (test_operator)
+        right: (word))
+      (parenthesized_test
+        (logical_test
+          (binary_test
+            left: (simple_expansion
+              (variable_name))
+            operator: (test_operator)
+            right: (word))
+          (negated_test
+            (unary_test
+              operator: (test_operator)
+              operand: (simple_expansion
+                (variable_name))))))))
+  (test_command
+    (regex_test
+      left: (simple_expansion
+        (variable_name))
+      right: (regex)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Function definitions
+================================================================================
+
+f() { a; }
+function g { b; }
+function h() ( c )
+i() {
+  d
+} > log
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word)))))
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word)))))
+  (function_definition
+    name: (word)
+    body: (subshell
+      (command
+        name: (command_name
+          (word)))))
+  (redirected_statement
+    body: (function_definition
+      name: (word)
+      body: (compound_statement
+        (command
+          name: (command_name
+            (word)))))
+    redirect: (file_redirect
+      destination: (word))))
+
+================================================================================
+Regex tests next to unspaced && and ||
+================================================================================
+
+[[ a =~ a&&b ]]
+[[ a =~ a||b ]]
+[[ a =~ (x|y) || b ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (test_command
+    (logical_test
+      (regex_test
+        left: (word)
+        right: (regex))
+      (word)))
+  (test_command
+    (regex_test
+      left: (word)
+      right: (regex)))
+  (test_command
+    (logical_test
+      (regex_test
+        left: (word)
+        right: (regex))
+      (word))))
+
+================================================================================
+Negated extglob patterns in test commands
+================================================================================
+
+[[ $x == !(a|b) ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (test_command
+    (binary_test
+      left: (simple_expansion
+        (variable_name))
+      operator: (test_operator)
+      right: (word))))
+
+================================================================================
+For loops without a separator before do
+================================================================================
+
+for i do echo ok; done
+select x do echo ok; done
+for i
+in a b; do c; done
+
+--------------------------------------------------------------------------------
+
+(program
+  (for_statement
+    variable: (variable_name)
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (for_statement
+    variable: (variable_name)
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    value: (word)
+    body: (do_group
+      (command
+        name: (command_name
+          (word))))))

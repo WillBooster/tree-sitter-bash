@@ -1,0 +1,704 @@
+================================================================================
+Simple commands
+================================================================================
+
+whoami
+echo a b c
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Commands with environment assignments
+================================================================================
+
+A=1 B="two" env
+C= cmd arg
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (string_content)))
+    name: (command_name
+      (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name))
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Assignment-only commands
+================================================================================
+
+a=1
+b+=2 c=
+d=(x "y" $z)
+e[1]=x
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    assignment: (variable_assignment
+      name: (variable_name)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (array
+        (word)
+        (string
+          (string_content))
+        (simple_expansion
+          (variable_name)))))
+  (command
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (word))
+      value: (word))))
+
+================================================================================
+Declaration commands
+================================================================================
+
+export A=1 B
+local -r c=$(d)
+readonly E
+declare -a f=(1 2)
+
+--------------------------------------------------------------------------------
+
+(program
+  (declaration_command
+    name: (command_name)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    argument: (word))
+  (declaration_command
+    name: (command_name)
+    argument: (word)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))))))
+  (declaration_command
+    name: (command_name)
+    argument: (word))
+  (declaration_command
+    name: (command_name)
+    argument: (word)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (array
+        (word)
+        (word)))))
+
+================================================================================
+Redirections anywhere in a command
+================================================================================
+
+npm > out run x 2>&1
+< in cat
+cmd &> all 3<> rw 4>&- >| clobber
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (file_redirect
+      destination: (word))
+    argument: (word)
+    argument: (word)
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word)))
+  (command
+    redirect: (file_redirect
+      destination: (word))
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    redirect: (file_redirect
+      destination: (word))
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))
+    redirect: (file_redirect
+      descriptor: (file_descriptor))
+    redirect: (file_redirect
+      destination: (word))))
+
+================================================================================
+Here-strings
+================================================================================
+
+cat <<< word
+cat 0<<<"$x" arg
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (herestring_redirect
+      value: (word)))
+  (command
+    name: (command_name
+      (word))
+    redirect: (herestring_redirect
+      descriptor: (file_descriptor)
+      value: (string
+        (simple_expansion
+          (variable_name))))
+    argument: (word)))
+
+================================================================================
+Pipelines
+================================================================================
+
+a | b |& c
+a |
+  b
+
+--------------------------------------------------------------------------------
+
+(program
+  (pipeline
+    (command
+      name: (command_name
+        (word)))
+    (command
+      name: (command_name
+        (word)))
+    (command
+      name: (command_name
+        (word))))
+  (pipeline
+    (command
+      name: (command_name
+        (word)))
+    (command
+      name: (command_name
+        (word)))))
+
+================================================================================
+Lists
+================================================================================
+
+a && b || c
+a &&
+  b
+a & b; c
+
+--------------------------------------------------------------------------------
+
+(program
+  (list
+    left: (list
+      left: (command
+        name: (command_name
+          (word)))
+      right: (command
+        name: (command_name
+          (word))))
+    right: (command
+      name: (command_name
+        (word))))
+  (list
+    left: (command
+      name: (command_name
+        (word)))
+    right: (command
+      name: (command_name
+        (word))))
+  (command
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word))))
+
+================================================================================
+Negated and timed pipelines
+================================================================================
+
+! a | b && c
+time -p a | b
+
+--------------------------------------------------------------------------------
+
+(program
+  (list
+    left: (negated_command
+      (pipeline
+        (command
+          name: (command_name
+            (word)))
+        (command
+          name: (command_name
+            (word)))))
+    right: (command
+      name: (command_name
+        (word))))
+  (timed_command
+    option: (word)
+    (pipeline
+      (command
+        name: (command_name
+          (word)))
+      (command
+        name: (command_name
+          (word))))))
+
+================================================================================
+Coprocesses
+================================================================================
+
+coproc cmd arg
+coproc name { a; }
+
+--------------------------------------------------------------------------------
+
+(program
+  (coproc_command
+    (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (coproc_command
+    name: (word)
+    (compound_statement
+      (command
+        name: (command_name
+          (word))))))
+
+================================================================================
+Command and process substitutions
+================================================================================
+
+echo $(a b) `c d` <(e) >(f)
+echo $(
+  a
+)
+echo ${ a; } ${| b; }
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))
+    argument: (process_substitution
+      (command
+        name: (command_name
+          (word))))
+    argument: (process_substitution
+      (command
+        name: (command_name
+          (word)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))))))
+
+================================================================================
+Comments
+================================================================================
+
+#!/bin/sh
+# comment
+echo a#b # trailing
+
+--------------------------------------------------------------------------------
+
+(program
+  (comment)
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (comment))
+
+================================================================================
+Line continuations
+================================================================================
+
+echo a \
+  b
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Line continuations after a word
+================================================================================
+
+a --flag\
+	|| b
+c "x"\
+  > out
+d\
+e
+
+--------------------------------------------------------------------------------
+
+(program
+  (list
+    left: (command
+      name: (command_name
+        (word))
+      argument: (word))
+    right: (command
+      name: (command_name
+        (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content))
+    redirect: (file_redirect
+      destination: (word)))
+  (command
+    name: (command_name
+      (concatenation
+        (word)
+        (word)))))
+
+================================================================================
+Line continuation before a blank line
+================================================================================
+
+f() {
+  a --x\
+
+}
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))))
+
+================================================================================
+Assignment values starting with a hash
+================================================================================
+
+color=#fff
+local c=#1 d=x
+y=#${z}w
+q= #comment
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word)))
+  (declaration_command
+    name: (command_name)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (concatenation
+        (word)
+        (expansion
+          parameter: (variable_name))
+        (word))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)))
+  (comment))
+
+================================================================================
+Empty assignment values before redirections
+================================================================================
+
+A=>f
+B=<g cmd
+export C=>h
+x=<(echo hi)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name))
+    redirect: (file_redirect
+      destination: (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name))
+    redirect: (file_redirect
+      destination: (word))
+    name: (command_name
+      (word)))
+  (declaration_command
+    name: (command_name)
+    argument: (variable_assignment
+      name: (variable_name))
+    redirect: (file_redirect
+      destination: (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (process_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))))
+
+================================================================================
+Assignment values starting with a hash and an extglob group
+================================================================================
+
+A=#@(a|b) B=#!(a|b) C=#@($x|b) cmd
+echo x #@($y) comment
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (concatenation
+        (word)
+        (extglob_pattern
+          alternative: (simple_expansion
+            (variable_name))
+          alternative: (word))))
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (comment))
+
+================================================================================
+Line continuations after a word before closers and redirections
+================================================================================
+
+a=$(foo\
+)
+echo `foo\
+` <(bar\
+)
+echo foo\
+ 2>&1
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))))
+    argument: (process_substitution
+      (command
+        name: (command_name
+          (word)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))))
+
+================================================================================
+Line continuations after blanks and before other continuations
+================================================================================
+
+echo x; \
+echo foo\
+\
+
+echo foo \
+ \
+  2>&1
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))))
+
+================================================================================
+Backslash at the end of input
+================================================================================
+
+echo a\
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Empty function substitutions
+================================================================================
+
+echo blank --${ 
+}--
+echo blank --${  }--
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (concatenation
+      (word)
+      (command_substitution)
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (concatenation
+      (word)
+      (command_substitution)
+      (word))))
+
+================================================================================
+Coprocesses with redirections
+================================================================================
+
+coproc { echo hi; } > /dev/null
+coproc name { echo hi; } 2>&1
+
+--------------------------------------------------------------------------------
+
+(program
+  (coproc_command
+    (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))
+    redirect: (file_redirect
+      destination: (word)))
+  (coproc_command
+    name: (word)
+    (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))))

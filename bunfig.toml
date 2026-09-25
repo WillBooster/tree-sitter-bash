@@ -1,0 +1,8 @@
+env = false
+telemetry = false
+
+[install]
+exact = true
+globalStore = false
+linker = "isolated"
+minimumReleaseAge = 604800

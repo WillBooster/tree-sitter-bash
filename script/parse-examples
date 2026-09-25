@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+clone() {
+  if [[ -d examples/$1 ]]; then
+    git -C "examples/$1" fetch origin "$3:$3" -f -u --depth=1
+  else
+    git clone "$2" "examples/$1" -b "$3" --single-branch --depth=1
+  fi
+}
+
+cd "$(dirname "$0")/.."
+
+clone bash-it https://github.com/Bash-it/bash-it master
+clone bash https://git.savannah.gnu.org/git/bash.git master
+clone gentoo https://anongit.gentoo.org/git/repo/gentoo.git master
+clone wild-corpus https://github.com/oilshell/wild-corpus main
+
+files=$(mktemp)
+output=$(mktemp)
+trap 'rm -f "$files" "$output"' EXIT
+
+# The same files as the "Parse examples" step in .github/workflows/ci.yml.
+find examples -type f \( -name '*.sh' -or -path 'examples/bash-it/*.bash' -or -path 'examples/bash/*.tests' \
+  -or -path 'examples/gentoo/*.eclass' \) \
+  ! -path examples/gentoo/app-antivirus/fangfrisch/files/fangfrisch-has-news.sh \
+  ! -path examples/gentoo/eclass/ruby-fakegem.eclass -print | LC_ALL=C sort > "$files"
+
+# The CLI exits non-zero whenever a file fails, so the output decides success. `--time` makes it print
+# a line for each file, including files that exceed `--timeout` (2 s), which bounds a runaway parse.
+bun run tree-sitter parse --grammar-path . -q -s --time --timeout 2000000 \
+  --paths "$files" > "$output" || true
+if ! grep -q '^Total parses' "$output"; then
+  cat "$output" >&2
+  exit 1
+fi
+grep '^Total parses' "$output"
+# A timeout depends on the machine, while CI parses without one, so it is no expected failure.
+if grep -q 'timed out' "$output"; then
+  echo 'These files exceeded the parse timeout; known-failures.txt is left unchanged:' >&2
+  awk '/timed out/{print $1}' "$output" >&2
+  exit 1
+fi
+awk '/ERROR|MISSING/{print $1}' "$output" | LC_ALL=C sort > script/known-failures.txt

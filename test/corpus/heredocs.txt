@@ -1,0 +1,994 @@
+================================================================================
+Heredoc with expansions
+================================================================================
+
+cat <<EOF
+a $b ${c} $(d) `e` $((1 + 1))
+\$(not) \`not\`
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (simple_expansion
+      (variable_name))
+    (heredoc_content)
+    (expansion
+      parameter: (variable_name))
+    (heredoc_content)
+    (command_substitution
+      (command
+        name: (command_name
+          (word))))
+    (heredoc_content)
+    (command_substitution
+      (command
+        name: (command_name
+          (word))))
+    (heredoc_content)
+    (arithmetic_expansion
+      (binary_expression
+        left: (number)
+        right: (number)))
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Quoted heredocs are literal
+================================================================================
+
+cat <<'EOF'
+$(not) `not`
+EOF
+cat <<"EOF"
+$x
+EOF
+cat <<\EOF
+$x
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Heredoc with a statement after the operator
+================================================================================
+
+cat <<EOF; echo after
+body
+EOF
+cat <<EOF | sh && echo ok
+body
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (list
+    left: (pipeline
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (command
+        name: (command_name
+          (word))))
+    right: (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Several heredocs on one line
+================================================================================
+
+cat <<A <<-B
+a
+A
+	b
+	B
+echo done
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc body starting with a backslash
+================================================================================
+
+cat <<EOF
+\$x
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Heredoc delimiter continued across lines
+================================================================================
+
+cat <<E\
+OF
+body
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Heredoc inside a command substitution
+================================================================================
+
+x=$(cat <<EOF
+body
+EOF
+)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))))))
+
+================================================================================
+Heredoc that reaches the end of input
+================================================================================
+
+cat <<EOF
+body
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Heredoc with a newline inside a header string
+================================================================================
+
+cat <<EOF "a
+b"
+body
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    argument: (string
+      (string_content)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Heredoc inside backquotes
+================================================================================
+
+x=`cat <<EOF
+body
+EOF`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))))))
+
+================================================================================
+Heredoc inside a command substitution in a heredoc body
+================================================================================
+
+cat <<A
+$(cat <<B
+b
+B
+)
+A
+echo x
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end)))
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredocs on one line inside a heredoc body
+================================================================================
+
+cat <<A <<C
+$(cat <<B
+b
+B
+)
+A
+c
+C
+echo x
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end)))
+    (heredoc_content)
+    (heredoc_end))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc operator before a multi-line substitution
+================================================================================
+
+cat <<A; x=$(
+echo b
+); echo "$x"
+a
+A
+echo z
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (simple_expansion
+        (variable_name))))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc operator before a substitution with its own heredoc
+================================================================================
+
+cat <<A; x=$(cat <<B
+b
+B
+); echo "$x"
+a
+A
+echo z
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (simple_expansion
+        (variable_name))))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Non-ASCII heredoc delimiters
+================================================================================
+
+cat <<終了
+x
+終了
+echo y
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc delimiter continued across lines keeps expansions
+================================================================================
+
+cat <<E\
+OF
+$x
+EOF
+cat <<E\OF
+$x
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (simple_expansion
+      (variable_name))
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Heredocs nested in substitutions two levels deep
+================================================================================
+
+cat <<OUTER
+Outer Heredoc Start
+$(cat <<INNER
+Inner Heredoc Content
+$(cat <<INNERMOST
+Innermost Heredoc Content
+INNERMOST
+)
+INNER)
+Outer Heredoc End
+OUTER
+echo after
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (command_substitution
+          (command
+            name: (command_name
+              (word))
+            redirect: (heredoc_redirect
+              delimiter: (heredoc_start)))
+          (heredoc_body
+            (heredoc_content)
+            (heredoc_end)))
+        (heredoc_content)
+        (heredoc_end)))
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc with a long delimiter
+================================================================================
+
+cat <<XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+hello
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+echo done
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc delimiter continued inside double quotes
+================================================================================
+
+cat <<"E\
+OF"
+body
+EOF
+echo done
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc operator before a multi-line arithmetic expansion
+================================================================================
+
+cat <<EOF $(( 1 +
+2 ))
+body
+EOF
+echo z
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (number)
+        right: (number))))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc in a substitution that closes on its line
+================================================================================
+
+x=$(cat <<A)
+body
+A
+y=$(
+echo in
+)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start))))))
+  (command
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))))
+
+================================================================================
+Heredoc delimiter too long for the scanner state is an error
+================================================================================
+
+cat <<XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXkhTJ0D1m
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXs0ILGhpb
+XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXkhTJ0D1m
+echo done
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    (command_name
+      (word))
+    (ERROR)
+    (word))
+  (command
+    (command_name
+      (word)))
+  (command
+    (command_name
+      (word)))
+  (command
+    (command_name
+      (word))
+    (word)))
+
+================================================================================
+Heredoc in backquotes that close on its line
+================================================================================
+
+x=`cat <<AB`
+body
+AB
+y=$(
+echo in
+)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start))))))
+  (command
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))))
+
+================================================================================
+Backquotes inside a top-level heredoc delimiter
+================================================================================
+
+cat <<EO`true`F
+hi
+EO`true`F
+echo done
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Two heredocs on a line after a long delimiter
+================================================================================
+
+cat <<AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA <<BBB
+x
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+y
+BBB
+echo done
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Rejected heredoc leaves the other heredocs on its line without bodies
+================================================================================
+
+cat <<AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA <<BBB
+x
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+y
+BBB
+cat <<C
+c
+C
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    (command_name
+      (word))
+    (ERROR)
+    (word)
+    (heredoc_redirect
+      (heredoc_start)))
+  (command
+    (command_name
+      (word)))
+  (command
+    (command_name
+      (word)))
+  (command
+    (command_name
+      (word)))
+  (command
+    (command_name
+      (word)))
+  (command
+    (command_name
+      (word))
+    (heredoc_redirect
+      (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Heredoc delimiters quoted with $' and $"
+================================================================================
+
+cat <<$"EOF"
+$x
+EOF
+cat <<$'\x45OF'
+b
+EOF
+echo after
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc delimiter starting with a backquote
+================================================================================
+
+cat <<`x`
+$y `date` b
+`x`
+echo done
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredoc body line continued onto the delimiter line
+================================================================================
+
+cat <<EOF
+hi \
+EOF
+echo x
+EOF
+echo after
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Heredocs inside function substitutions
+================================================================================
+
+echo ${ cat <<EOF
+hi
+EOF}
+x=${ cat <<EOF
+EOF)
+hi
+EOF
+}
+echo after
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))

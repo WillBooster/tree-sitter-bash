@@ -1,0 +1,1101 @@
+================================================================================
+Quoted strings
+================================================================================
+
+echo "a $b ${c} $(d) $((1 + 2)) \" $" 'raw $x' $'ansi\n' $"translated"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content)
+      (simple_expansion
+        (variable_name))
+      (string_content)
+      (expansion
+        parameter: (variable_name))
+      (string_content)
+      (command_substitution
+        (command
+          name: (command_name
+            (word))))
+      (string_content)
+      (arithmetic_expansion
+        (binary_expression
+          left: (number)
+          right: (number)))
+      (string_content))
+    argument: (raw_string)
+    argument: (ansi_c_string)
+    argument: (translated_string
+      (string_content))))
+
+================================================================================
+Concatenations
+================================================================================
+
+echo a"b"'c'$d${e}f $x#y ~/"dir"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (string
+        (string_content))
+      (raw_string)
+      (simple_expansion
+        (variable_name))
+      (expansion
+        parameter: (variable_name))
+      (word))
+    argument: (concatenation
+      (simple_expansion
+        (variable_name))
+      (word))
+    argument: (concatenation
+      (word)
+      (string
+        (string_content)))))
+
+================================================================================
+Bare dollars
+================================================================================
+
+echo $ "$" a$
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (string
+      (string_content))
+    argument: (concatenation
+      (word)
+      (word))))
+
+================================================================================
+Escaped characters
+================================================================================
+
+echo \$x \" a\ b
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Simple expansions
+================================================================================
+
+echo $a $_b $1 $@ $* $# $? $$ $! $- $0
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (simple_expansion
+      (variable_name))
+    argument: (simple_expansion
+      (variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))))
+
+================================================================================
+Parameter expansions
+================================================================================
+
+echo ${a} ${#a} ${!a} ${!a*} ${#} ${!} ${a:-b} ${a:=b c} ${a#*/} ${a%%.*} ${a/x/y} ${a//x} ${a^^} ${a,} ${a~} ${a:1:2} ${a@Q} ${a[1]} ${a[@]} ${#a[@]} ${a:-"q"$(c)}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name))
+    argument: (expansion
+      prefix: (operator)
+      parameter: (variable_name))
+    argument: (expansion
+      prefix: (operator)
+      parameter: (variable_name))
+    argument: (expansion
+      prefix: (operator)
+      parameter: (variable_name)
+      operator: (operator))
+    argument: (expansion
+      parameter: (special_variable_name))
+    argument: (expansion
+      parameter: (special_variable_name))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word)))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word)))
+    argument: (expansion
+      prefix: (operator)
+      parameter: (subscript
+        name: (variable_name)
+        index: (word)))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (string
+        (string_content))
+      argument: (command_substitution
+        (command
+          name: (command_name
+            (word)))))))
+
+================================================================================
+Arithmetic expansions
+================================================================================
+
+echo $((1 + 2 * 3)) $((a << 2)) $((x ? y : z)) $((i++)) $((-a)) $[1 + 1] $((0x1f + 2#101)) $((a[1] = 2, b))
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (number)
+        right: (binary_expression
+          left: (number)
+          right: (number))))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (variable_name)
+        right: (number)))
+    argument: (arithmetic_expansion
+      (ternary_expression
+        condition: (variable_name)
+        consequence: (variable_name)
+        alternative: (variable_name)))
+    argument: (arithmetic_expansion
+      (postfix_expression
+        (variable_name)))
+    argument: (arithmetic_expansion
+      (unary_expression
+        (variable_name)))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (number)
+        right: (number)))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (number)
+        right: (number)))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (binary_expression
+          left: (subscript
+            name: (variable_name)
+            index: (number))
+          right: (number))
+        right: (variable_name)))))
+
+================================================================================
+Extglob groups
+================================================================================
+
+ls @(a|b).txt +([0-9]) a!(x)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Arrays
+================================================================================
+
+a=()
+b=(1 "two" $(three) [4]=four)
+c+=("$d")
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (array)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (array
+        (word)
+        (string
+          (string_content))
+        (command_substitution
+          (command
+            name: (command_name
+              (word))))
+        (word))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (array
+        (string
+          (simple_expansion
+            (variable_name)))))))
+
+================================================================================
+Bare dollars in parameter expansions
+================================================================================
+
+echo ${a-\$} ${b:-x$}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)
+      argument: (word))))
+
+================================================================================
+Based numbers with expanded digits
+================================================================================
+
+echo $((10#${x:=0} + 1))
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (number
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (word)))
+        right: (number)))))
+
+================================================================================
+Nested extglob groups
+================================================================================
+
+echo @(a|@(b|c)) x@(ab|+([^/]))/..?(/) !(a|!(b))
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Closing characters inside substitutions
+================================================================================
+
+echo $(echo }) ${ echo }; } $()
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))
+    argument: (command_substitution)))
+
+================================================================================
+Extglob groups with expansions
+================================================================================
+
+echo ${x}@($y|z)* @("a"|b)
+[[ ${test} == @($(IFS='|'; echo "${skip[*]}")) ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (expansion
+        parameter: (variable_name))
+      (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name))
+        alternative: (word))
+      (word))
+    argument: (extglob_pattern
+      alternative: (string
+        (string_content))
+      alternative: (word)))
+  (test_command
+    (binary_test
+      left: (expansion
+        parameter: (variable_name))
+      operator: (test_operator)
+      right: (extglob_pattern
+        alternative: (command_substitution
+          (command
+            assignment: (variable_assignment
+              name: (variable_name)
+              value: (raw_string)))
+          (command
+            name: (command_name
+              (word))
+            argument: (string
+              (expansion
+                parameter: (subscript
+                  name: (variable_name)
+                  index: (word))))))))))
+
+================================================================================
+Negated extglob groups with expansions
+================================================================================
+
+case $i in
+!($KEEP)) j=1 ;;
+esac
+echo !($x|y)
+[[ $a == !($b) ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (case_statement
+    value: (simple_expansion
+      (variable_name))
+    (case_item
+      pattern: (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name)))
+      (command
+        assignment: (variable_assignment
+          name: (variable_name)
+          value: (word)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (extglob_pattern
+      alternative: (simple_expansion
+        (variable_name))
+      alternative: (word)))
+  (test_command
+    (binary_test
+      left: (simple_expansion
+        (variable_name))
+      operator: (test_operator)
+      right: (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name))))))
+
+================================================================================
+Negated extglob groups as values and operands
+================================================================================
+
+for f in !(a|b); do :; done
+x=!(a)
+cat < !(a)
+a=(!(b))
+case !(a) in x) ;; esac
+[[ -f !(a) ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    body: (do_group
+      (command
+        name: (command_name
+          (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word)))
+  (command
+    name: (command_name
+      (word))
+    redirect: (file_redirect
+      destination: (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (array
+        (word))))
+  (case_statement
+    value: (word)
+    (case_item
+      pattern: (word)))
+  (test_command
+    (unary_test
+      operator: (test_operator)
+      operand: (word))))
+
+================================================================================
+Closing brackets inside command substitutions
+================================================================================
+
+yes "$(printf %${c}s ])" | head
+echo $[ 1 + 2 ] $(echo ])
+
+--------------------------------------------------------------------------------
+
+(program
+  (pipeline
+    (command
+      name: (command_name
+        (word))
+      argument: (string
+        (command_substitution
+          (command
+            name: (command_name
+              (word))
+            argument: (concatenation
+              (word)
+              (expansion
+                parameter: (variable_name))
+              (word))
+            argument: (word)))))
+    (command
+      name: (command_name
+        (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (number)
+        right: (number)))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))))
+
+================================================================================
+Negated extglob groups inside extglob groups
+================================================================================
+
+echo @(!(a$b)) @(x|!($y|z))
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (extglob_pattern
+      alternative: (extglob_pattern
+        alternative: (concatenation
+          (word)
+          (simple_expansion
+            (variable_name)))))
+    argument: (extglob_pattern
+      alternative: (word)
+      alternative: (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name))
+        alternative: (word)))))
+
+================================================================================
+Structured extglob groups inside words
+================================================================================
+
+echo foo@($(date)|a)bar foo@(a|b)bar a!($x)b ${y}c@("q")
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (extglob_pattern
+        alternative: (command_substitution
+          (command
+            name: (command_name
+              (word))))
+        alternative: (word))
+      (word))
+    argument: (word)
+    argument: (concatenation
+      (word)
+      (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name)))
+      (word))
+    argument: (concatenation
+      (expansion
+        parameter: (variable_name))
+      (word)
+      (extglob_pattern
+        alternative: (string
+          (string_content))))))
+
+================================================================================
+Structured extglob groups in command names
+================================================================================
+
+foo@($(date)|a)bar
+foo+($x) arg
+a=1 b+=2 c[1]=3 d[k]+=4 cmd
+x+y z
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (concatenation
+        (word)
+        (extglob_pattern
+          alternative: (command_substitution
+            (command
+              name: (command_name
+                (word))))
+          alternative: (word))
+        (word))))
+  (command
+    name: (command_name
+      (concatenation
+        (word)
+        (extglob_pattern
+          alternative: (simple_expansion
+            (variable_name)))))
+    argument: (word))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (word))
+      value: (word))
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (word))
+      value: (word))
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Structured extglob groups after digits and across line continuations
+================================================================================
+
+echo foo@(a\
+|b) 1@($x|y)tail 1>out 12 3@(a|b)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (extglob_pattern
+        alternative: (word)
+        alternative: (word)))
+    argument: (concatenation
+      (word)
+      (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name))
+        alternative: (word))
+      (word))
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Structured extglob groups after a leading escape
+================================================================================
+
+echo \foo@($x)bar \a \
+ 2>&1
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name)))
+      (word))
+    argument: (word)
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))))
+
+================================================================================
+Extglob groups holding blanks
+================================================================================
+
+echo @(a b) foo@(a b)bar @($x b|c)
+A=@(a b)
+[[ $x == @(a b) ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (extglob_pattern
+      alternative: (simple_expansion
+        (variable_name))
+      alternative: (word)
+      alternative: (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word)))
+  (test_command
+    (binary_test
+      left: (simple_expansion
+        (variable_name))
+      operator: (test_operator)
+      right: (word))))
+
+================================================================================
+Hash words inside structured extglob groups
+================================================================================
+
+echo @($x #b) @( #b $x) @(a b) # real comment
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (extglob_pattern
+      alternative: (simple_expansion
+        (variable_name))
+      alternative: (word))
+    argument: (extglob_pattern
+      alternative: (word)
+      alternative: (simple_expansion
+        (variable_name)))
+    argument: (word))
+  (comment))
+
+================================================================================
+Parameter expansions with a blank after the prefix
+================================================================================
+
+echo ${# y} ${! y} "${# y}" ${y }
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      prefix: (operator)
+      parameter: (variable_name))
+    argument: (expansion
+      prefix: (operator)
+      parameter: (variable_name))
+    argument: (string
+      (expansion
+        prefix: (operator)
+        parameter: (variable_name)))
+    argument: (expansion
+      parameter: (variable_name))))
+
+================================================================================
+Nested subscripts and text after an expansion parameter
+================================================================================
+
+A[x[1]]=v A[x [1]]=w cmd
+echo ${A[x[1]]} ${m[1][2]} ${x y} ${x-y}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (word)
+        index: (word))
+      value: (word))
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (word)
+        index: (word))
+      value: (word))
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word)
+        index: (word)))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word)
+        index: (word)))
+    argument: (expansion
+      parameter: (variable_name)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))))
+
+================================================================================
+Subscripts nested deeply and across lines
+================================================================================
+
+A[x[1[2]]]=v cmd
+echo ${x[a[b[c]]]}
+A[x
+]=yes
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (word)
+        index: (word)
+        index: (word))
+      value: (word))
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word)
+        index: (word)
+        index: (word))))
+  (command
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (word))
+      value: (word))))
+
+================================================================================
+Quoted brackets in assignment subscripts
+================================================================================
+
+A["]"]=x A[']']=w A[$(echo "]")]=z cmd
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (string
+          (string_content)))
+      value: (word))
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (raw_string))
+      value: (word))
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (command_substitution
+          (command
+            name: (command_name
+              (word))
+            argument: (string
+              (string_content)))))
+      value: (word))
+    name: (command_name
+      (word))))
+
+================================================================================
+Empty and parameter-less expansions
+================================================================================
+
+echo ${} ${=1} ${$} ${1:-/proc/${$}/fd/0} ${"quoted"} ${`date`}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion)
+    argument: (expansion
+      argument: (word))
+    argument: (expansion
+      parameter: (special_variable_name))
+    argument: (expansion
+      parameter: (special_variable_name)
+      operator: (operator)
+      argument: (word)
+      argument: (expansion
+        parameter: (special_variable_name))
+      argument: (word))
+    argument: (expansion
+      argument: (string
+        (string_content)))
+    argument: (expansion
+      argument: (command_substitution
+        (command
+          name: (command_name
+            (word)))))))
+
+================================================================================
+Words led by negated extglob groups
+================================================================================
+
+echo !($x)b !(a)$x !($x)'a'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name)))
+      (word))
+    argument: (concatenation
+      (word)
+      (simple_expansion
+        (variable_name)))
+    argument: (concatenation
+      (extglob_pattern
+        alternative: (simple_expansion
+          (variable_name)))
+      (raw_string))))
+
+================================================================================
+Process substitutions inside expansions and subscripts
+================================================================================
+
+echo ${x:+--arg <(echo hi)} ${a[<(b)]} ${x:-a<b} ${x:-<}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)
+      argument: (process_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (process_substitution
+          (command
+            name: (command_name
+              (word))))))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))))
+
+================================================================================
+Process substitutions after angle brackets in expansions
+================================================================================
+
+echo ${x:-a<<(b)} ${a[<<(b)]} ${x:-<<}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)
+      argument: (word)
+      argument: (process_substitution
+        (command
+          name: (command_name
+            (word)))))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word)
+        index: (process_substitution
+          (command
+            name: (command_name
+              (word))))))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)
+      argument: (word))))
+
+================================================================================
+Deeply nested literal extglob groups after literal text
+================================================================================
+
+echo x@(a|@(b|@(c|@(d|e)))) x@(a|@(b|@(c|d)))
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (extglob_pattern
+        alternative: (word)
+        alternative: (word)))
+    argument: (word)))

@@ -1,0 +1,4693 @@
+================================================================================
+Upstream: Commands
+================================================================================
+
+whoami
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))))
+
+================================================================================
+Upstream: Commands with arguments
+================================================================================
+
+cat file1.txt
+git diff --word-diff=color -- file1.txt file2.txt
+echo $sing\
+levar
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (simple_expansion
+        (variable_name))
+      (word))))
+
+================================================================================
+Upstream: Quoted command names
+================================================================================
+
+"$a/$b" c
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (string
+        (simple_expansion
+          (variable_name))
+        (string_content)
+        (simple_expansion
+          (variable_name))))
+    argument: (word)))
+
+================================================================================
+Upstream: Commands with numeric arguments
+================================================================================
+
+exit 1
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Upstream: Commands with environment variables
+================================================================================
+
+VAR1=1 ./script/test
+VAR1=a VAR2="ok" git diff --word-diff=color
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    name: (command_name
+      (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (string_content)))
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Upstream: Empty environment variables
+================================================================================
+
+VAR1=
+VAR2= echo
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name))
+    name: (command_name
+      (word))))
+
+================================================================================
+Upstream: File redirects
+================================================================================
+
+whoami > /dev/null
+cat a b > /dev/null
+2>&1 whoami
+echo "foobar" >&2
+[ ! command -v go &>/dev/null ] && return
+
+if [ ]; then
+	>aa >bb
+fi
+
+exec {VIRTWL[0]} {VIRTWL[1]} <&- >&-
+exec {VIRTWL[0]}<&- {VIRTWL[1]}>&-
+
+grep 2>/dev/null -q "^/usr/bin/scponly$" /etc/shells
+
+x <x a b c
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (file_redirect
+      destination: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    redirect: (file_redirect
+      destination: (word)))
+  (command
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content))
+    redirect: (file_redirect
+      destination: (word)))
+  (list
+    left: (command
+      name: (command_name
+        (word))
+      argument: (word)
+      argument: (word)
+      argument: (word)
+      argument: (word)
+      redirect: (file_redirect
+        destination: (word))
+      argument: (word))
+    right: (command
+      name: (command_name
+        (word))))
+  (if_statement
+    condition: (command
+      name: (command_name
+        (word))
+      argument: (word))
+    consequence: (command
+      redirect: (file_redirect
+        destination: (word))
+      redirect: (file_redirect
+        destination: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    redirect: (file_redirect)
+    redirect: (file_redirect))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    redirect: (file_redirect)
+    argument: (word)
+    redirect: (file_redirect))
+  (command
+    name: (command_name
+      (word))
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))
+    argument: (word)
+    argument: (string
+      (string_content))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    redirect: (file_redirect
+      destination: (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Upstream: File redirects (noclobber override)
+================================================================================
+
+whoami >| /dev/null
+cat a b >| /dev/null
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (file_redirect
+      destination: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    redirect: (file_redirect
+      destination: (word))))
+
+================================================================================
+Upstream: Heredoc redirects
+================================================================================
+
+node <<JS
+console.log("hi")
+JS
+
+bash -c <<JS
+echo hi
+JS
+
+newins <<-EOF - org.freedesktop.Notifications.service
+	[D-BUS Service]
+	Name=org.freedesktop.Notifications
+	Exec=/usr/libexec/notification-daemon
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    argument: (word)
+    argument: (word))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Heredocs with variables
+================================================================================
+
+node <<JS
+a $B ${C}
+JS
+
+exit
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (simple_expansion
+      (variable_name))
+    (heredoc_content)
+    (expansion
+      parameter: (variable_name))
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))))
+
+================================================================================
+Upstream: Heredocs with file redirects
+================================================================================
+
+cat <<EOF > $tmpfile
+a $B ${C}
+EOF
+
+wc -l $tmpfile
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    redirect: (file_redirect
+      destination: (simple_expansion
+        (variable_name))))
+  (heredoc_body
+    (heredoc_content)
+    (simple_expansion
+      (variable_name))
+    (heredoc_content)
+    (expansion
+      parameter: (variable_name))
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (simple_expansion
+      (variable_name))))
+
+================================================================================
+Upstream: Heredocs with many file redirects
+================================================================================
+
+FOO=bar echo <<EOF 2> err.txt > hello.txt
+hello
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word))
+    redirect: (file_redirect
+      destination: (word)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Heredocs with pipes
+================================================================================
+
+one <<EOF | grep two
+three
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (pipeline
+    (command
+      name: (command_name
+        (word))
+      redirect: (heredoc_redirect
+        delimiter: (heredoc_start)))
+    (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Heredocs with escaped expansions
+================================================================================
+
+cat  << EOF
+DEV_NAME=\$(lsblk)
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Quoted Heredocs
+================================================================================
+
+cat << 'EOF'
+a=$b
+EOF
+
+cat << "EOF"
+a=$b
+EOF
+
+cat <<"END OF FILE"
+hello,
+world
+END OF FILE
+
+cat << \EOF
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Heredocs with indented closing delimiters
+================================================================================
+
+usage() {
+	cat <<-EOF
+		Usage: ${0##*/} FOO BAR
+	EOF
+}
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (expansion
+          parameter: (special_variable_name)
+          operator: (operator)
+          argument: (word))
+        (heredoc_content)
+        (heredoc_end)))))
+
+================================================================================
+Upstream: Heredocs with empty bodies
+================================================================================
+
+node <<JS
+JS
+
+node << 'SJ'
+SJ
+
+usage() {
+	cat <<-EOF
+	EOF
+}
+
+node << 'EOF' > temp
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end))))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start))
+    redirect: (file_redirect
+      destination: (word)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Heredocs with weird characters
+================================================================================
+
+node <<_DELIMITER_WITH_UNDERSCORES_
+Hello.
+_DELIMITER_WITH_UNDERSCORES_
+
+node <<'```'
+Hello.
+```
+
+node <<!HEREDOC!
+Hello.
+!HEREDOC!
+
+node <<\'
+Hello.
+'
+
+node <<\\
+Hello.
+\
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Heredocs with a rhs statement
+================================================================================
+
+cat <<-_EOF_ || die "cat EOF failed"
+	#!/bin/sh
+	echo hello
+_EOF_
+
+--------------------------------------------------------------------------------
+
+(program
+  (list
+    left: (command
+      name: (command_name
+        (word))
+      redirect: (heredoc_redirect
+        delimiter: (heredoc_start)))
+    right: (command
+      name: (command_name
+        (word))
+      argument: (string
+        (string_content))))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Heredocs with a $ that is not an expansion
+================================================================================
+
+cat <<EOF
+# check out this regex '^EOF$'
+EOF
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Nested Heredocs
+================================================================================
+
+cat <<OUTER
+Outer Heredoc Start
+$(cat <<INNER
+Inner Heredoc Content
+$(cat <<INNERMOST
+Innermost Heredoc Content
+INNERMOST
+)
+INNER)
+Outer Heredoc End
+OUTER
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (command_substitution
+          (command
+            name: (command_name
+              (word))
+            redirect: (heredoc_redirect
+              delimiter: (heredoc_start)))
+          (heredoc_body
+            (heredoc_content)
+            (heredoc_end)))
+        (heredoc_content)
+        (heredoc_end)))
+    (heredoc_content)
+    (heredoc_end)))
+
+================================================================================
+Upstream: Herestrings
+================================================================================
+
+node <<< foo
+
+while read -u 3 entry; do
+  echo $entry
+done 3<<<"$ENTRIES"
+
+$(tc-getCC) -Werror -Wl,-l:libobjc.so.${ver} -x objective-c \
+		- <<<$'int main() {}' -o /dev/null 2> /dev/null;
+
+<<<string cmd arg
+
+cmd arg <<<string
+
+cmd <<<string arg
+
+<<<string
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (herestring_redirect
+      value: (word)))
+  (redirected_statement
+    body: (while_statement
+      condition: (command
+        name: (command_name
+          (word))
+        argument: (word)
+        argument: (word)
+        argument: (word))
+      body: (do_group
+        (command
+          name: (command_name
+            (word))
+          argument: (simple_expansion
+            (variable_name)))))
+    redirect: (herestring_redirect
+      descriptor: (file_descriptor)
+      value: (string
+        (simple_expansion
+          (variable_name)))))
+  (command
+    name: (command_name
+      (command_substitution
+        (command
+          name: (command_name
+            (word)))))
+    argument: (word)
+    argument: (concatenation
+      (word)
+      (expansion
+        parameter: (variable_name)))
+    argument: (word)
+    argument: (word)
+    argument: (word)
+    redirect: (herestring_redirect
+      value: (ansi_c_string))
+    argument: (word)
+    argument: (word)
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word)))
+  (command
+    redirect: (herestring_redirect
+      value: (word))
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    redirect: (herestring_redirect
+      value: (word)))
+  (command
+    name: (command_name
+      (word))
+    redirect: (herestring_redirect
+      value: (word))
+    argument: (word))
+  (command
+    redirect: (herestring_redirect
+      value: (word))))
+
+================================================================================
+Upstream: Subscripts
+================================================================================
+
+echo ${a[1 + 2]}
+
+echo ${b[1234 % 2]}
+
+${words[++counter]}
+
+${array[(($number+1))]}
+
+${array[((number+1))]}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word)))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word)
+          index: (simple_expansion
+            (variable_name))
+          index: (word)))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word))))))
+
+================================================================================
+Upstream: Bare $
+================================================================================
+
+echo $
+echo "${module}"$
+echo $$
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (string
+        (expansion
+          parameter: (variable_name)))
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (simple_expansion
+      (special_variable_name))))
+
+================================================================================
+Upstream: Arithmetic with command substitution
+================================================================================
+
+$(( $( ver_cut 2 ) - 1 ))
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (arithmetic_expansion
+        (binary_expression
+          left: (command_substitution
+            (command
+              name: (command_name
+                (word))
+              argument: (word)))
+          right: (number))))))
+
+================================================================================
+Upstream: Ralative path without dots
+================================================================================
+
+bin/ls /usr/bin
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Upstream: Literal words
+================================================================================
+
+echo a
+echo a b
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Upstream: Words with special characters
+================================================================================
+
+echo {o[k]}
+echo }}}
+echo ]]] ===
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Upstream: Simple variable expansions
+================================================================================
+
+echo $abc
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (simple_expansion
+      (variable_name))))
+
+================================================================================
+Upstream: Special variable expansions
+================================================================================
+
+echo $# $* $@ $!
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))
+    argument: (simple_expansion
+      (special_variable_name))))
+
+================================================================================
+Upstream: Variable expansions
+================================================================================
+
+echo ${}
+echo ${#}
+echo ${var1#*#}
+echo ${!abc}
+echo ${abc}
+echo ${abc:-def}
+echo ${abc:+ghi}
+echo ${abc:- }
+echo ${abc:
+}
+echo ${abc,?}
+echo ${abc^^b}
+echo ${abc@U}
+echo ${abc:- -quiet}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (special_variable_name)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      prefix: (operator)
+      parameter: (variable_name)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))))
+
+================================================================================
+Upstream: Variable expansions with operators
+================================================================================
+
+A="${B[0]# }"
+C="${D/#* -E /}"
+F="${G%% *}"
+H="${I#*;}"
+J="${K##*;}"
+L="${M%;*}"
+N="${O%%;*}"
+P="${Q%|*}"
+R="${S%()}"
+T="${U%(}"
+V="${W%)}"
+X="${Y%<}"
+Z="${A#*<B>}"
+C="${D%</E>*}"
+F="${#!}"
+G=${H,,[I]}
+J=${K^^[L]}
+L="${M/'N'*/O}"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (subscript
+            name: (variable_name)
+            index: (word))
+          operator: (operator)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          prefix: (operator)
+          parameter: (special_variable_name)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (raw_string)
+          argument: (word))))))
+
+================================================================================
+Upstream: More Variable expansions with operators
+================================================================================
+
+${parameter-default}
+${parameter:-default}
+${parameter=default}
+${parameter:=default}
+${parameter+alt_value}
+${parameter:+alt_value}
+${parameter?err_msg}
+${parameter:?err_msg}
+${var%Pattern}
+${var%%Pattern}
+${var:pos}
+${var:pos:len}
+${MATRIX:$(($RANDOM%${#MATRIX})):1}
+${PKG_CONFIG_LIBDIR:-${ESYSROOT}/usr/$(get_libdir)/pkgconfig}
+${ver_str::${#ver_str}-${#not_match}}
+${value#\{sd.cicd.}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (arithmetic_expansion
+          (binary_expression
+            left: (simple_expansion
+              (variable_name))
+            right: (expansion
+              prefix: (operator)
+              parameter: (variable_name))))
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (expansion
+          parameter: (variable_name))
+        argument: (word)
+        argument: (command_substitution
+          (command
+            name: (command_name
+              (word))))
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)
+        argument: (expansion
+          prefix: (operator)
+          parameter: (variable_name))
+        argument: (word)
+        argument: (expansion
+          prefix: (operator)
+          parameter: (variable_name)))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)))))
+
+================================================================================
+Upstream: Variable expansions in strings
+================================================================================
+
+A="${A:-$B/c}"
+A="${b=$c/$d}"
+MY_PV="${PV/_pre/$'\x7e'pre}"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (simple_expansion
+            (variable_name))
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (simple_expansion
+            (variable_name))
+          argument: (word)
+          argument: (simple_expansion
+            (variable_name))))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)
+          argument: (ansi_c_string)
+          argument: (word))))))
+
+================================================================================
+Upstream: Variable expansions with regexes
+================================================================================
+
+A=${B//:;;/$'\n'}
+
+# escaped space
+C=${D/;\ *;|}
+MOFILES=${LINGUAS// /.po }.po
+MY_P="${PN/aspell/aspell"${ASPELL_VERSION}"}"
+pyc=${pyc//*\/}
+${pv/\.}
+${new_test_cp//"${old_ver_cp}"/}
+${tests_to_run//"${classes}"\/}
+${allarchives// /\\|}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)
+        argument: (ansi_c_string))))
+  (comment)
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (concatenation
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word))
+        (word))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)
+          argument: (string
+            (expansion
+              parameter: (variable_name)))))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (string
+          (expansion
+            parameter: (variable_name)))
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (string
+          (expansion
+            parameter: (variable_name)))
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)))))
+
+================================================================================
+Upstream: Other variable expansion operators
+================================================================================
+
+cat ${BAR} ${ABC=def} ${GHI:?jkl}
+[ "$a" != "${a#[Bc]}" ]
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (simple_expansion
+        (variable_name)))
+    argument: (word)
+    argument: (string
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)))
+    argument: (word)))
+
+================================================================================
+Upstream: Variable Expansions: Length
+================================================================================
+
+${parameter:-1}
+
+${parameter: -1}
+
+${parameter:(-1)}
+
+${matrix:$(($random%${#matrix})):1}
+
+"${_component_to_single:${len}:2}"
+
+"${PN::-1}"
+
+${trarr:$(ver_cut 2):1}
+
+${comp[@]:start:end*2-start}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (arithmetic_expansion
+          (binary_expression
+            left: (simple_expansion
+              (variable_name))
+            right: (expansion
+              prefix: (operator)
+              parameter: (variable_name))))
+        argument: (word))))
+  (command
+    name: (command_name
+      (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (expansion
+            parameter: (variable_name))
+          argument: (word)))))
+  (command
+    name: (command_name
+      (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (command_substitution
+          (command
+            name: (command_name
+              (word))
+            argument: (word)))
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word))
+        operator: (operator)
+        argument: (word)))))
+
+================================================================================
+Upstream: Variable Expansions with operators
+================================================================================
+
+${parameter-default}
+${parameter- default}
+${!varprefix*}
+${!varprefix@}
+${parameter@U}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        prefix: (operator)
+        parameter: (variable_name)
+        operator: (operator))))
+  (command
+    name: (command_name
+      (expansion
+        prefix: (operator)
+        parameter: (variable_name)
+        operator: (operator))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)))))
+
+================================================================================
+Upstream: Variable Expansions: Bizarre Cases
+================================================================================
+
+${!#}
+${!# }
+${!##}
+${!## }
+${!##/}
+# here be dragons
+echo "${kw}? ( ${cond:+${cond}? (} ${baseuri}-${ver}-${kw}.${suff} ${cond:+) })"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (expansion
+        prefix: (operator)
+        parameter: (special_variable_name))))
+  (command
+    name: (command_name
+      (expansion
+        prefix: (operator)
+        parameter: (special_variable_name))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (special_variable_name)
+        operator: (operator))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (special_variable_name)
+        operator: (operator))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (special_variable_name)
+        operator: (operator)
+        argument: (word))))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (expansion
+        parameter: (variable_name))
+      (string_content)
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (expansion
+          parameter: (variable_name))
+        argument: (word))
+      (string_content)
+      (expansion
+        parameter: (variable_name))
+      (string_content)
+      (expansion
+        parameter: (variable_name))
+      (string_content)
+      (expansion
+        parameter: (variable_name))
+      (string_content)
+      (expansion
+        parameter: (variable_name))
+      (string_content)
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))
+      (string_content))))
+
+================================================================================
+Upstream: Variable Expansions: Weird Cases
+================================================================================
+
+${completions[*]}
+${=1}
+${2?}
+${p_key#*=}
+${abc:- }
+${B[0]# }
+${to_enables[0]##*/}
+exec "${0#-}" --rcfile "${BASH_IT_BASHRC:-${HOME?}/.bashrc}"
+recho "TDEFAULTS = ${selvecs:+-DSELECT_VECS=\"$selvecs\"}"
+local msg="${2:-command '$1' does not exist}"
+${cdir:+#}
+${dict_langs:+;}
+${UTIL_LINUX_LIBC[@]/%/? ( sys-apps/util-linux )}
+${id}${2+ ${2}}
+${BRANDING_GCC_PKGVERSION/(/(Gentoo ${PVR}${extvers}, } # look at that parenthesis!
+some-command ${foo:+--arg <(printf '%s\n' "$foo")}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word)))))
+  (command
+    name: (command_name
+      (expansion
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (special_variable_name)
+        operator: (operator))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word))
+        operator: (operator))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word))
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (expansion
+        parameter: (special_variable_name)
+        operator: (operator)
+        argument: (word)))
+    argument: (word)
+    argument: (string
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (expansion
+          parameter: (variable_name)
+          operator: (operator))
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content)
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)
+        argument: (simple_expansion
+          (variable_name))
+        argument: (word))))
+  (declaration_command
+    name: (command_name)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (special_variable_name)
+          operator: (operator)
+          argument: (word)
+          argument: (raw_string)
+          argument: (word)))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word))
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (concatenation
+        (expansion
+          parameter: (variable_name))
+        (expansion
+          parameter: (special_variable_name)
+          operator: (operator)
+          argument: (expansion
+            parameter: (special_variable_name))))))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)
+        argument: (expansion
+          parameter: (variable_name))
+        argument: (expansion
+          parameter: (variable_name))
+        argument: (word))))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)
+      argument: (process_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (raw_string)
+          argument: (string
+            (simple_expansion
+              (variable_name))))))))
+
+================================================================================
+Upstream: Variable Expansions: Regex
+================================================================================
+
+A=${B//:;;/$'\n'}
+C="${D/#* -E /}"
+BASH_IT_GIT_URL="${BASH_IT_GIT_URL/git@/https://}"
+10#${command_start##*.}
+echo ${LIB_DEPEND//\[static-libs(+)]}
+${ALL_LLVM_TARGETS[@]/%/(-)?}
+filterdiff -p1 ${paths[@]/#/-i }
+${cflags//-O? /$(get-flag O) }
+curf="${f%'-roff2html'*}.html"
+reff="${f/'-roff2html'*/'-ref'}.html"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)
+        argument: (ansi_c_string))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    name: (command_name
+      (concatenation
+        (word)
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (variable_name)
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (subscript
+          name: (variable_name)
+          index: (word))
+        operator: (operator)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word))
+      operator: (operator)
+      argument: (word)))
+  (command
+    name: (command_name
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)
+        argument: (command_substitution
+          (command
+            name: (command_name
+              (word))
+            argument: (word))))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (raw_string)
+          argument: (word))
+        (string_content))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (raw_string)
+          argument: (word)
+          argument: (raw_string))
+        (string_content)))))
+
+================================================================================
+Upstream: Words ending with '$'
+================================================================================
+
+grep ^${var}$
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (expansion
+        parameter: (variable_name))
+      (word))))
+
+================================================================================
+Upstream: Command substitutions
+================================================================================
+
+echo `echo hi`
+echo `echo hi; echo there`
+echo $(echo $(echo hi))
+echo $(< some-file)
+
+# both of these are concatenations!
+echo `echo otherword`word
+echo word`echo otherword`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (command_substitution
+          (command
+            name: (command_name
+              (word))
+            argument: (word))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        redirect: (file_redirect
+          destination: (word)))))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))))
+
+================================================================================
+Upstream: Process substitutions
+================================================================================
+
+wc -c <(echo abc && echo def)
+wc -c <(echo abc; echo def)
+echo abc > >(wc -c)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (process_substitution
+      (list
+        left: (command
+          name: (command_name
+            (word))
+          argument: (word))
+        right: (command
+          name: (command_name
+            (word))
+          argument: (word)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (process_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    redirect: (file_redirect
+      destination: (process_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))))
+
+================================================================================
+Upstream: Single quoted strings
+================================================================================
+
+echo 'a b' 'c d'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (raw_string)
+    argument: (raw_string)))
+
+================================================================================
+Upstream: Double quoted strings
+================================================================================
+
+echo "a" "b"
+echo "a ${b} c" "d $e"
+echo "(())"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content))
+    argument: (string
+      (string_content)))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content)
+      (expansion
+        parameter: (variable_name))
+      (string_content))
+    argument: (string
+      (string_content)
+      (simple_expansion
+        (variable_name))))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content))))
+
+================================================================================
+Upstream: Strings containing command substitutions
+================================================================================
+
+find "`dirname $file`" -name "$base"'*'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (simple_expansion
+            (variable_name)))))
+    argument: (word)
+    argument: (concatenation
+      (string
+        (simple_expansion
+          (variable_name)))
+      (raw_string))))
+
+================================================================================
+Upstream: Strings containing escape sequence
+================================================================================
+
+echo "\"The great escape\`\${var}"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content))))
+
+================================================================================
+Upstream: Strings containing special characters
+================================================================================
+
+echo "s/$/'/"
+echo "#"
+echo "s$"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content)))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content)))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content))))
+
+================================================================================
+Upstream: Strings with ANSI-C quoting
+================================================================================
+
+echo $'Here\'s Johnny!\r\n'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (ansi_c_string)))
+
+================================================================================
+Upstream: Arrays and array expansions
+================================================================================
+
+a=()
+b=(1 2 3)
+
+echo ${a[@]}
+echo ${#b[@]}
+
+a[$i]=50
+a+=(foo "bar" $(baz))
+
+printf "  %-9s" "${seq0:-(default)}"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (array)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (array
+        (word)
+        (word)
+        (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      parameter: (subscript
+        name: (variable_name)
+        index: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (expansion
+      prefix: (operator)
+      parameter: (subscript
+        name: (variable_name)
+        index: (word))))
+  (command
+    assignment: (variable_assignment
+      name: (subscript
+        name: (variable_name)
+        index: (simple_expansion
+          (variable_name)))
+      value: (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (array
+        (word)
+        (string
+          (string_content))
+        (command_substitution
+          (command
+            name: (command_name
+              (word)))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content))
+    argument: (string
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)))))
+
+================================================================================
+Upstream: Escaped characters in strings
+================================================================================
+
+echo -ne "\033k$1\033\\" > /dev/stderr
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (string
+      (string_content)
+      (simple_expansion
+        (special_variable_name))
+      (string_content))
+    redirect: (file_redirect
+      destination: (word))))
+
+================================================================================
+Upstream: Words containing bare '#'
+================================================================================
+
+curl -# localhost #comment without space
+nix build nixpkgs#hello -v # comment with space
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word))
+  (comment))
+
+================================================================================
+Upstream: Words containing # that are not comments
+================================================================================
+
+echo 'word'#not-comment # a legit comment
+echo $(uname -a)#not-comment # a legit comment
+echo `uname -a`#not-comment # a legit comment
+echo $hey#not-comment # a legit comment
+var=#not-comment # a legit comment
+echo "'$var'" # -> '#not-comment'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (raw_string)
+      (word)))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))
+      (word)))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))
+      (word)))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (simple_expansion
+        (variable_name))
+      (word)))
+  (comment)
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word)))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content)
+      (simple_expansion
+        (variable_name))
+      (string_content)))
+  (comment))
+
+================================================================================
+Upstream: Multiple variable assignments
+================================================================================
+
+component_type="${1}" item_name="${2?}"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (special_variable_name))))
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (expansion
+          parameter: (special_variable_name)
+          operator: (operator))))))
+
+================================================================================
+Upstream: Arithmetic expansions
+================================================================================
+
+echo $((1 + 2 - 3 * 4 / 5))
+a=$((6 % 7 ** 8 << 9 >> 10 & 11 | 12 ^ 13))
+$(((${1:-${SECONDS}} % 12) + 144))
+((foo=0))
+echo $((bar=1))
+echo $((-1, 1))
+echo $((! -a || ~ +b || ++c || --d))
+echo $((foo-- || bar++))
+(("${MULTIBUILD_VARIANTS}" > 1))
+$(("$(stat --printf '%05a' "${save_file}")" & 07177))
+soft_errors_count=$[soft_errors_count + 1]
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (binary_expression
+          left: (number)
+          right: (number))
+        right: (binary_expression
+          left: (binary_expression
+            left: (number)
+            right: (number))
+          right: (number)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (arithmetic_expansion
+        (binary_expression
+          left: (binary_expression
+            left: (binary_expression
+              left: (binary_expression
+                left: (binary_expression
+                  left: (number)
+                  right: (binary_expression
+                    left: (number)
+                    right: (number)))
+                right: (number))
+              right: (number))
+            right: (number))
+          right: (binary_expression
+            left: (number)
+            right: (number))))))
+  (command
+    name: (command_name
+      (arithmetic_expansion
+        (binary_expression
+          left: (parenthesized_expression
+            (binary_expression
+              left: (expansion
+                parameter: (special_variable_name)
+                operator: (operator)
+                argument: (expansion
+                  parameter: (variable_name)))
+              right: (number)))
+          right: (number)))))
+  (arithmetic_command
+    (binary_expression
+      left: (variable_name)
+      right: (number)))
+  (command
+    name: (command_name
+      (word))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (variable_name)
+        right: (number))))
+  (command
+    name: (command_name
+      (word))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (unary_expression
+          (number))
+        right: (number))))
+  (command
+    name: (command_name
+      (word))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (binary_expression
+          left: (binary_expression
+            left: (unary_expression
+              (unary_expression
+                (variable_name)))
+            right: (unary_expression
+              (unary_expression
+                (variable_name))))
+          right: (unary_expression
+            (variable_name)))
+        right: (unary_expression
+          (variable_name)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (arithmetic_expansion
+      (binary_expression
+        left: (postfix_expression
+          (variable_name))
+        right: (postfix_expression
+          (variable_name)))))
+  (arithmetic_command
+    (binary_expression
+      left: (string
+        (expansion
+          parameter: (variable_name)))
+      right: (number)))
+  (command
+    name: (command_name
+      (arithmetic_expansion
+        (binary_expression
+          left: (string
+            (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)
+                argument: (raw_string)
+                argument: (string
+                  (expansion
+                    parameter: (variable_name))))))
+          right: (number)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (arithmetic_expansion
+        (binary_expression
+          left: (variable_name)
+          right: (number))))))
+
+================================================================================
+Upstream: Concatenation with double backticks
+================================================================================
+
+main() {
+    local foo="asd"`
+        `"fgh"
+}
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (declaration_command
+        name: (command_name)
+        argument: (variable_assignment
+          name: (variable_name)
+          value: (concatenation
+            (string
+              (string_content))
+            (command_substitution)
+            (string
+              (string_content))))))))
+
+================================================================================
+Upstream: Brace expressions and lookalikes
+================================================================================
+
+echo {1..2}
+echo {0..5}
+echo {0..2 # not a brace expression
+echo }{0..2}
+echo {0..n} # not a brace expression
+echo {0..n..2} # not a brace expression
+echo {0..2}{1..2}
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Upstream: Comments
+================================================================================
+
+#!/bin/bash
+# hi
+
+--------------------------------------------------------------------------------
+
+(program
+  (comment)
+  (comment))
+
+================================================================================
+Upstream: Escaped newlines
+================================================================================
+
+abc \
+  d \
+  e
+
+f=g   \
+  h=i \
+  j   \
+  --k
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Upstream: escaped newline immediately after a char
+================================================================================
+
+echo a \
+    b
+
+echo a\
+    b
+
+echo a\
+    b\
+    c
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Upstream: Escaped whitespace
+================================================================================
+
+echo 1 \ 2 \ 3
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Upstream: Files without trailing terminators
+================================================================================
+
+echo hi
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Upstream: Pipelines
+================================================================================
+
+whoami | cat
+cat foo | grep -v bar
+cat baz | head -n 1
+
+--------------------------------------------------------------------------------
+
+(program
+  (pipeline
+    (command
+      name: (command_name
+        (word)))
+    (command
+      name: (command_name
+        (word))))
+  (pipeline
+    (command
+      name: (command_name
+        (word))
+      argument: (word))
+    (command
+      name: (command_name
+        (word))
+      argument: (word)
+      argument: (word)))
+  (pipeline
+    (command
+      name: (command_name
+        (word))
+      argument: (word))
+    (command
+      name: (command_name
+        (word))
+      argument: (word)
+      argument: (word))))
+
+================================================================================
+Upstream: Lists
+================================================================================
+
+a | b && c && d; d e f || e g
+
+--------------------------------------------------------------------------------
+
+(program
+  (list
+    left: (list
+      left: (pipeline
+        (command
+          name: (command_name
+            (word)))
+        (command
+          name: (command_name
+            (word))))
+      right: (command
+        name: (command_name
+          (word))))
+    right: (command
+      name: (command_name
+        (word))))
+  (list
+    left: (command
+      name: (command_name
+        (word))
+      argument: (word)
+      argument: (word))
+    right: (command
+      name: (command_name
+        (word))
+      argument: (word))))
+
+================================================================================
+Upstream: While statements
+================================================================================
+
+while something happens; do
+  echo a
+  echo b
+done
+
+while local name="$1" val="$2"; shift 2; do
+  printf "%s (%s)\n" "$val" "$name"
+done
+
+--------------------------------------------------------------------------------
+
+(program
+  (while_statement
+    condition: (command
+      name: (command_name
+        (word))
+      argument: (word))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (while_statement
+    condition: (declaration_command
+      name: (command_name)
+      argument: (variable_assignment
+        name: (variable_name)
+        value: (string
+          (simple_expansion
+            (special_variable_name))))
+      argument: (variable_assignment
+        name: (variable_name)
+        value: (string
+          (simple_expansion
+            (special_variable_name)))))
+    condition: (command
+      name: (command_name
+        (word))
+      argument: (word))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (simple_expansion
+            (variable_name)))
+        argument: (string
+          (simple_expansion
+            (variable_name)))))))
+
+================================================================================
+Upstream: Until statements
+================================================================================
+
+until something happens; do
+  echo a
+  echo b
+done
+
+--------------------------------------------------------------------------------
+
+(program
+  (while_statement
+    condition: (command
+      name: (command_name
+        (word))
+      argument: (word))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))))
+
+================================================================================
+Upstream: While statements with IO redirects
+================================================================================
+
+while read line; do
+  echo $line
+done < <(cat file)
+
+--------------------------------------------------------------------------------
+
+(program
+  (redirected_statement
+    body: (while_statement
+      condition: (command
+        name: (command_name
+          (word))
+        argument: (word))
+      body: (do_group
+        (command
+          name: (command_name
+            (word))
+          argument: (simple_expansion
+            (variable_name)))))
+    redirect: (file_redirect
+      destination: (process_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))))
+
+================================================================================
+Upstream: For statements
+================================================================================
+
+for a in 1 2 $(seq 5 10); do
+  echo $a
+done
+
+for ARG; do
+  echo $ARG
+  ARG=''
+done
+
+for c in ${=1}; do
+	echo c
+done
+
+--------------------------------------------------------------------------------
+
+(program
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    value: (word)
+    value: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word)
+        argument: (word)))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))))
+  (for_statement
+    variable: (variable_name)
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))
+      (command
+        assignment: (variable_assignment
+          name: (variable_name)
+          value: (raw_string)))))
+  (for_statement
+    variable: (variable_name)
+    value: (expansion
+      argument: (word))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))))
+
+================================================================================
+Upstream: Select statements
+================================================================================
+
+select choice in X Y $(ls); do
+  echo $choice
+  break
+done
+
+select ARG; do
+  echo $ARG
+  ARG=''
+done
+
+--------------------------------------------------------------------------------
+
+(program
+  (for_statement
+    variable: (variable_name)
+    value: (word)
+    value: (word)
+    value: (command_substitution
+      (command
+        name: (command_name
+          (word))))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))
+      (command
+        name: (command_name
+          (word)))))
+  (for_statement
+    variable: (variable_name)
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))
+      (command
+        assignment: (variable_assignment
+          name: (variable_name)
+          value: (raw_string))))))
+
+================================================================================
+Upstream: C-style for statements
+================================================================================
+
+for (( c=1; c<=5; c++ ))
+do
+  echo $c
+done
+
+for (( c=1; c<=5; c++ )) {
+	echo $c
+}
+
+for (( ; ; ))
+do
+  echo 'forever'
+done
+
+for ((cx = 0; c = $cx / $pf, c < $wc - $k; )); do
+		echo "$cx"
+done
+
+for (( i = 4;;i--)) ; do echo $i; if (( $i == 0 )); then break; fi; done
+
+# added post-bash-4.2
+for (( i = j = k = 1; i % 9 || (j *= -1, $( ((i%9)) || printf " " >&2; echo 0), k++ <= 10); i += j ))
+do
+printf "$i"
+done
+
+echo
+
+( for (( i = j = k = 1; i % 9 || (j *= -1, $( ((i%9)) || printf " " >&2; echo 0), k++ <= 10); i += j ))
+do
+printf "$i"
+done )
+
+--------------------------------------------------------------------------------
+
+(program
+  (c_style_for_statement
+    initializer: (binary_expression
+      left: (variable_name)
+      right: (number))
+    condition: (binary_expression
+      left: (variable_name)
+      right: (number))
+    update: (postfix_expression
+      (variable_name))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))))
+  (c_style_for_statement
+    initializer: (binary_expression
+      left: (variable_name)
+      right: (number))
+    condition: (binary_expression
+      left: (variable_name)
+      right: (number))
+    update: (postfix_expression
+      (variable_name))
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))))
+  (c_style_for_statement
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string))))
+  (c_style_for_statement
+    initializer: (binary_expression
+      left: (variable_name)
+      right: (number))
+    condition: (binary_expression
+      left: (binary_expression
+        left: (variable_name)
+        right: (binary_expression
+          left: (simple_expansion
+            (variable_name))
+          right: (simple_expansion
+            (variable_name))))
+      right: (binary_expression
+        left: (variable_name)
+        right: (binary_expression
+          left: (simple_expansion
+            (variable_name))
+          right: (simple_expansion
+            (variable_name)))))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (simple_expansion
+            (variable_name))))))
+  (c_style_for_statement
+    initializer: (binary_expression
+      left: (variable_name)
+      right: (number))
+    update: (postfix_expression
+      (variable_name))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))
+      (if_statement
+        condition: (arithmetic_command
+          (binary_expression
+            left: (simple_expansion
+              (variable_name))
+            right: (number)))
+        consequence: (command
+          name: (command_name
+            (word))))))
+  (comment)
+  (c_style_for_statement
+    initializer: (binary_expression
+      left: (variable_name)
+      right: (binary_expression
+        left: (variable_name)
+        right: (binary_expression
+          left: (variable_name)
+          right: (number))))
+    condition: (binary_expression
+      left: (binary_expression
+        left: (variable_name)
+        right: (number))
+      right: (parenthesized_expression
+        (binary_expression
+          left: (binary_expression
+            left: (binary_expression
+              left: (variable_name)
+              right: (unary_expression
+                (number)))
+            right: (command_substitution
+              (list
+                left: (arithmetic_command
+                  (binary_expression
+                    left: (variable_name)
+                    right: (number)))
+                right: (command
+                  name: (command_name
+                    (word))
+                  argument: (string
+                    (string_content))
+                  redirect: (file_redirect
+                    destination: (word))))
+              (command
+                name: (command_name
+                  (word))
+                argument: (word))))
+          right: (binary_expression
+            left: (postfix_expression
+              (variable_name))
+            right: (number)))))
+    update: (binary_expression
+      left: (variable_name)
+      right: (variable_name))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (simple_expansion
+            (variable_name))))))
+  (command
+    name: (command_name
+      (word)))
+  (subshell
+    (c_style_for_statement
+      initializer: (binary_expression
+        left: (variable_name)
+        right: (binary_expression
+          left: (variable_name)
+          right: (binary_expression
+            left: (variable_name)
+            right: (number))))
+      condition: (binary_expression
+        left: (binary_expression
+          left: (variable_name)
+          right: (number))
+        right: (parenthesized_expression
+          (binary_expression
+            left: (binary_expression
+              left: (binary_expression
+                left: (variable_name)
+                right: (unary_expression
+                  (number)))
+              right: (command_substitution
+                (list
+                  left: (arithmetic_command
+                    (binary_expression
+                      left: (variable_name)
+                      right: (number)))
+                  right: (command
+                    name: (command_name
+                      (word))
+                    argument: (string
+                      (string_content))
+                    redirect: (file_redirect
+                      destination: (word))))
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (word))))
+            right: (binary_expression
+              left: (postfix_expression
+                (variable_name))
+              right: (number)))))
+      update: (binary_expression
+        left: (variable_name)
+        right: (variable_name))
+      body: (do_group
+        (command
+          name: (command_name
+            (word))
+          argument: (string
+            (simple_expansion
+              (variable_name))))))))
+
+================================================================================
+Upstream: If statements
+================================================================================
+
+if cat some_file | grep -v ok; then
+  echo one
+elif cat other_file | grep -v ok; then
+  echo two
+else
+  exit
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (pipeline
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (command
+        name: (command_name
+          (word))
+        argument: (word)
+        argument: (word)))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (word))
+    (elif_clause
+      condition: (pipeline
+        (command
+          name: (command_name
+            (word))
+          argument: (word))
+        (command
+          name: (command_name
+            (word))
+          argument: (word)
+          argument: (word)))
+      consequence: (command
+        name: (command_name
+          (word))
+        argument: (word)))
+    (else_clause
+      (command
+        name: (command_name
+          (word))))))
+
+================================================================================
+Upstream: If statements with conditional expressions
+================================================================================
+
+if [ "$(uname)" == 'Darwin' ]; then
+  echo one
+fi
+
+if [ a = -d ]; then
+  echo two
+fi
+
+[[ abc == +(a|b|c) ]] && echo 1
+[[ abc != +(a|b|c) ]] && echo 2
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (command
+      name: (command_name
+        (word))
+      argument: (string
+        (command_substitution
+          (command
+            name: (command_name
+              (word)))))
+      argument: (word)
+      argument: (raw_string)
+      argument: (word))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (if_statement
+    condition: (command
+      name: (command_name
+        (word))
+      argument: (word)
+      argument: (word)
+      argument: (word)
+      argument: (word))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (list
+    left: (test_command
+      (binary_test
+        left: (word)
+        operator: (test_operator)
+        right: (word)))
+    right: (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (list
+    left: (test_command
+      (binary_test
+        left: (word)
+        operator: (test_operator)
+        right: (word)))
+    right: (command
+      name: (command_name
+        (word))
+      argument: (word))))
+
+================================================================================
+Upstream: If statements with negated command
+================================================================================
+
+if ! command -v echo; then
+  echo 'hello'
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (negated_command
+      (command
+        name: (command_name
+          (word))
+        argument: (word)
+        argument: (word)))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (raw_string))))
+
+================================================================================
+Upstream: If statements with command
+================================================================================
+
+if command -v echo; then
+  echo 'hello'
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (command
+      name: (command_name
+        (word))
+      argument: (word)
+      argument: (word))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (raw_string))))
+
+================================================================================
+Upstream: If statements with variable assignment by command substitution
+================================================================================
+
+if result=$(echo 'hello'); then
+  echo 'hello'
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (command
+      assignment: (variable_assignment
+        name: (variable_name)
+        value: (command_substitution
+          (command
+            name: (command_name
+              (word))
+            argument: (raw_string)))))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (raw_string))))
+
+================================================================================
+Upstream: If statements with negated variable assignment by command substitution
+================================================================================
+
+if ! result=$(echo 'hello'); then
+  echo 'hello'
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (negated_command
+      (command
+        assignment: (variable_assignment
+          name: (variable_name)
+          value: (command_substitution
+            (command
+              name: (command_name
+                (word))
+              argument: (raw_string))))))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (raw_string))))
+
+================================================================================
+Upstream: If statements with variable assignment
+================================================================================
+
+if foo=1; then
+  echo 'hello'
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (command
+      assignment: (variable_assignment
+        name: (variable_name)
+        value: (word)))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (raw_string))))
+
+================================================================================
+Upstream: If statements with negated variable assignment
+================================================================================
+
+if ! foo=1; then
+  echo 'hello'
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (negated_command
+      (command
+        assignment: (variable_assignment
+          name: (variable_name)
+          value: (word))))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (raw_string))))
+
+================================================================================
+Upstream: Test commands
+================================================================================
+
+if [[ "$lsb_dist" != 'Ubuntu' || $(ver_to_int "$lsb_release") < $(ver_to_int '14.04') ]]; then
+	return 1
+fi
+
+[[ ${PV} != $(sed -n -e 's/^Version: //p' "${ED}/usr/$(get_libdir)/pkgconfig/tss2-tcti-tabrmd.pc" || die) ]]
+
+[[ ${f} != */@(default).vim ]]
+
+[[ "${MY_LOCALES}" != *en_US* || a != 2 ]]
+
+[[ $(LC_ALL=C $(tc-getCC) ${LDFLAGS} -Wl,--version 2>/dev/null) != @(LLD|GNU\ ld)* ]]
+
+[[ -f "${EROOT}/usr/share/php/.packagexml/${MY_P}.xml" && \
+	-x "${EROOT}/usr/bin/peardev" ]]
+
+[[ ${test} == @($(IFS='|'; echo "${skip[*]}")) ]]
+
+[[ ${SRC_URI} == */${a}* ]]
+
+[[ a == *_@(LIB|SYMLINK) ]]
+
+[[ ${1} =~ \.(lisp|lsp|cl)$ ]]
+
+[[ a == - ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (test_command
+      (logical_test
+        (binary_test
+          left: (string
+            (simple_expansion
+              (variable_name)))
+          operator: (test_operator)
+          right: (raw_string))
+        (binary_test
+          left: (command_substitution
+            (command
+              name: (command_name
+                (word))
+              argument: (string
+                (simple_expansion
+                  (variable_name)))))
+          operator: (test_operator)
+          right: (command_substitution
+            (command
+              name: (command_name
+                (word))
+              argument: (raw_string))))))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (test_command
+    (binary_test
+      left: (expansion
+        parameter: (variable_name))
+      operator: (test_operator)
+      right: (command_substitution
+        (list
+          left: (command
+            name: (command_name
+              (word))
+            argument: (word)
+            argument: (word)
+            argument: (raw_string)
+            argument: (string
+              (expansion
+                parameter: (variable_name))
+              (string_content)
+              (command_substitution
+                (command
+                  name: (command_name
+                    (word))))
+              (string_content)))
+          right: (command
+            name: (command_name
+              (word)))))))
+  (test_command
+    (binary_test
+      left: (expansion
+        parameter: (variable_name))
+      operator: (test_operator)
+      right: (word)))
+  (test_command
+    (logical_test
+      (binary_test
+        left: (string
+          (expansion
+            parameter: (variable_name)))
+        operator: (test_operator)
+        right: (word))
+      (binary_test
+        left: (word)
+        operator: (test_operator)
+        right: (word))))
+  (test_command
+    (binary_test
+      left: (command_substitution
+        (command
+          assignment: (variable_assignment
+            name: (variable_name)
+            value: (word))
+          name: (command_name
+            (command_substitution
+              (command
+                name: (command_name
+                  (word)))))
+          argument: (expansion
+            parameter: (variable_name))
+          argument: (word)
+          redirect: (file_redirect
+            descriptor: (file_descriptor)
+            destination: (word))))
+      operator: (test_operator)
+      right: (word)))
+  (test_command
+    (logical_test
+      (unary_test
+        operator: (test_operator)
+        operand: (string
+          (expansion
+            parameter: (variable_name))
+          (string_content)
+          (expansion
+            parameter: (variable_name))
+          (string_content)))
+      (unary_test
+        operator: (test_operator)
+        operand: (string
+          (expansion
+            parameter: (variable_name))
+          (string_content)))))
+  (test_command
+    (binary_test
+      left: (expansion
+        parameter: (variable_name))
+      operator: (test_operator)
+      right: (extglob_pattern
+        alternative: (command_substitution
+          (command
+            assignment: (variable_assignment
+              name: (variable_name)
+              value: (raw_string)))
+          (command
+            name: (command_name
+              (word))
+            argument: (string
+              (expansion
+                parameter: (subscript
+                  name: (variable_name)
+                  index: (word)))))))))
+  (test_command
+    (binary_test
+      left: (expansion
+        parameter: (variable_name))
+      operator: (test_operator)
+      right: (concatenation
+        (word)
+        (expansion
+          parameter: (variable_name))
+        (word))))
+  (test_command
+    (binary_test
+      left: (word)
+      operator: (test_operator)
+      right: (word)))
+  (test_command
+    (regex_test
+      left: (expansion
+        parameter: (special_variable_name))
+      right: (regex)))
+  (test_command
+    (binary_test
+      left: (word)
+      operator: (test_operator)
+      right: (word))))
+
+================================================================================
+Upstream: Test commands with ternary
+================================================================================
+
+if (( 1 < 2 ? 1 : 2 )); then
+	return 1
+fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (arithmetic_command
+      (ternary_expression
+        condition: (binary_expression
+          left: (number)
+          right: (number))
+        consequence: (number)
+        alternative: (number)))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (word))))
+
+================================================================================
+Upstream: Ternary expressions
+================================================================================
+
+$((n < 10 ? n : 10))
+$(($n < 10 ? $n : 10))
+$((${n} < 10 ? ${n} : 10))
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (arithmetic_expansion
+        (ternary_expression
+          condition: (binary_expression
+            left: (variable_name)
+            right: (number))
+          consequence: (variable_name)
+          alternative: (number)))))
+  (command
+    name: (command_name
+      (arithmetic_expansion
+        (ternary_expression
+          condition: (binary_expression
+            left: (simple_expansion
+              (variable_name))
+            right: (number))
+          consequence: (simple_expansion
+            (variable_name))
+          alternative: (number)))))
+  (command
+    name: (command_name
+      (arithmetic_expansion
+        (ternary_expression
+          condition: (binary_expression
+            left: (expansion
+              parameter: (variable_name))
+            right: (number))
+          consequence: (expansion
+            parameter: (variable_name))
+          alternative: (number))))))
+
+================================================================================
+Upstream: Test commands with regexes
+================================================================================
+
+[[ "35d8b" =~ ^[0-9a-fA-F] ]]
+[[ $CMD =~ (^|;)update_terminal_cwd($|;) ]]
+[[ ! " ${completions[*]} " =~ " $alias_cmd " ]]
+! [[ "$a" =~ ^a|b\ *c|d$ ]]
+[[ "$1" =~ ^${var}${var}*=..* ]]
+[[ "$1" =~ ^\-${var}+ ]]
+[[ ${var1} == *${var2}* ]]
+[[ "$server" =~ [0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3} ]]
+[[ "$primary_wins" =~ ([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}) ]]
+[[ -f ${x} && $(od -t x1 -N 4 "${x}") == *"7f 45 4c 46"* ]]
+[[ ${PV} =~ 99999999$ ]]
+[[ $1 == -- ]]
+[[ " ${REPLACING_VERSIONS} " != *\ ${PVR}\ * ]]
+[[ ${file} == @(*${GENTOO_PATCH_NAME}.tar.xz|*.asc|*.sig) ]]
+[[ $RUBY_TARGETS != *$( eselect ruby show | awk 'NR==2' | tr  -d ' '  )* ]]
+[[ " ${m[0]##*/}" =~ ^(\ ${skip_files[*]/%/.*|\\} ) ]]
+[[ ' boop xyz' =~ ' boop '(.*)$ ]]
+[[ $b = foo* ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (test_command
+    (regex_test
+      left: (string
+        (string_content))
+      right: (regex)))
+  (test_command
+    (regex_test
+      left: (simple_expansion
+        (variable_name))
+      right: (regex)))
+  (test_command
+    (negated_test
+      (regex_test
+        left: (string
+          (string_content)
+          (expansion
+            parameter: (subscript
+              name: (variable_name)
+              index: (word)))
+          (string_content))
+        right: (regex))))
+  (negated_command
+    (test_command
+      (regex_test
+        left: (string
+          (simple_expansion
+            (variable_name)))
+        right: (regex))))
+  (test_command
+    (regex_test
+      left: (string
+        (simple_expansion
+          (special_variable_name)))
+      right: (regex)))
+  (test_command
+    (regex_test
+      left: (string
+        (simple_expansion
+          (special_variable_name)))
+      right: (regex)))
+  (test_command
+    (binary_test
+      left: (expansion
+        parameter: (variable_name))
+      operator: (test_operator)
+      right: (concatenation
+        (word)
+        (expansion
+          parameter: (variable_name))
+        (word))))
+  (test_command
+    (regex_test
+      left: (string
+        (simple_expansion
+          (variable_name)))
+      right: (regex)))
+  (test_command
+    (regex_test
+      left: (string
+        (simple_expansion
+          (variable_name)))
+      right: (regex)))
+  (test_command
+    (logical_test
+      (unary_test
+        operator: (test_operator)
+        operand: (expansion
+          parameter: (variable_name)))
+      (binary_test
+        left: (command_substitution
+          (command
+            name: (command_name
+              (word))
+            argument: (word)
+            argument: (word)
+            argument: (word)
+            argument: (word)
+            argument: (string
+              (expansion
+                parameter: (variable_name)))))
+        operator: (test_operator)
+        right: (concatenation
+          (word)
+          (string
+            (string_content))
+          (word)))))
+  (test_command
+    (regex_test
+      left: (expansion
+        parameter: (variable_name))
+      right: (regex)))
+  (test_command
+    (binary_test
+      left: (simple_expansion
+        (special_variable_name))
+      operator: (test_operator)
+      right: (word)))
+  (test_command
+    (binary_test
+      left: (string
+        (string_content)
+        (expansion
+          parameter: (variable_name))
+        (string_content))
+      operator: (test_operator)
+      right: (concatenation
+        (word)
+        (expansion
+          parameter: (variable_name))
+        (word))))
+  (test_command
+    (binary_test
+      left: (expansion
+        parameter: (variable_name))
+      operator: (test_operator)
+      right: (extglob_pattern
+        alternative: (concatenation
+          (word)
+          (expansion
+            parameter: (variable_name))
+          (word))
+        alternative: (word)
+        alternative: (word))))
+  (test_command
+    (binary_test
+      left: (simple_expansion
+        (variable_name))
+      operator: (test_operator)
+      right: (concatenation
+        (word)
+        (command_substitution
+          (pipeline
+            (command
+              name: (command_name
+                (word))
+              argument: (word)
+              argument: (word))
+            (command
+              name: (command_name
+                (word))
+              argument: (raw_string))
+            (command
+              name: (command_name
+                (word))
+              argument: (word)
+              argument: (raw_string))))
+        (word))))
+  (test_command
+    (regex_test
+      left: (string
+        (string_content)
+        (expansion
+          parameter: (subscript
+            name: (variable_name)
+            index: (word))
+          operator: (operator)
+          argument: (word)))
+      right: (regex)))
+  (test_command
+    (regex_test
+      left: (raw_string)
+      right: (regex)))
+  (test_command
+    (binary_test
+      left: (simple_expansion
+        (variable_name))
+      operator: (test_operator)
+      right: (word))))
+
+================================================================================
+Upstream: Test command paren statefulness with a case glob
+================================================================================
+
+[[ ${test} == @($(IFS='|'; echo "${skip[*]}")) ]]
+
+case ${out} in
+*"not supported"*|\
+*"operation not supported"*)
+	;;
+esac
+
+case $1 in
+-o)
+	owner=$2
+	shift
+	;;
+-g) ;;
+esac
+
+[[ a == \"+(?)\" ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (test_command
+    (binary_test
+      left: (expansion
+        parameter: (variable_name))
+      operator: (test_operator)
+      right: (extglob_pattern
+        alternative: (command_substitution
+          (command
+            assignment: (variable_assignment
+              name: (variable_name)
+              value: (raw_string)))
+          (command
+            name: (command_name
+              (word))
+            argument: (string
+              (expansion
+                parameter: (subscript
+                  name: (variable_name)
+                  index: (word)))))))))
+  (case_statement
+    value: (expansion
+      parameter: (variable_name))
+    (case_item
+      pattern: (concatenation
+        (word)
+        (string
+          (string_content))
+        (word))
+      pattern: (concatenation
+        (word)
+        (string
+          (string_content))
+        (word))))
+  (case_statement
+    value: (simple_expansion
+      (special_variable_name))
+    (case_item
+      pattern: (word)
+      (command
+        assignment: (variable_assignment
+          name: (variable_name)
+          value: (simple_expansion
+            (special_variable_name))))
+      (command
+        name: (command_name
+          (word))))
+    (case_item
+      pattern: (word)))
+  (test_command
+    (binary_test
+      left: (word)
+      operator: (test_operator)
+      right: (word))))
+
+================================================================================
+Upstream: Subshells
+================================================================================
+
+(
+  ./start-server --port=80
+) &
+
+time ( cd tests && sh run-tests.sh )
+
+--------------------------------------------------------------------------------
+
+(program
+  (subshell
+    (command
+      name: (command_name
+        (word))
+      argument: (word)))
+  (timed_command
+    (subshell
+      (list
+        left: (command
+          name: (command_name
+            (word))
+          argument: (word))
+        right: (command
+          name: (command_name
+            (word))
+          argument: (word))))))
+
+================================================================================
+Upstream: Function definitions
+================================================================================
+
+do_something() {
+  echo ok
+}
+
+run_subshell_command() (
+  true
+)
+
+run_test_command() [[ -e foo ]]
+
+function do_something_else() {
+  a | xargs -I{} find xml/{} -type f
+}
+
+function do_yet_another_thing {
+  echo ok
+} 2>&1
+
+do_nothing() { return 0; }
+
+foo::bar() {
+  echo what
+}
+
+foo::baz() {
+  echo how
+}
+
+assert()
+  if ! $1; then
+    return 1
+  fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (function_definition
+    name: (word)
+    body: (subshell
+      (command
+        name: (command_name
+          (word)))))
+  (function_definition
+    name: (word)
+    body: (test_command
+      (unary_test
+        operator: (test_operator)
+        operand: (word))))
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (pipeline
+        (command
+          name: (command_name
+            (word)))
+        (command
+          name: (command_name
+            (word))
+          argument: (word)
+          argument: (word)
+          argument: (word)
+          argument: (word)
+          argument: (word)))))
+  (redirected_statement
+    body: (function_definition
+      name: (word)
+      body: (compound_statement
+        (command
+          name: (command_name
+            (word))
+          argument: (word))))
+    redirect: (file_redirect
+      descriptor: (file_descriptor)
+      destination: (word)))
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (function_definition
+    name: (word)
+    body: (if_statement
+      condition: (negated_command
+        (command
+          name: (command_name
+            (simple_expansion
+              (special_variable_name)))))
+      consequence: (command
+        name: (command_name
+          (word))
+        argument: (word)))))
+
+================================================================================
+Upstream: Variable declaration: declare & typeset
+================================================================================
+
+declare var1
+typeset -i -r var2=42 var3=10
+
+--------------------------------------------------------------------------------
+
+(program
+  (declaration_command
+    name: (command_name)
+    argument: (word))
+  (declaration_command
+    name: (command_name)
+    argument: (word)
+    argument: (word)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (word))))
+
+================================================================================
+Upstream: Variable declaration: readonly
+================================================================================
+
+readonly var1
+readonly var2=42
+
+--------------------------------------------------------------------------------
+
+(program
+  (declaration_command
+    name: (command_name)
+    argument: (word))
+  (declaration_command
+    name: (command_name)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (word))))
+
+================================================================================
+Upstream: Variable declaration: local
+================================================================================
+
+local a=42 b
+local -r c
+local var=word1\ word2
+
+--------------------------------------------------------------------------------
+
+(program
+  (declaration_command
+    name: (command_name)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (word))
+    argument: (word))
+  (declaration_command
+    name: (command_name)
+    argument: (word)
+    argument: (word))
+  (declaration_command
+    name: (command_name)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (word))))
+
+================================================================================
+Upstream: Variable declaration: export
+================================================================================
+
+export PATH
+export FOOBAR PATH="$PATH:/usr/foobar/bin"
+export $FOO:$BAR
+
+--------------------------------------------------------------------------------
+
+(program
+  (declaration_command
+    name: (command_name)
+    argument: (word))
+  (declaration_command
+    name: (command_name)
+    argument: (word)
+    argument: (variable_assignment
+      name: (variable_name)
+      value: (string
+        (simple_expansion
+          (variable_name))
+        (string_content))))
+  (declaration_command
+    name: (command_name)
+    argument: (concatenation
+      (simple_expansion
+        (variable_name))
+      (word)
+      (simple_expansion
+        (variable_name)))))
+
+================================================================================
+Upstream: Variable declaration: command substitution with semi-colon
+================================================================================
+
+_path=$(
+  while statement; do
+    cd ".."
+  done;
+  echo $PWD
+)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (while_statement
+          condition: (command
+            name: (command_name
+              (word)))
+          body: (do_group
+            (command
+              name: (command_name
+                (word))
+              argument: (string
+                (string_content)))))
+        (command
+          name: (command_name
+            (word))
+          argument: (simple_expansion
+            (variable_name)))))))
+
+================================================================================
+Upstream: Command substution with $ and backticks
+================================================================================
+
+$(eval echo $`echo ${foo}`)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word)
+          argument: (concatenation
+            (word)
+            (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (expansion
+                  parameter: (variable_name))))))))))
+
+================================================================================
+Upstream: Expressions passed to declaration commands
+================================================================================
+
+export "$(echo ${key} | tr [:lower:] [:upper:])=${p_key#*=}"
+
+--------------------------------------------------------------------------------
+
+(program
+  (declaration_command
+    name: (command_name)
+    argument: (string
+      (command_substitution
+        (pipeline
+          (command
+            name: (command_name
+              (word))
+            argument: (expansion
+              parameter: (variable_name)))
+          (command
+            name: (command_name
+              (word))
+            argument: (word)
+            argument: (word))))
+      (string_content)
+      (expansion
+        parameter: (variable_name)
+        operator: (operator)
+        argument: (word)))))
+
+================================================================================
+Upstream: Unset commands
+================================================================================
+
+unset A
+unset "$variable_name"
+unsetenv -f ONE TWO
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (simple_expansion
+        (variable_name))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word)
+    argument: (word)))
+
+================================================================================
+Upstream: Compound statements
+================================================================================
+
+a () {
+    ls || { echo "b"; return 0; }
+    echo c
+}
+
+{ echo "a"
+  echo "b"
+} >&2
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (list
+        left: (command
+          name: (command_name
+            (word)))
+        right: (compound_statement
+          (command
+            name: (command_name
+              (word))
+            argument: (string
+              (string_content)))
+          (command
+            name: (command_name
+              (word))
+            argument: (word))))
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (redirected_statement
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content)))
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))))
+    redirect: (file_redirect
+      destination: (word))))
+
+================================================================================
+Upstream: If condition with subshell
+================================================================================
+
+if (echo $BASHPID; true); then echo $BASHPID; fi
+
+--------------------------------------------------------------------------------
+
+(program
+  (if_statement
+    condition: (subshell
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))
+      (command
+        name: (command_name
+          (word))))
+    consequence: (command
+      name: (command_name
+        (word))
+      argument: (simple_expansion
+        (variable_name)))))
+
+================================================================================
+Upstream: While condition with subshell
+================================================================================
+
+while (echo $BASHPID; true); do echo $BASHPID; break; done
+
+--------------------------------------------------------------------------------
+
+(program
+  (while_statement
+    condition: (subshell
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))
+      (command
+        name: (command_name
+          (word))))
+    body: (do_group
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))
+      (command
+        name: (command_name
+          (word))))))
