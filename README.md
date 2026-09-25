@@ -1,7 +1,10 @@
 # @willbooster/tree-sitter-bash
 
-[![CI][ci]](https://github.com/WillBooster/tree-sitter-bash/actions/workflows/ci.yml)
-[![npm][npm]](https://www.npmjs.com/package/@willbooster/tree-sitter-bash)
+[![npm version](https://img.shields.io/npm/v/@willbooster/tree-sitter-bash.svg)](https://www.npmjs.com/package/@willbooster/tree-sitter-bash)
+[![license](https://img.shields.io/npm/l/@willbooster/tree-sitter-bash.svg)](https://www.npmjs.com/package/@willbooster/tree-sitter-bash)
+[![Test](https://github.com/WillBooster/tree-sitter-bash/actions/workflows/test.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-bash/actions/workflows/test.yml)
+[![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
+[![wbfy](https://img.shields.io/badge/wbfy-20.20.0-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
 
 Bash grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), rewritten from
 [tree-sitter/tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash). The syntax trees differ from the
@@ -32,21 +35,17 @@ const tree = parser.parse('cat <<EOF; echo done\n$(date)\nEOF\n');
 ```sh
 mise install
 bun install --frozen-lockfile
-bun run lint
-bun run test
 bun run tree-sitter generate
-bun run tree-sitter test
+bun run test
 script/parse-examples
 ```
 
 `script/parse-examples` clones real-world scripts into `examples/`, parses them with the local
-tree-sitter CLI, and rewrites `script/known-failures.txt`, the list of files that CI expects to fail.
+tree-sitter CLI, and rewrites `script/known-failures.txt`, the list of files that fail to parse; its diff shows
+regressions.
 
 ### References
 
 - [Bash man page](http://man7.org/linux/man-pages/man1/bash.1.html#SHELL_GRAMMAR)
 - [Shell command language specification](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html)
 - [mvdan/sh - a shell parser in go](https://github.com/mvdan/sh)
-
-[ci]: https://img.shields.io/github/actions/workflow/status/WillBooster/tree-sitter-bash/ci.yml?logo=github&label=CI
-[npm]: https://img.shields.io/npm/v/%40willbooster%2Ftree-sitter-bash?logo=npm
