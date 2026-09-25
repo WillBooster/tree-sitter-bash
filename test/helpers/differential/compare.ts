@@ -56,6 +56,16 @@ export class Oracle {
     this.runs++;
     const scriptPath = path.join(this.directory, `script${this.runs}.sh`);
     const logPath = path.join(this.directory, `log${this.runs}`);
+    try {
+      return this.compareAt(script, scriptPath, logPath);
+    } finally {
+      // Removed per run, so cleanup time does not grow with the number of scripts.
+      fs.rmSync(scriptPath, { force: true });
+      fs.rmSync(logPath, { force: true, recursive: true });
+    }
+  }
+
+  private compareAt(script: string, scriptPath: string, logPath: string): Outcome {
     fs.writeFileSync(scriptPath, script);
     const syntax = Bun.spawnSync([this.bash, '-n', scriptPath], { stderr: 'pipe' });
     if (syntax.exitCode !== 0) return { kind: 'invalid', reason: syntax.stderr.toString() };
