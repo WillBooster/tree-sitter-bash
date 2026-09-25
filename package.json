@@ -1,28 +1,21 @@
 {
   "name": "@willbooster/tree-sitter-bash",
-  "version": "0.25.1",
+  "version": "0.0.0-semantically-released",
   "description": "Bash grammar for tree-sitter",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/WillBooster/tree-sitter-bash.git"
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
-  },
-  "license": "MIT",
-  "author": {
-    "name": "Max Brunsfeld",
-    "email": "maxbrunsfeld@gmail.com"
-  },
-  "main": "bindings/node",
-  "types": "bindings/node",
   "keywords": [
     "incremental",
     "parsing",
     "tree-sitter",
     "bash"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WillBooster/tree-sitter-bash.git"
+  },
+  "license": "MIT",
+  "author": "WillBooster Inc.",
+  "main": "bindings/node",
+  "types": "bindings/node",
   "files": [
     "grammar.js",
     "tree-sitter.json",
@@ -33,19 +26,37 @@
     "src/**",
     "*.wasm"
   ],
+  "scripts": {
+    "build-prebuilds": "prebuildify --napi --strip --name tree-sitter-bash",
+    "build/ci": "tree-sitter generate",
+    "cleanup": "bun wb lint --fix --format",
+    "format": "bun wb lint --format",
+    "install": "node-gyp-build",
+    "lint": "bun wb lint",
+    "lint-fix": "bun wb lint --fix",
+    "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
+    "release": "wb release",
+    "release-test": "node node_modules/semantic-release/bin/semantic-release.js --dry-run --plugins @semantic-release/commit-analyzer @semantic-release/release-notes-generator",
+    "prestart": "tree-sitter build --wasm",
+    "start": "tree-sitter playground",
+    "test": "tree-sitter test && node --test bindings/node/*_test.js",
+    "test/ci": "bun wb test-on-ci",
+    "verify": "bun wb verify",
+    "verify-full": "bun wb verify --full"
+  },
   "dependencies": {
     "node-addon-api": "^8.2.1",
     "node-gyp-build": "^4.8.2"
   },
   "devDependencies": {
     "@semantic-release/exec": "7.1.0",
-    "@willbooster/wb": "22.7.0",
+    "@willbooster/wb": "22.7.1",
     "conventional-changelog-conventionalcommits": "9.3.1",
-    "eslint": "^9.12.0",
-    "eslint-config-treesitter": "^1.0.2",
+    "lefthook": "2.1.14",
     "node-gyp": "13.0.2",
     "prebuildify": "^6.0.1",
     "semantic-release": "25.0.5",
+    "sort-package-json": "4.0.0",
     "tree-sitter": "^0.25.0",
     "tree-sitter-cli": "^0.27.0"
   },
@@ -57,22 +68,8 @@
       "optional": true
     }
   },
-  "patchedDependencies": {
-    "eslint-config-treesitter@1.0.2": "patches/eslint-config-treesitter@1.0.2.patch"
-  },
-  "trustedDependencies": [
-    "tree-sitter",
-    "tree-sitter-cli"
-  ],
-  "scripts": {
-    "install": "node-gyp-build",
-    "lint": "eslint grammar.js",
-    "prestart": "tree-sitter build --wasm",
-    "release": "wb release",
-    "release-test": "node node_modules/semantic-release/bin/semantic-release.js --dry-run --plugins @semantic-release/commit-analyzer @semantic-release/release-notes-generator",
-    "start": "tree-sitter playground",
-    "test": "node --test bindings/node/*_test.js",
-    "build-prebuilds": "prebuildify --napi --strip --name tree-sitter-bash",
-    "build/ci": "tree-sitter generate"
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   }
 }

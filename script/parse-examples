@@ -21,7 +21,6 @@ files=$(mktemp)
 output=$(mktemp)
 trap 'rm -f "$files" "$output"' EXIT
 
-# The same files as the "Parse examples" step in .github/workflows/ci.yml.
 find examples -type f \( -name '*.sh' -or -path 'examples/bash-it/*.bash' -or -path 'examples/bash/*.tests' \
   -or -path 'examples/gentoo/*.eclass' \) \
   ! -path examples/gentoo/app-antivirus/fangfrisch/files/fangfrisch-has-news.sh \
@@ -36,7 +35,7 @@ if ! grep -q '^Total parses' "$output"; then
   exit 1
 fi
 grep '^Total parses' "$output"
-# A timeout depends on the machine, while CI parses without one, so it is no expected failure.
+# A timeout depends on the machine, so it is no expected failure.
 if grep -q 'timed out' "$output"; then
   echo 'These files exceeded the parse timeout; known-failures.txt is left unchanged:' >&2
   awk '/timed out/{print $1}' "$output" >&2

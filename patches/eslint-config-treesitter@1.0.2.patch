@@ -1,9 +1,0 @@
-diff --git a/package.json b/package.json
---- a/package.json
-+++ b/package.json
-@@ -18,3 +18,4 @@
-   "dependencies": {
--    "eslint-plugin-jsdoc": "^50.2.4"
-+    "eslint-plugin-jsdoc": "^50.2.4",
-+    "globals": "^14.0.0"
-   },
