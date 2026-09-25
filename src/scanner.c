@@ -808,7 +808,7 @@ static bool at_closing_reserved_word(TSLexer *lexer) {
     uint32_t length = 0;
     for (;;) {
         if (lexer->lookahead == '\\') {
-            // Bash joins a backslash-newline before it reads the word (`th\` + `en`).
+            // Bash joins a backslash-newline before it checks where the word ends (`then\` + newline).
             advance(lexer);
             if (lexer->lookahead == '\r') {
                 advance(lexer);
