@@ -115,7 +115,6 @@ examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/types.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/variables.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/vartree1.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/vartree2.sh
-examples/wild-corpus/illumos-gate/usr/src/test/os-tests/tests/pf_key/acquire-spray.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/env/illumos.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/gk/cshrc.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/gk/login.sh
@@ -128,7 +127,6 @@ examples/wild-corpus/minix/commands/scripts/DESCRIBE.sh
 examples/wild-corpus/minix/commands/scripts/mkdist.sh
 examples/wild-corpus/oil/test/gold.sh
 examples/wild-corpus/oil/test/runtime-errors.sh
-examples/wild-corpus/shell/ast/src/cmd/3d/features/syscall.sh
 examples/wild-corpus/shell/ast/src/cmd/INIT/ditto.sh
 examples/wild-corpus/shell/ast/src/cmd/html/mm2bb.sh
 examples/wild-corpus/shell/ast/src/cmd/html/mm2html.sh

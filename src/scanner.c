@@ -1017,6 +1017,37 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return true;
     }
 
+    // Bash ends backquotes at the first unescaped backquote, even inside single quotes (`echo '`),
+    // and then reports the unterminated quote when it runs the substitution. So a quote that the next
+    // backquote cuts short closes the substitution there when it may close, and otherwise is skipped
+    // up to the backquote, which then cannot be parsed; the quote never hides the text after it.
+    if (scanner->backtick_depth > 0 && lexer->lookahead == '\'') {
+        advance(lexer);
+        while (!lexer->eof(lexer) && lexer->lookahead != '\'' && lexer->lookahead != '`') {
+            if (lexer->lookahead == '\\') {
+                advance(lexer);
+                if (lexer->eof(lexer)) {
+                    break;
+                }
+            }
+            advance(lexer);
+        }
+        if (lexer->lookahead != '`') {
+            return false;
+        }
+        if (valid_symbols[BACKTICK_CLOSE]) {
+            advance(lexer);
+            lexer->mark_end(lexer);
+            scanner->backtick_depth--;
+            discard_unstarted_heredocs(scanner);
+            lexer->result_symbol = BACKTICK_CLOSE;
+            return true;
+        }
+        lexer->mark_end(lexer);
+        lexer->result_symbol = LINE_CONTINUATION;
+        return true;
+    }
+
     if ((valid_symbols[BACKTICK_OPEN] || valid_symbols[BACKTICK_CLOSE]) && lexer->lookahead == '`') {
         if (scanner->backtick_depth > 0 && valid_symbols[BACKTICK_CLOSE]) {
             advance(lexer);

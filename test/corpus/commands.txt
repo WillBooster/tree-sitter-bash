@@ -743,3 +743,52 @@ b
       (word))
     argument: (word)
     argument: (word)))
+
+================================================================================
+Backquotes end at a backquote inside single quotes
+================================================================================
+
+echo "`: '`"; echo a; echo "`'`"
+x=`: '`; echo b
+echo `echo 'a\`b'` 'c`d'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution
+        (command
+          name: (command_name
+            (word))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)))
+    argument: (raw_string)))
