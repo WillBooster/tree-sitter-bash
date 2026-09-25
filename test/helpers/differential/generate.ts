@@ -51,10 +51,6 @@ class ScriptGenerator {
 
   // Separates or ends a statement; a newline also starts the bodies of pending heredocs.
   private terminator(): void {
-    if (this.inBackquotes) {
-      this.emit(this.random.pick(['; ', ';', ' & ']));
-      return;
-    }
     switch (this.random.int(5)) {
       case 0: {
         this.emit(';');
@@ -228,10 +224,6 @@ class ScriptGenerator {
         break;
       }
       case 'declaration': {
-        if (depth >= MaxDepth) {
-          this.simpleCommand(depth);
-          break;
-        }
         // Only the substitution in the value runs.
         this.emit(`${this.random.pick(['export', 'declare', 'readonly', 'W=b'])} V${this.nextFunctionId++}=`);
         const array = this.random.chance(0.3);
@@ -262,7 +254,7 @@ class ScriptGenerator {
   // Bash 5.2 drops a `;` on the line after a heredoc inside a command substitution, so substitutions
   // stay on one line until the bodies of their heredocs, right before the closer.
   private newlineAllowed(): boolean {
-    return !this.inBackquotes && this.pendingHeredocs.length === 1;
+    return this.pendingHeredocs.length === 1;
   }
 
   private simpleCommand(depth: number): void {
@@ -412,7 +404,7 @@ class ScriptGenerator {
         break;
       }
       case 1: {
-        if (depth < MaxDepth && this.substitutionsDisabled === 0 && !this.inBackquotes && this.random.chance(0.3)) {
+        if (depth < MaxDepth && this.substitutionsDisabled === 0 && this.random.chance(0.3)) {
           this.emit('<<< "$(');
           this.substitutionBody(depth);
           this.emit(')"');
