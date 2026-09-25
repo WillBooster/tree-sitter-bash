@@ -39,7 +39,7 @@
     "release-test": "node node_modules/semantic-release/bin/semantic-release.js --dry-run --plugins @semantic-release/commit-analyzer @semantic-release/release-notes-generator",
     "prestart": "tree-sitter build --wasm",
     "start": "tree-sitter playground",
-    "test": "tree-sitter test && node --test bindings/node/*_test.js",
+    "test": "bun wb test",
     "test/ci": "bun wb test-on-ci",
     "verify": "bun wb verify",
     "verify-full": "bun wb verify --full"

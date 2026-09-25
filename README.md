@@ -40,9 +40,10 @@ bun run test
 script/parse-examples
 ```
 
-`script/parse-examples` clones real-world scripts into `examples/`, parses them with the local
-tree-sitter CLI, and rewrites `script/known-failures.txt`, the list of files that fail to parse; its diff shows
-regressions.
+`bun run test` runs the corpus in `test/corpus`, the Node.js binding test, and a check that real-world scripts
+cloned into `examples/` fail to parse exactly as listed in `script/known-failures.txt`; the first run clones them,
+which takes a few minutes. After a grammar change alters that list, `script/parse-examples` rewrites it; review
+its diff before committing.
 
 ### References
 
