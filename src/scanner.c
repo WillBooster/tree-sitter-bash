@@ -57,6 +57,9 @@ typedef struct {
     // A heredoc body ended right before a `${ list; }` closer; the newline that ended the command's
     // line began the body, so a terminator is still owed before the `}`.
     bool terminator_owed;
+    // The last token of this scanner was a line continuation that ended a line; nothing concatenates at
+    // the start of the next one.
+    bool after_line_break;
 } Scanner;
 
 static inline uint16_t current_depth(Scanner *scanner) {
@@ -120,7 +123,7 @@ static unsigned decode_varint(const char *in, unsigned available, int32_t *c) {
     return 0;
 }
 
-// Serialized layout: backtick depth, the owed-terminator flag, the closers of the open substitutions
+// Serialized layout: backtick depth, the owed-terminator and line-break flags, the closers of the open substitutions
 // (uint16 count, then one byte each), and heredoc count, then per heredoc its flags, depth (uint16),
 // delimiter length (uint16), and the delimiter as varints.
 #define HEREDOC_HEADER_SIZE (3 + 2 * sizeof(uint16_t))
@@ -147,6 +150,7 @@ static void scanner_reset(Scanner *scanner) {
     scanner->backtick_depth = 0;
     array_clear(&scanner->closers);
     scanner->terminator_owed = false;
+    scanner->after_line_break = false;
 }
 
 // The body being read: the most deeply nested started heredoc.
@@ -842,6 +846,9 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     // by the character right after it, even when blanks are skipped below to find a newline.
     int32_t first = lexer->lookahead;
     bool at_eof = lexer->eof(lexer);
+    // Kept only if this call returns a token, so the flag lasts until the scanner's next token.
+    bool after_line_break = scanner->after_line_break;
+    scanner->after_line_break = false;
 
     if (scanner->terminator_owed) {
         scanner->terminator_owed = false;
@@ -907,10 +914,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return scan_heredoc_start(scanner, lexer);
     }
 
-    // A token that ends a line (a line continuation after a blank, a heredoc body) separates words, so
-    // nothing concatenates at the start of a line. The column is checked only where a concatenation
-    // could start, since computing it costs a scan back to the line start.
-    if (valid_symbols[CONCAT] && !at_eof && !iswspace(first) && lexer->get_column(lexer) != 0) {
+    // A line continuation after a blank separates words, so nothing concatenates at the start of the
+    // next line. The column costs a scan back to the line start, so it is computed only right after
+    // such a continuation and only where a concatenation could start; a concatenation then clears the
+    // flag, which bounds the scans to one per continuation.
+    if (valid_symbols[CONCAT] && !at_eof && !iswspace(first) && !is_metacharacter(first) &&
+        !(after_line_break && lexer->get_column(lexer) == 0)) {
         int32_t c = first;
         if (c == '\\' && lexer->lookahead == '\\') {
             // A backslash-newline joins lines, so the word continues only if the next line does.
@@ -957,10 +966,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             }
             // The word continues only if the next line does; otherwise the continuations themselves are
             // the token, so that whatever follows them is lexed as it would be without them.
-            lexer->result_symbol =
-                lexer->eof(lexer) || iswspace(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)
-                    ? LINE_CONTINUATION
-                    : CONCAT;
+            if (lexer->eof(lexer) || iswspace(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
+                scanner->after_line_break = true;
+                lexer->result_symbol = LINE_CONTINUATION;
+            } else {
+                lexer->result_symbol = CONCAT;
+            }
             return true;
         }
         if (!at_eof && !iswspace(c) && !is_metacharacter(c) && !(c == '`' && scanner->backtick_depth > 0)) {
@@ -1016,6 +1027,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
                 advance(lexer);
                 lexer->mark_end(lexer);
+                scanner->after_line_break = true;
                 lexer->result_symbol = LINE_CONTINUATION;
                 return true;
             }
@@ -1162,7 +1174,7 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
     Scanner *scanner = (Scanner *)payload;
     unsigned size = 0;
     buffer[size++] = (char)scanner->backtick_depth;
-    buffer[size++] = (char)scanner->terminator_owed;
+    buffer[size++] = (char)(scanner->terminator_owed | scanner->after_line_break << 1);
     uint16_t closer_count = (uint16_t)scanner->closers.size;
     memcpy(&buffer[size], &closer_count, sizeof(closer_count));
     size += sizeof(closer_count);
@@ -1196,7 +1208,8 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
     }
     unsigned size = 0;
     scanner->backtick_depth = (uint8_t)buffer[size++];
-    scanner->terminator_owed = buffer[size++];
+    scanner->terminator_owed = buffer[size] & 1;
+    scanner->after_line_break = (buffer[size++] & 2) != 0;
     uint16_t closer_count;
     memcpy(&closer_count, &buffer[size], sizeof(closer_count));
     size += sizeof(closer_count);

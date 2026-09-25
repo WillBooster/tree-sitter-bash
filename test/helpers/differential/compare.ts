@@ -18,6 +18,10 @@ export function isAddonStale(): boolean {
 const parser = new Parser();
 parser.setLanguage(Bash);
 
+export function parse(script: string): Parser.Tree {
+  return parser.parse(script);
+}
+
 // Each run of `c` writes its words to a file of its own in $C_LOG: appending to one file could
 // interleave concurrent runs, since printf may split its output at a newline.
 const Prelude = `c() { C_RUNS=$((C_RUNS + 1)); printf '%s\\x1f' "$@" > "$C_LOG/$BASHPID.$C_RUNS"; }
