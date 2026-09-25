@@ -91,24 +91,27 @@ export class Oracle {
   }
 }
 
-function readInvocations(directory: string): Map<string, string[]> {
-  const invocations = new Map<string, string[]>();
+// Every run of `c`, grouped by its first word; each id runs once in a generated script.
+function readInvocations(directory: string): Map<string, string[][]> {
+  const invocations = new Map<string, string[][]>();
   for (const name of fs.readdirSync(directory)) {
     const words = fs.readFileSync(path.join(directory, name), 'utf8').split('\u001F').slice(0, -1);
-    invocations.set(words[0] ?? '', words);
+    const id = words[0] ?? '';
+    invocations.set(id, [...(invocations.get(id) ?? []), words]);
   }
   return invocations;
 }
 
-// Every `c` command in the tree, keyed by its first word, wherever it is: substitutions, heredoc
+// Every `c` command in the tree, grouped by its first word, wherever it is: substitutions, heredoc
 // bodies, and function bodies included.
-function collectInvocations(root: Parser.SyntaxNode): Map<string, Invocation> {
-  const invocations = new Map<string, Invocation>();
+function collectInvocations(root: Parser.SyntaxNode): Map<string, Invocation[]> {
+  const invocations = new Map<string, Invocation[]>();
   const visit = (node: Parser.SyntaxNode): void => {
     const name = node.type === 'command' ? node.childForFieldName('name')?.firstChild : undefined;
     if (name && literalValue(name) === 'c') {
       const words = node.childrenForFieldName('argument').map((argument) => literalValue(argument));
-      invocations.set(words[0] ?? '', { words });
+      const id = words[0] ?? '';
+      invocations.set(id, [...(invocations.get(id) ?? []), { words }]);
     }
     for (const child of node.children) visit(child);
   };
@@ -116,10 +119,14 @@ function collectInvocations(root: Parser.SyntaxNode): Map<string, Invocation> {
   return invocations;
 }
 
-function diffInvocations(executed: Map<string, string[]>, parsed: Map<string, Invocation>): string[] {
+function diffInvocations(executed: Map<string, string[][]>, parsed: Map<string, Invocation[]>): string[] {
   const details: string[] = [];
-  for (const [id, words] of executed) {
-    const invocation = parsed.get(id);
+  for (const [id, runs] of executed) {
+    const invocations = parsed.get(id) ?? [];
+    const [words = []] = runs;
+    const [invocation] = invocations;
+    if (runs.length > 1) details.push(`bash runs \`c ${id}\` ${runs.length} times`);
+    if (invocations.length > 1) details.push(`the tree shows \`c ${id}\` ${invocations.length} times`);
     if (!invocation) {
       details.push(`bash runs \`c ${id}\`, which the tree does not show as a command`);
     } else if (
@@ -129,8 +136,10 @@ function diffInvocations(executed: Map<string, string[]>, parsed: Map<string, In
       details.push(`\`c ${id}\` receives ${JSON.stringify(words)} in bash but ${JSON.stringify(invocation.words)} in the tree`);
     }
   }
-  for (const id of parsed.keys()) {
-    if (!executed.has(id)) details.push(`the tree shows \`c ${id}\` as a command, which bash never runs`);
+  for (const [id, invocations] of parsed) {
+    if (executed.has(id)) continue;
+    details.push(`the tree shows \`c ${id}\` as a command, which bash never runs`);
+    if (invocations.length > 1) details.push(`the tree shows \`c ${id}\` ${invocations.length} times`);
   }
   return details;
 }
