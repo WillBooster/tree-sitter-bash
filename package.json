@@ -56,7 +56,7 @@
     "lefthook": "2.1.14",
     "node-gyp": "13.0.2",
     "prebuildify": "^6.0.1",
-    "semantic-release": "25.0.5",
+    "semantic-release": "25.0.9",
     "sort-package-json": "4.0.0",
     "tree-sitter": "^0.25.0",
     "tree-sitter-cli": "^0.27.0"
