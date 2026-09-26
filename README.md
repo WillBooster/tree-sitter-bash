@@ -18,6 +18,8 @@ original grammar's.
   consist of assignments and redirections only.
 - `$((…))` is always an arithmetic expansion, including inside heredoc bodies; escaped `\$` and `` \` `` are literal.
 - A newline is a statement terminator only where one may end a statement; elsewhere it is whitespace.
+- Like bash, only a space, a tab, and a newline separate words. Any other whitespace is part of a word, including
+  the CR of a CRLF line ending, so a CRLF script parses as bash runs it (`echo a` + CRLF passes `a` + CR).
 
 ## Usage
 

@@ -74,7 +74,11 @@ static inline bool is_metacharacter(int32_t c) {
     return c == '|' || c == '&' || c == ';' || c == '(' || c == ')' || c == '<' || c == '>';
 }
 
-static inline bool is_blank(int32_t c) { return c == ' ' || c == '\t' || c == '\r' || c == '\f' || c == '\v'; }
+// Like bash, only a space and a tab are blanks; every other whitespace character, CR included, is part
+// of a word.
+static inline bool is_blank(int32_t c) { return c == ' ' || c == '\t'; }
+
+static inline bool is_separator(int32_t c) { return is_blank(c) || c == '\n'; }
 
 static inline bool is_name_start(int32_t c) { return iswalpha(c) || c == '_'; }
 
@@ -221,13 +225,12 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             at_line_start = false;
             lexer->mark_end(lexer);
             // Like bash, compare the delimiter with the line after joining backslash-newlines and
-            // then stripping the leading tabs of `<<-`. As elsewhere in the grammar, CRLF counts as a
-            // newline.
+            // then stripping the leading tabs of `<<-`.
             bool consumed = false;
             bool escaped = false;
             uint32_t matched = 0;
             // At the end of input the lookahead is 0, which a delimiter holding NUL would otherwise match.
-            // Bash compares one line at a time, so a delimiter holding a newline (`<<"E\` + CRLF +
+            // Bash compares one line at a time, so a delimiter holding a newline (`<<"E` + newline +
             // `OF"`) never matches.
             for (;;) {
                 if (matched == 0 && heredoc->allows_indent && lexer->lookahead == '\t') {
@@ -237,8 +240,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                     advance(lexer);
                     consumed = true;
                     if (lexer->lookahead != '\n' || lexer->eof(lexer)) {
-                        // An escape rather than a line continuation: the escaped character, which is
-                        // the CR itself before a CRLF line ending as in bash, is content.
+                        // An escape rather than a line continuation: the escaped character is content.
                         if (!lexer->eof(lexer)) {
                             advance(lexer);
                         }
@@ -253,9 +255,6 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 } else {
                     break;
                 }
-            }
-            if (!escaped && lexer->lookahead == '\r') {
-                advance(lexer);
             }
             // Inside a substitution, bash also ends the body at a delimiter directly followed by the
             // innermost substitution's closer (`)` or `}`) or a closing backquote.
@@ -452,7 +451,7 @@ static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
         }
         // Inside backquotes an unquoted backquote closes the substitution; at top level it is part of
         // the word (`<<EO`true`F`).
-        if (iswspace(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
+        if (is_separator(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
             break;
         }
         advance(lexer);
@@ -539,7 +538,7 @@ static bool scan_regex(TSLexer *lexer) {
     while (!lexer->eof(lexer)) {
         lexer->mark_end(lexer);
         int32_t c = lexer->lookahead;
-        if (depth == 0 && iswspace(c)) {
+        if (depth == 0 && is_separator(c)) {
             break;
         }
         // Like bash, treat `|` and parentheses as regex characters, while other metacharacters end
@@ -600,7 +599,7 @@ static bool scan_string_content(TSLexer *lexer) {
 }
 
 static inline bool is_word_break(int32_t c) {
-    return iswspace(c) || is_metacharacter(c) || c == '"' || c == '\'' || c == '`' || c == '$' || c == '\\';
+    return is_separator(c) || is_metacharacter(c) || c == '"' || c == '\'' || c == '`' || c == '$' || c == '\\';
 }
 
 static inline bool is_extglob_operator(int32_t c) { return c == '?' || c == '*' || c == '+' || c == '@' || c == '!'; }
@@ -802,7 +801,7 @@ static bool at_closing_reserved_word(TSLexer *lexer) {
         }
     }
     if (length == 0 || length == sizeof(word) ||
-        !(lexer->eof(lexer) || iswspace(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
+        !(lexer->eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
         return false;
     }
     for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++) {
@@ -891,7 +890,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     // next line. The column costs a scan back to the line start, so it is computed only right after
     // such a continuation and only where a concatenation could start; a concatenation then clears the
     // flag, which bounds the scans to one per continuation.
-    if (valid_symbols[CONCAT] && !at_eof && !iswspace(first) && !is_metacharacter(first) &&
+    if (valid_symbols[CONCAT] && !at_eof && !is_separator(first) && !is_metacharacter(first) &&
         !(after_line_break && lexer->get_column(lexer) == 0)) {
         int32_t c = first;
         if (c == '\\' && lexer->lookahead == '\\') {
@@ -933,7 +932,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             }
             // The word continues only if the next line does; otherwise the continuations themselves are
             // the token, so that whatever follows them is lexed as it would be without them.
-            if (lexer->eof(lexer) || iswspace(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
+            if (lexer->eof(lexer) || is_separator(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
                 scanner->after_line_break = true;
                 lexer->result_symbol = LINE_CONTINUATION;
             } else {
@@ -960,7 +959,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->result_symbol = EMPTY_VALUE;
             return true;
         }
-        if (at_eof || iswspace(c) || c == ';' || c == '&' || c == '|' || c == ')' ||
+        if (at_eof || is_separator(c) || c == ';' || c == '&' || c == '|' || c == ')' ||
             (c == '`' && scanner->backtick_depth > 0)) {
             lexer->result_symbol = EMPTY_VALUE;
             return true;

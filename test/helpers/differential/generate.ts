@@ -541,6 +541,14 @@ class ScriptGenerator {
       'a:b',
       'ü',
       '日本',
+      // Bash splits words only at a space, a tab, or a newline; other whitespace stays in the word,
+      // including the CR that a CRLF line ending leaves at the end of a line's last word.
+      'a\rb',
+      'x\r',
+      'a\vb',
+      'a\fb',
+      'a\u00a0b',
+      'a\u3000b',
       // Reserved words are plain words after a command's first word.
       'if',
       'then',
