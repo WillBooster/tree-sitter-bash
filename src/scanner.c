@@ -54,8 +54,9 @@ typedef struct {
     uint8_t backtick_depth;
     // The closer (`)`, `}`, or `]`) of each open substitution, innermost last.
     Array(uint8_t) closers;
-    // A heredoc body ended right before a `${ list; }` closer; the newline that ended the command's
-    // line began the body, so a terminator is still owed before the `}`.
+    // A heredoc body ended before the end of its line (at a `${ list; }` closer, or at a delimiter
+    // followed by more code); the newline that ended the command's line began the body, so a
+    // terminator is still owed before what follows.
     bool terminator_owed;
     // The last token of this scanner was a line continuation that ended a line; nothing concatenates at
     // the start of the next one.
@@ -229,6 +230,13 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             bool consumed = false;
             bool escaped = false;
             uint32_t matched = 0;
+            // Inside `$( )`, `<( )`, and `>( )`, bash also ends the body at a line that merely starts with
+            // the delimiter when a `)` follows anywhere on that line, and reads the rest of the line as
+            // code. Such a line ends the content token before it and the end token after the delimiter.
+            bool in_parenthesized = scanner->closers.size > 0 && *array_back(&scanner->closers) == ')';
+            bool prefix_marked = false;
+            bool line_joined_after_prefix = false;
+            int32_t escaped_after_prefix = 0;
             // At the end of input the lookahead is 0, which a delimiter holding NUL would otherwise match.
             // Bash compares one line at a time, so a delimiter holding a newline (`<<"E` + newline +
             // `OF"`) never matches.
@@ -242,16 +250,29 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                     if (lexer->lookahead != '\n' || lexer->eof(lexer)) {
                         // An escape rather than a line continuation: the escaped character is content.
                         if (!lexer->eof(lexer)) {
+                            if (prefix_marked) {
+                                escaped_after_prefix = lexer->lookahead;
+                            }
                             advance(lexer);
                         }
                         escaped = true;
                         break;
                     }
                     advance(lexer);
+                    // The rule above looks at one line as written, before bash joins lines.
+                    line_joined_after_prefix = prefix_marked;
                 } else if (matched < heredoc->delimiter.size && !lexer->eof(lexer) && lexer->lookahead != '\n' &&
                            lexer->lookahead == *array_get(&heredoc->delimiter, matched)) {
                     advance(lexer);
                     matched++;
+                    if (matched == heredoc->delimiter.size && in_parenthesized) {
+                        if (did_advance) {
+                            lexer->result_symbol = HEREDOC_CONTENT;
+                            return true;
+                        }
+                        lexer->mark_end(lexer);
+                        prefix_marked = true;
+                    }
                 } else {
                     break;
                 }
@@ -270,6 +291,19 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 lexer->result_symbol = HEREDOC_END;
                 scanner->terminator_owed = lexer->lookahead == '}';
                 remove_heredoc(scanner, index);
+                return true;
+            }
+            if (prefix_marked && !line_joined_after_prefix) {
+                while (!lexer->eof(lexer) && lexer->lookahead != '\n' && lexer->lookahead != ')') {
+                    advance(lexer);
+                }
+                if (escaped_after_prefix == ')' || lexer->lookahead == ')') {
+                    lexer->result_symbol = HEREDOC_END;
+                    scanner->terminator_owed = true;
+                    remove_heredoc(scanner, index);
+                } else {
+                    lexer->result_symbol = HEREDOC_CONTENT;
+                }
                 return true;
             }
             // The characters read while trying the delimiter are content; an empty attempt must not
@@ -824,7 +858,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     if (scanner->terminator_owed) {
         scanner->terminator_owed = false;
-        if (valid_symbols[NEWLINE] && lexer->lookahead == '}') {
+        if (valid_symbols[NEWLINE]) {
             lexer->result_symbol = NEWLINE;
             return true;
         }

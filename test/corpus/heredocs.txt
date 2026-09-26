@@ -693,6 +693,79 @@ echo in
           argument: (word))))))
 
 ================================================================================
+Heredoc in a substitution ends at a line starting with its delimiter and holding a paren
+================================================================================
+
+x=$(cat <<EOF
+body
+EOF echo done)
+y=$(cat <<EOF
+body
+EOF)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))
+        (command
+          name: (command_name
+            (word)))))))
+
+================================================================================
+Heredoc in a substitution keeps a line starting with its delimiter without a paren
+================================================================================
+
+x=$(cat <<EOF
+EOF x
+EOF
+)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_content)
+          (heredoc_content)
+          (heredoc_end))))))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 
