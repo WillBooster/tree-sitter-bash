@@ -1082,6 +1082,31 @@ echo ${x:-a<<(b)} ${a[<<(b)]} ${x:-<<}
       argument: (word))))
 
 ================================================================================
+Process substitution joins the word part before it
+================================================================================
+
+cat a<(ls) 2>(cat)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (concatenation
+      (word)
+      (process_substitution
+        (command
+          name: (command_name
+            (word)))))
+    argument: (concatenation
+      (word)
+      (process_substitution
+        (command
+          name: (command_name
+            (word)))))))
+
+================================================================================
 Deeply nested literal extglob groups after literal text
 ================================================================================
 

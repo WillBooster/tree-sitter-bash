@@ -1,5 +1,5 @@
 ================================================================================
-Commands with CRLF line endings
+CRLF line endings leave the CR in each line's last word
 ================================================================================
 
 A=one
@@ -15,14 +15,19 @@ echo $A
       name: (variable_name)
       value: (word)))
   (command
+    name: (command_name
+      (word)))
+  (command
     assignment: (variable_assignment
       name: (variable_name)
       value: (word)))
   (command
     name: (command_name
       (word))
-    argument: (simple_expansion
-      (variable_name))))
+    argument: (concatenation
+      (simple_expansion
+        (variable_name))
+      (word))))
 
 ================================================================================
 Backslash-CR quotes the CR of a heredoc delimiter
