@@ -13,7 +13,9 @@ permissions:
 jobs:
   release:
     uses: WillBooster/reusable-workflows/.github/workflows/release.yml@main
-    needs: prebuild
+    needs:
+      - prebuild
+      - wasm
     permissions:
       id-token: write
       contents: write
@@ -68,4 +70,23 @@ jobs:
         with:
           name: prebuilds-${{ matrix.runner }}
           path: prebuilds
+          if-no-files-found: error
+  wasm:
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: jdx/mise-action@v4.3.0
+      - run: bun install --frozen-lockfile
+      - run: script/set-grammar-version "$VERSION"
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+      - run: bun run build-wasm
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: wasm
+          path: tree-sitter-bash.wasm
           if-no-files-found: error
