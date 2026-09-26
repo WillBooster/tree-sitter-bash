@@ -54,6 +54,8 @@ typedef struct {
     uint8_t backtick_depth;
     // The closer (`)`, `}`, or `]`) of each open substitution, innermost last.
     Array(uint8_t) closers;
+    // How many closers were open when the backquotes opened; the ones after them are nested inside.
+    uint16_t backtick_closers;
     // A heredoc body ended before the end of its line (at a `${ list; }` closer, or at a delimiter
     // followed by more code); the newline that ended the command's line began the body, so a
     // terminator is still owed before what follows.
@@ -128,13 +130,14 @@ static unsigned decode_varint(const char *in, unsigned available, int32_t *c) {
     return 0;
 }
 
-// Serialized layout: backtick depth, the owed-terminator and line-break flags, the closers of the open substitutions
+// Serialized layout: backtick depth, the closer count when the backquotes opened (uint16), the owed-terminator and
+// line-break flags, the closers of the open substitutions
 // (uint16 count, then one byte each), and heredoc count, then per heredoc its flags, depth (uint16),
 // delimiter length (uint16), and the delimiter as varints.
 #define HEREDOC_HEADER_SIZE (3 + 2 * sizeof(uint16_t))
 
 static unsigned serialized_size(Scanner *scanner) {
-    unsigned size = 3 + sizeof(uint16_t) + scanner->closers.size;
+    unsigned size = 3 + 2 * sizeof(uint16_t) + scanner->closers.size;
     for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i);
         size += HEREDOC_HEADER_SIZE;
@@ -154,6 +157,7 @@ static void scanner_reset(Scanner *scanner) {
     array_clear(&scanner->heredocs);
     scanner->backtick_depth = 0;
     array_clear(&scanner->closers);
+    scanner->backtick_closers = 0;
     scanner->terminator_owed = false;
     scanner->after_line_break = false;
 }
@@ -233,7 +237,11 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             // Inside `$( )`, `<( )`, and `>( )`, bash also ends the body at a line that merely starts with
             // the delimiter when a `)` follows anywhere on that line, and reads the rest of the line as
             // code. Such a line ends the content token before it and the end token after the delimiter.
-            bool in_parenthesized = scanner->closers.size > 0 && *array_back(&scanner->closers) == ')';
+            // Where the backquotes are innermost, bash fixes their extent before it reads the body, so
+            // the rule is off.
+            uint16_t outside_backquotes = scanner->backtick_depth > 0 ? scanner->backtick_closers : 0;
+            bool in_parenthesized =
+                scanner->closers.size > outside_backquotes && *array_back(&scanner->closers) == ')';
             bool prefix_marked = false;
             int32_t escaped_after_prefix = 0;
             // At the end of input the lookahead is 0, which a delimiter holding NUL would otherwise match.
@@ -1141,6 +1149,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             advance(lexer);
             lexer->mark_end(lexer);
             scanner->backtick_depth++;
+            scanner->backtick_closers = (uint16_t)scanner->closers.size;
             lexer->result_symbol = BACKTICK_OPEN;
             return true;
         }
@@ -1218,6 +1227,8 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
     Scanner *scanner = (Scanner *)payload;
     unsigned size = 0;
     buffer[size++] = (char)scanner->backtick_depth;
+    memcpy(&buffer[size], &scanner->backtick_closers, sizeof(scanner->backtick_closers));
+    size += sizeof(scanner->backtick_closers);
     buffer[size++] = (char)(scanner->terminator_owed | scanner->after_line_break << 1);
     uint16_t closer_count = (uint16_t)scanner->closers.size;
     memcpy(&buffer[size], &closer_count, sizeof(closer_count));
@@ -1247,11 +1258,13 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
 void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
     Scanner *scanner = (Scanner *)payload;
     scanner_reset(scanner);
-    if (length < 2 + sizeof(uint16_t)) {
+    if (length < 2 + 2 * sizeof(uint16_t)) {
         return;
     }
     unsigned size = 0;
     scanner->backtick_depth = (uint8_t)buffer[size++];
+    memcpy(&scanner->backtick_closers, &buffer[size], sizeof(scanner->backtick_closers));
+    size += sizeof(scanner->backtick_closers);
     scanner->terminator_owed = buffer[size] & 1;
     scanner->after_line_break = (buffer[size++] & 2) != 0;
     uint16_t closer_count;

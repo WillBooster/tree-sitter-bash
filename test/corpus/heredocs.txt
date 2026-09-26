@@ -870,6 +870,34 @@ bo`
           (heredoc_end))))))
 
 ================================================================================
+Heredoc in backquotes inside a substitution ignores the substitution's paren
+================================================================================
+
+x=$(echo "`cat <<X
+X y`")
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (string
+            (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                redirect: (heredoc_redirect
+                  delimiter: (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end)))))))))
+
+================================================================================
 Backquotes inside a top-level heredoc delimiter
 ================================================================================
 
