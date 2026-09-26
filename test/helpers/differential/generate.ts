@@ -389,6 +389,8 @@ class ScriptGenerator {
         break;
       }
       case 7: {
+        // A word part right before it joins the same word.
+        if (this.random.chance(0.3)) this.emit(this.literalWord());
         this.emit(this.random.chance(0.7) ? '<(' : '>(');
         this.substitutionBody(depth);
         this.emit(')');
@@ -487,7 +489,7 @@ class ScriptGenerator {
 
   private heredocLine(delimiter: string, quoted: boolean, indent: boolean, depth: number): string {
     const tab = indent && this.random.chance(0.5) ? '\t' : '';
-    switch (this.random.int(8)) {
+    switch (this.random.int(9)) {
       case 0: {
         // Unquoted, this runs; quoted, it is data. The id is fresh either way and bash decides.
         return `${tab}x $(c ${this.commandId()}) y`;
@@ -497,7 +499,7 @@ class ScriptGenerator {
       }
       case 2: {
         // Looks like the delimiter but is not the whole line.
-        return `${tab}${this.random.pick([`${delimiter} `, ` ${delimiter}`, `${delimiter}x`, `x${delimiter}`])}`;
+        return `${tab}${this.random.pick([`${delimiter} `, ` ${delimiter}`, `${delimiter}x`, `x${delimiter}`, `${delimiter}\r`])}`;
       }
       case 3: {
         // A continued line: unquoted bodies join it with the next line.
@@ -508,6 +510,10 @@ class ScriptGenerator {
       }
       case 5: {
         return depth < MaxDepth && !quoted ? `${tab}\${X:-$(c ${this.commandId()})}` : `${tab}$X \\$Y`;
+      }
+      case 6: {
+        // A CRLF line ending leaves a CR in the line.
+        return `${tab}${this.dataText()}\r`;
       }
       default: {
         return `${tab}${this.dataText()}`;

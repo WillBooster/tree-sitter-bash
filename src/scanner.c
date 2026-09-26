@@ -330,13 +330,25 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             case '\\':
                 advance(lexer);
                 did_advance = true;
-                if (!heredoc->is_raw && !lexer->eof(lexer)) {
+                // Inside backquotes a backslash also hides a backquote from a quoted body's end.
+                if (!lexer->eof(lexer) &&
+                    (!heredoc->is_raw || (scanner->backtick_depth > 0 && lexer->lookahead == '`'))) {
                     // A backslash-newline joins lines before the delimiter comparison, while a
                     // backslash-CR escapes only the CR, so the LF after it still ends the line.
                     advance(lexer);
                 }
                 break;
             case '`':
+                // Bash ends backquotes at the first unescaped backquote, even inside a heredoc body,
+                // and ends the body there.
+                if (scanner->backtick_depth > 0) {
+                    lexer->mark_end(lexer);
+                    lexer->result_symbol = did_advance ? HEREDOC_CONTENT : HEREDOC_END;
+                    if (!did_advance) {
+                        remove_heredoc(scanner, index);
+                    }
+                    return true;
+                }
                 if (!heredoc->is_raw) {
                     lexer->mark_end(lexer);
                     lexer->result_symbol = HEREDOC_CONTENT;
@@ -529,8 +541,8 @@ static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
     return true;
 }
 
-static bool scan_heredoc_arrow(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
-    advance(lexer);
+// Scans `<<` or `<<-` after its first `<` has been read.
+static bool scan_heredoc_arrow_after_first(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     if (lexer->lookahead != '<') {
         return false;
     }
@@ -560,6 +572,11 @@ static bool scan_heredoc_arrow(Scanner *scanner, TSLexer *lexer, const bool *val
     array_push(&scanner->heredocs, heredoc);
     lexer->result_symbol = allows_indent ? HEREDOC_ARROW_DASH : HEREDOC_ARROW;
     return true;
+}
+
+static bool scan_heredoc_arrow(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
+    advance(lexer);
+    return scan_heredoc_arrow_after_first(scanner, lexer, valid_symbols);
 }
 
 // The right side of `=~` extends to an unquoted space, tab, or newline outside parentheses.
@@ -885,7 +902,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     if (scanner->heredocs.size > 0) {
         int32_t active = active_heredoc_index(scanner);
         if (active >= 0 && (valid_symbols[HEREDOC_CONTENT] || valid_symbols[HEREDOC_END]) &&
-            !(lexer->lookahead == '`' && !array_get(&scanner->heredocs, active)->is_raw)) {
+            !(lexer->lookahead == '`' && !array_get(&scanner->heredocs, active)->is_raw &&
+              scanner->backtick_depth == 0)) {
             return scan_heredoc_content(scanner, lexer, (uint32_t)active);
         }
         // A newline inside a string is part of it, so bodies start only outside strings.
@@ -924,6 +942,22 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     // next line. The column costs a scan back to the line start, so it is computed only right after
     // such a continuation and only where a concatenation could start; a concatenation then clears the
     // flag, which bounds the scans to one per continuation.
+    // Like bash, `a<(cmd)` is one word. `<` and `>` end a word part otherwise, so the concatenation
+    // needs a look at the next character, and a `<<` read along the way is scanned as a heredoc arrow.
+    if (valid_symbols[CONCAT] && (first == '<' || first == '>') &&
+        !(after_line_break && lexer->get_column(lexer) == 0)) {
+        lexer->mark_end(lexer);
+        advance(lexer);
+        if (lexer->lookahead == '(') {
+            lexer->result_symbol = CONCAT;
+            return true;
+        }
+        if (first == '<' && (valid_symbols[HEREDOC_ARROW] || valid_symbols[HEREDOC_ARROW_DASH])) {
+            return scan_heredoc_arrow_after_first(scanner, lexer, valid_symbols);
+        }
+        return false;
+    }
+
     if (valid_symbols[CONCAT] && !at_eof && !is_separator(first) && !is_metacharacter(first) &&
         !(after_line_break && lexer->get_column(lexer) == 0)) {
         int32_t c = first;
@@ -966,7 +1000,16 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             }
             // The word continues only if the next line does; otherwise the continuations themselves are
             // the token, so that whatever follows them is lexed as it would be without them.
-            if (lexer->eof(lexer) || is_separator(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
+            if ((c == '<' || c == '>')) {
+                advance(lexer);
+                if (lexer->lookahead == '(') {
+                    lexer->result_symbol = CONCAT;
+                    return true;
+                }
+                scanner->after_line_break = true;
+                lexer->result_symbol = LINE_CONTINUATION;
+            } else if (lexer->eof(lexer) || is_separator(c) || is_metacharacter(c) ||
+                       (c == '`' && scanner->backtick_depth > 0)) {
                 scanner->after_line_break = true;
                 lexer->result_symbol = LINE_CONTINUATION;
             } else {
@@ -1114,7 +1157,9 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         lexer->mark_end(lexer);
         lexer->result_symbol = FILE_DESCRIPTOR;
         if (lexer->lookahead == '<' || lexer->lookahead == '>') {
-            return true;
+            // Like bash, digits before `<(` or `>(` are a word joined with the process substitution.
+            advance(lexer);
+            return lexer->lookahead != '(';
         }
         return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
     }

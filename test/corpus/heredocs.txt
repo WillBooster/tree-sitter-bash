@@ -832,6 +832,44 @@ echo in
           argument: (word))))))
 
 ================================================================================
+Heredoc in backquotes ends at the first unescaped backquote
+================================================================================
+
+x=`cat <<EOF
+body
+EOFx`
+y=`cat <<"EOF"
+bo`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))))))
+
+================================================================================
 Backquotes inside a top-level heredoc delimiter
 ================================================================================
 
