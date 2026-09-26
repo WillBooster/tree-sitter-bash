@@ -52,7 +52,7 @@
   "devDependencies": {
     "@semantic-release/exec": "7.1.0",
     "@willbooster/wb": "22.8.0",
-    "conventional-changelog-conventionalcommits": "9.3.1",
+    "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.14",
     "node-gyp": "13.0.2",
     "prebuildify": "^6.0.1",
