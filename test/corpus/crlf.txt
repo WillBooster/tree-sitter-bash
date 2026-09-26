@@ -25,7 +25,7 @@ echo $A
       (variable_name))))
 
 ================================================================================
-Heredoc delimiter continued across CRLF lines
+Backslash-CR quotes the CR of a heredoc delimiter
 ================================================================================
 
 cat <<E\
@@ -44,14 +44,10 @@ echo z
       delimiter: (heredoc_start)))
   (heredoc_body
     (heredoc_content)
-    (heredoc_end))
-  (command
-    name: (command_name
-      (word))
-    argument: (word)))
+    (heredoc_end)))
 
 ================================================================================
-Heredoc body line continued across CRLF lines
+Backslash-CR does not join heredoc body lines
 ================================================================================
 
 cat <<EOF
@@ -74,11 +70,17 @@ echo z
     (heredoc_end))
   (command
     name: (command_name
+      (word)))
+  (command
+    name: (command_name
+      (word)))
+  (command
+    name: (command_name
       (word))
     argument: (word)))
 
 ================================================================================
-Heredoc delimiter line joined across CRLF lines
+Backslash-CR does not join a heredoc delimiter line
 ================================================================================
 
 cat <<EOF
@@ -96,11 +98,7 @@ echo z
       delimiter: (heredoc_start)))
   (heredoc_body
     (heredoc_content)
-    (heredoc_end))
-  (command
-    name: (command_name
-      (word))
-    argument: (word)))
+    (heredoc_end)))
 
 ================================================================================
 Backslash before a lone CR in a heredoc body
@@ -141,3 +139,46 @@ echo after
     name: (command_name
       (word))
     argument: (word)))
+
+================================================================================
+Backslash-CR does not continue a command
+================================================================================
+
+cat /dev/null \
+touch CREATED
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Backslash-CR in a double-quoted heredoc delimiter keeps its newline
+================================================================================
+
+cat <<"E\
+OF"
+E\
+OF
+EOF
+echo marker
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
