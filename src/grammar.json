@@ -2471,7 +2471,7 @@
                   },
                   {
                     "type": "PATTERN",
-                    "value": "\\\\[^\\r\\n]"
+                    "value": "\\\\[^\\n]"
                   },
                   {
                     "type": "PATTERN",
@@ -2621,7 +2621,7 @@
               },
               {
                 "type": "PATTERN",
-                "value": "\\\\[^\\r\\n]"
+                "value": "\\\\[^\\n]"
               },
               {
                 "type": "PATTERN",
@@ -2640,7 +2640,7 @@
                 },
                 {
                   "type": "PATTERN",
-                  "value": "\\\\[^\\r\\n]"
+                  "value": "\\\\[^\\n]"
                 },
                 {
                   "type": "PATTERN",
@@ -2822,7 +2822,7 @@
                   },
                   {
                     "type": "PATTERN",
-                    "value": "\\\\[^\\r\\n]"
+                    "value": "\\\\[^\\n]"
                   },
                   {
                     "type": "PATTERN",
@@ -4605,7 +4605,7 @@
     },
     {
       "type": "PATTERN",
-      "value": "\\\\\\r?\\n"
+      "value": "\\\\\\n"
     },
     {
       "type": "SYMBOL",

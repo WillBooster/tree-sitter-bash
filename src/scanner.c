@@ -234,14 +234,10 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 } else if (lexer->lookahead == '\\' && !heredoc->is_raw) {
                     advance(lexer);
                     consumed = true;
-                    bool escaped_cr = lexer->lookahead == '\r';
-                    if (escaped_cr) {
-                        advance(lexer);
-                    }
                     if (lexer->lookahead != '\n' || lexer->eof(lexer)) {
                         // An escape rather than a line continuation: the escaped character, which is
-                        // the CR itself when no LF follows it, is content.
-                        if (!escaped_cr && !lexer->eof(lexer)) {
+                        // the CR itself before a CRLF line ending as in bash, is content.
+                        if (!lexer->eof(lexer)) {
                             advance(lexer);
                         }
                         escaped = true;
@@ -300,16 +296,9 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 advance(lexer);
                 did_advance = true;
                 if (!heredoc->is_raw && !lexer->eof(lexer)) {
-                    // A backslash-newline joins lines before the delimiter comparison. A CR without an
-                    // LF after it is the escaped character itself.
-                    if (lexer->lookahead == '\r') {
-                        advance(lexer);
-                        if (lexer->lookahead == '\n') {
-                            advance(lexer);
-                        }
-                    } else if (!lexer->eof(lexer)) {
-                        advance(lexer);
-                    }
+                    // A backslash-newline joins lines before the delimiter comparison, while a
+                    // backslash-CR escapes only the CR, so the LF after it still ends the line.
+                    advance(lexer);
                 }
                 break;
             case '`':
@@ -446,16 +435,8 @@ static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
                 continue;
             }
             // Inside double quotes a backslash-newline still only continues the line.
-            if (quote == '"' && c == '\\' && (lexer->lookahead == '\n' || lexer->lookahead == '\r')) {
-                if (lexer->lookahead == '\r') {
-                    advance(lexer);
-                }
-                if (lexer->lookahead == '\n') {
-                    advance(lexer);
-                    continue;
-                }
-                array_push(&heredoc->delimiter, '\\');
-                array_push(&heredoc->delimiter, '\r');
+            if (quote == '"' && c == '\\' && lexer->lookahead == '\n') {
+                advance(lexer);
                 continue;
             }
             if (quote == '"' && c == '\\' &&
@@ -486,15 +467,8 @@ static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
             heredoc->is_raw = true;
         } else if (c == '\\') {
             // A backslash-newline only continues the line; any other backslash quotes the delimiter.
-            bool carriage_return = lexer->lookahead == '\r';
-            if (carriage_return) {
-                advance(lexer);
-            }
             if (lexer->lookahead == '\n') {
                 advance(lexer);
-            } else if (carriage_return) {
-                heredoc->is_raw = true;
-                array_push(&heredoc->delimiter, '\r');
             } else if (!lexer->eof(lexer)) {
                 heredoc->is_raw = true;
                 array_push(&heredoc->delimiter, lexer->lookahead);
@@ -647,7 +621,7 @@ static GroupKind scan_extglob_group(TSLexer *lexer) {
         advance(lexer);
         if (c == '\\') {
             // The word token's literal groups cannot hold a line continuation.
-            if (lexer->eof(lexer) || lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+            if (lexer->eof(lexer) || lexer->lookahead == '\n') {
                 return lexer->eof(lexer) ? GROUP_UNSUPPORTED : GROUP_STRUCTURED;
             }
             advance(lexer);
@@ -683,7 +657,7 @@ static bool continue_extglob_prefix(TSLexer *lexer, bool consumed) {
         } else if (c == '\\') {
             advance(lexer);
             // A backslash-newline continues the line; the word token handles that.
-            if (lexer->eof(lexer) || lexer->lookahead == '\n' || lexer->lookahead == '\r') {
+            if (lexer->eof(lexer) || lexer->lookahead == '\n') {
                 return false;
             }
             advance(lexer);
@@ -814,9 +788,6 @@ static bool at_closing_reserved_word(TSLexer *lexer) {
         if (lexer->lookahead == '\\') {
             // Bash joins a backslash-newline before it checks where the word ends (`then\` + newline).
             advance(lexer);
-            if (lexer->lookahead == '\r') {
-                advance(lexer);
-            }
             if (lexer->lookahead != '\n') {
                 return false;
             }
@@ -925,9 +896,6 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             // A backslash-newline joins lines, so the word continues only if the next line does.
             lexer->mark_end(lexer);
             advance(lexer);
-            if (lexer->lookahead == '\r') {
-                advance(lexer);
-            }
             // Bash drops a backslash at the end of input like a continuation.
             if (lexer->eof(lexer)) {
                 lexer->mark_end(lexer);
@@ -948,9 +916,6 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
                     break;
                 }
                 advance(lexer);
-                if (lexer->lookahead == '\r') {
-                    advance(lexer);
-                }
                 if (lexer->eof(lexer)) {
                     lexer->mark_end(lexer);
                     lexer->result_symbol = LINE_CONTINUATION;
@@ -1021,9 +986,6 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             // after one; a backslash escaping a word's first character can only start an extglob prefix
             // (`\foo@($x)`), and the word token handles it otherwise.
             advance(lexer);
-            if (lexer->lookahead == '\r') {
-                advance(lexer);
-            }
             if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
                 advance(lexer);
                 lexer->mark_end(lexer);

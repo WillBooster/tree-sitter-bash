@@ -82,7 +82,7 @@ module.exports = grammar({
     $.comment,
     $.heredoc_body,
     /\s/,
-    /\\\r?\n/,
+    /\\\n/,
     $._line_continuation,
   ],
 
@@ -474,7 +474,7 @@ module.exports = grammar({
 
     _negated_extglob_word: _ => token(prec(1, seq(
       EXTGLOB_NEGATION,
-      repeat(choice(noneOf(...WORD_BREAKS), /\\[^\r\n]/, EXTGLOB_GROUP, EXTGLOB_NEGATION)),
+      repeat(choice(noneOf(...WORD_BREAKS), /\\[^\n]/, EXTGLOB_GROUP, EXTGLOB_NEGATION)),
     ))),
 
     concatenation: $ => prec.right(seq(
@@ -506,8 +506,8 @@ module.exports = grammar({
     // An extglob group (`@(a|b)`) is part of the word; `!(` only inside a word, since a leading `!`
     // before `(` negates a subshell.
     word: _ => token(seq(
-      choice(noneOf('#', ...WORD_BREAKS), /\\[^\r\n]/, EXTGLOB_GROUP),
-      repeat(choice(noneOf(...WORD_BREAKS), /\\[^\r\n]/, EXTGLOB_GROUP, EXTGLOB_NEGATION)),
+      choice(noneOf('#', ...WORD_BREAKS), /\\[^\n]/, EXTGLOB_GROUP),
+      repeat(choice(noneOf(...WORD_BREAKS), /\\[^\n]/, EXTGLOB_GROUP, EXTGLOB_NEGATION)),
     )),
 
     // A `#` inside a word (`a$b#c`) is literal; only a `#` that begins a word starts a comment.
@@ -533,7 +533,7 @@ module.exports = grammar({
 
     _hash_word: _ => token(prec(1, seq(
       '#',
-      repeat(choice(noneOf(...WORD_BREAKS), /\\[^\r\n]/, EXTGLOB_GROUP, EXTGLOB_NEGATION)),
+      repeat(choice(noneOf(...WORD_BREAKS), /\\[^\n]/, EXTGLOB_GROUP, EXTGLOB_NEGATION)),
     ))),
 
     string: $ => seq(
