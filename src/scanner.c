@@ -235,7 +235,6 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             // code. Such a line ends the content token before it and the end token after the delimiter.
             bool in_parenthesized = scanner->closers.size > 0 && *array_back(&scanner->closers) == ')';
             bool prefix_marked = false;
-            bool line_joined_after_prefix = false;
             int32_t escaped_after_prefix = 0;
             // At the end of input the lookahead is 0, which a delimiter holding NUL would otherwise match.
             // Bash compares one line at a time, so a delimiter holding a newline (`<<"E` + newline +
@@ -259,8 +258,6 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                         break;
                     }
                     advance(lexer);
-                    // The rule above looks at one line as written, before bash joins lines.
-                    line_joined_after_prefix = prefix_marked;
                 } else if (matched < heredoc->delimiter.size && !lexer->eof(lexer) && lexer->lookahead != '\n' &&
                            lexer->lookahead == *array_get(&heredoc->delimiter, matched)) {
                     advance(lexer);
@@ -293,9 +290,14 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 remove_heredoc(scanner, index);
                 return true;
             }
-            if (prefix_marked && !line_joined_after_prefix) {
+            if (prefix_marked) {
+                // The line is read after joining its backslash-newlines, as for the delimiter.
                 while (!lexer->eof(lexer) && lexer->lookahead != '\n' && lexer->lookahead != ')') {
+                    bool backslash = lexer->lookahead == '\\' && !heredoc->is_raw;
                     advance(lexer);
+                    if (backslash && lexer->lookahead == '\n') {
+                        advance(lexer);
+                    }
                 }
                 if (escaped_after_prefix == ')' || lexer->lookahead == ')') {
                     lexer->result_symbol = HEREDOC_END;
