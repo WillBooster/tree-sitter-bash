@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Collects the prebuilds that the Release workflow's prebuild jobs uploaded in this run, so the
-# published package installs without a compiler. semantic-release runs it before publishing.
+# Collects the prebuilds and the wasm build that the Release workflow's prebuild and wasm jobs
+# uploaded in this run, so the published package installs without a compiler and loads in
+# web-tree-sitter. semantic-release runs it before publishing.
 
 set -euo pipefail
 
@@ -20,3 +21,7 @@ if [[ $actual -ne $expected ]]; then
   echo "Expected $expected prebuilds but found $actual" >&2
   exit 1
 fi
+
+rm -f tree-sitter-bash.wasm
+gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name wasm --dir .
+test -f tree-sitter-bash.wasm
