@@ -227,6 +227,8 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             bool escaped = false;
             uint32_t matched = 0;
             // At the end of input the lookahead is 0, which a delimiter holding NUL would otherwise match.
+            // Bash compares one line at a time, so a delimiter holding a newline (`<<"E\` + CRLF +
+            // `OF"`) never matches.
             for (;;) {
                 if (matched == 0 && heredoc->allows_indent && lexer->lookahead == '\t') {
                     advance(lexer);
@@ -244,7 +246,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                         break;
                     }
                     advance(lexer);
-                } else if (matched < heredoc->delimiter.size && !lexer->eof(lexer) &&
+                } else if (matched < heredoc->delimiter.size && !lexer->eof(lexer) && lexer->lookahead != '\n' &&
                            lexer->lookahead == *array_get(&heredoc->delimiter, matched)) {
                     advance(lexer);
                     matched++;

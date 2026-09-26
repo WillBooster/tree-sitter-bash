@@ -159,3 +159,25 @@ touch CREATED
     name: (command_name
       (word))
     argument: (word)))
+
+================================================================================
+Backslash-CR in a double-quoted heredoc delimiter keeps its newline
+================================================================================
+
+cat <<"E\
+OF"
+E\
+OF
+echo marker
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    redirect: (heredoc_redirect
+      delimiter: (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end)))
