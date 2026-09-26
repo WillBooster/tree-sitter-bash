@@ -7,8 +7,10 @@
 // @ts-check
 
 // Characters that end an unquoted word part: metacharacters, quotes, and characters that begin an
-// expansion. `#` only starts a comment at the beginning of a word, so it is handled separately.
-const WORD_BREAKS = ['\\s', '|', '&', ';', '(', ')', '<', '>', '"', '\'', '`', '$', '\\\\'];
+// expansion. `#` only starts a comment at the beginning of a word, so it is handled separately. Like
+// bash, only a space, a tab, and a newline separate words; any other whitespace (CR, a no-break space)
+// is part of a word.
+const WORD_BREAKS = [' ', '\\t', '\\n', '|', '&', ';', '(', ')', '<', '>', '"', '\'', '`', '$', '\\\\'];
 
 // Extglob groups nest (`@(a|+([0-9]))`); a regular expression expresses a fixed depth, and three levels
 // cover every nested pattern in the example corpora.
@@ -81,7 +83,7 @@ module.exports = grammar({
   extras: $ => [
     $.comment,
     $.heredoc_body,
-    /\s/,
+    /[ \t\n]/,
     /\\\n/,
     $._line_continuation,
   ],
@@ -550,7 +552,7 @@ module.exports = grammar({
 
     raw_string: _ => /'[^']*'/,
 
-    ansi_c_string: _ => /\$'([^'\\]|\\(.|\r?\n))*'/,
+    ansi_c_string: _ => /\$'([^'\\]|\\(.|\n))*'/,
 
     translated_string: $ => seq('$"', repeat(choice(
       $.string_content,
@@ -633,7 +635,7 @@ module.exports = grammar({
       ))),
     ),
 
-    _expansion_text: _ => token(prec(-1, /([^}$`"'\\<>]|[<>]+[^(}$`"'\\<>]|\\(.|\r?\n))+/)),
+    _expansion_text: _ => token(prec(-1, /([^}$`"'\\<>]|[<>]+[^(}$`"'\\<>]|\\(.|\n))+/)),
 
     // A `<` or `>` that the text above cannot end with, e.g. before `}`. A single character, so that a
     // run before `(` leaves its last `<`/`>` to open a process substitution (`${x:-a<<(b)}`).
@@ -645,7 +647,7 @@ module.exports = grammar({
       seq('$(', $._substitution_start, optional($._statements), $._substitution_end, ')'),
       // bash 5.3 runs `${ list; }` and `${| list; }` in the current shell.
       seq(
-        alias(token(/\$\{[\s|]/), '${'),
+        alias(token(/\$\{[ \t\n|]/), '${'),
         $._brace_substitution_start,
         optional($._terminated_statements),
         $._brace_substitution_end,

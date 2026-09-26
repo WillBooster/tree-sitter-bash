@@ -2467,7 +2467,7 @@
                 "members": [
                   {
                     "type": "PATTERN",
-                    "value": "[^\\s|&;()<>\"'`$\\\\]"
+                    "value": "[^ \\t\\n|&;()<>\"'`$\\\\]"
                   },
                   {
                     "type": "PATTERN",
@@ -2617,7 +2617,7 @@
             "members": [
               {
                 "type": "PATTERN",
-                "value": "[^#\\s|&;()<>\"'`$\\\\]"
+                "value": "[^# \\t\\n|&;()<>\"'`$\\\\]"
               },
               {
                 "type": "PATTERN",
@@ -2636,7 +2636,7 @@
               "members": [
                 {
                   "type": "PATTERN",
-                  "value": "[^\\s|&;()<>\"'`$\\\\]"
+                  "value": "[^ \\t\\n|&;()<>\"'`$\\\\]"
                 },
                 {
                   "type": "PATTERN",
@@ -2818,7 +2818,7 @@
                 "members": [
                   {
                     "type": "PATTERN",
-                    "value": "[^\\s|&;()<>\"'`$\\\\]"
+                    "value": "[^ \\t\\n|&;()<>\"'`$\\\\]"
                   },
                   {
                     "type": "PATTERN",
@@ -2886,7 +2886,7 @@
     },
     "ansi_c_string": {
       "type": "PATTERN",
-      "value": "\\$'([^'\\\\]|\\\\(.|\\r?\\n))*'"
+      "value": "\\$'([^'\\\\]|\\\\(.|\\n))*'"
     },
     "translated_string": {
       "type": "SEQ",
@@ -3471,7 +3471,7 @@
         "value": -1,
         "content": {
           "type": "PATTERN",
-          "value": "([^}$`\"'\\\\<>]|[<>]+[^(}$`\"'\\\\<>]|\\\\(.|\\r?\\n))+"
+          "value": "([^}$`\"'\\\\<>]|[<>]+[^(}$`\"'\\\\<>]|\\\\(.|\\n))+"
         }
       }
     },
@@ -3531,7 +3531,7 @@
                 "type": "TOKEN",
                 "content": {
                   "type": "PATTERN",
-                  "value": "\\$\\{[\\s|]"
+                  "value": "\\$\\{[ \\t\\n|]"
                 }
               },
               "named": false,
@@ -4601,7 +4601,7 @@
     },
     {
       "type": "PATTERN",
-      "value": "\\s"
+      "value": "[ \\t\\n]"
     },
     {
       "type": "PATTERN",

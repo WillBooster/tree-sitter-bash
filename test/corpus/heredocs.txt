@@ -693,6 +693,79 @@ echo in
           argument: (word))))))
 
 ================================================================================
+Heredoc in a substitution ends at a line starting with its delimiter and holding a paren
+================================================================================
+
+x=$(cat <<EOF
+body
+EOF echo done)
+y=$(cat <<EOF
+body
+EOF)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))
+        (command
+          name: (command_name
+            (word))
+          argument: (word)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))
+        (command
+          name: (command_name
+            (word)))))))
+
+================================================================================
+Heredoc in a substitution keeps a line starting with its delimiter without a paren
+================================================================================
+
+x=$(cat <<EOF
+EOF x
+EOF
+)
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_content)
+          (heredoc_content)
+          (heredoc_end))))))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 
@@ -757,6 +830,72 @@ echo in
           name: (command_name
             (word))
           argument: (word))))))
+
+================================================================================
+Heredoc in backquotes ends at the first unescaped backquote
+================================================================================
+
+x=`cat <<EOF
+body
+EOFx`
+y=`cat <<"EOF"
+bo`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))))))
+
+================================================================================
+Heredoc in backquotes inside a substitution ignores the substitution's paren
+================================================================================
+
+x=$(echo "`cat <<X
+X y`")
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (string
+            (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                redirect: (heredoc_redirect
+                  delimiter: (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end)))))))))
 
 ================================================================================
 Backquotes inside a top-level heredoc delimiter
