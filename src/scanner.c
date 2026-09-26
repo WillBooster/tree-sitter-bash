@@ -528,7 +528,7 @@ static bool scan_heredoc_arrow(Scanner *scanner, TSLexer *lexer, const bool *val
     return true;
 }
 
-// The right side of `=~` extends to unquoted whitespace outside parentheses.
+// The right side of `=~` extends to an unquoted space, tab, or newline outside parentheses.
 static bool scan_regex(TSLexer *lexer) {
     while (is_blank(lexer->lookahead)) {
         skip(lexer);
