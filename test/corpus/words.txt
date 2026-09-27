@@ -807,7 +807,7 @@ echo @($x #b) @( #b $x) @(a b) # real comment
   (comment))
 
 ================================================================================
-Parameter expansions with a blank after the prefix
+Parameter expansions with a blank after the parameter
 ================================================================================
 
 echo ${# y} ${! y} "${# y}" ${y }
