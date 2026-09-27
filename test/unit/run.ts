@@ -19,7 +19,7 @@ export function testCommand(
       const child = spawn(command[0], command.slice(1), {
         cwd: `${import.meta.dir}/../..`,
         detached: true,
-        env: { ...options.env, ...process.env },
+        env: { ...process.env, ...options.env },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       let output = '';
