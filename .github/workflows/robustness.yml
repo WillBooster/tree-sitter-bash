@@ -1,0 +1,54 @@
+name: Robustness
+'on':
+  pull_request: null
+  push:
+    branches:
+      - main
+  workflow_dispatch: null
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  # The scanner depends on the C library (e.g. `iswalpha`), so the tests run on every platform that the
+  # Release workflow builds a prebuild for; the Test workflow covers ubuntu-latest.
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - ubuntu-24.04-arm
+          - macos-latest
+          - macos-15-intel
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@v4.3.0
+      - run: bun install --frozen-lockfile
+      - run: bun run build/ci
+      - run: bun run test/ci
+  # Runs the parser under libFuzzer with AddressSanitizer and UndefinedBehaviorSanitizer, seeded with the
+  # input of each corpus case. A grammar change alters which tokens the scanner is asked for, so it runs
+  # on every change, not only on scanner changes.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          mkdir -p .tmp/fuzz-seeds
+          awk -v dir=.tmp/fuzz-seeds '
+            state != 2 && /^=+$/ { if (++state == 2) file = sprintf("%s/%d", dir, ++n); next }
+            state == 2 && /^---+$/ { state = 0; close(file); next }
+            state == 2 { print > file }
+          ' $(find test/corpus -name '*.txt' | LC_ALL=C sort)
+      - uses: tree-sitter/fuzz-action@v4
+        with:
+          corpus: .tmp/fuzz-seeds
+          max-time: '300'
+          # Keep in step with the tree-sitter-cli version in bun.lock.
+          tree-sitter-version: v0.27.0
