@@ -3479,8 +3479,64 @@
         "type": "PREC",
         "value": -1,
         "content": {
-          "type": "PATTERN",
-          "value": "([^}$`\"'\\\\<> \\t\\n]|[<>]+[^(}$`\"'\\\\<>]|\\\\(.|\\n))([^}$`\"'\\\\<>]|[<>]+[^(}$`\"'\\\\<>]|\\\\(.|\\n))*"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "PATTERN",
+                  "value": "[^}$`\"'\\\\<> \\t\\n]"
+                },
+                {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "PATTERN",
+                      "value": "[<>]+"
+                    },
+                    {
+                      "type": "PATTERN",
+                      "value": "[^(}$`\"'\\\\<>]"
+                    }
+                  ]
+                },
+                {
+                  "type": "PATTERN",
+                  "value": "\\\\(.|\\n)"
+                }
+              ]
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "PATTERN",
+                    "value": "[^}$`\"'\\\\<>]"
+                  },
+                  {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "PATTERN",
+                        "value": "[<>]+"
+                      },
+                      {
+                        "type": "PATTERN",
+                        "value": "[^(}$`\"'\\\\<>]"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "\\\\(.|\\n)"
+                  }
+                ]
+              }
+            }
+          ]
         }
       }
     },
@@ -3490,8 +3546,42 @@
         "type": "PREC",
         "value": 1,
         "content": {
-          "type": "PATTERN",
-          "value": "[ \\t\\n]([^}$`\"'\\\\<>]|[<>]+[^(}$`\"'\\\\<>]|\\\\(.|\\n))*"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "PATTERN",
+              "value": "[ \\t\\n]"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "PATTERN",
+                    "value": "[^}$`\"'\\\\<>]"
+                  },
+                  {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "PATTERN",
+                        "value": "[<>]+"
+                      },
+                      {
+                        "type": "PATTERN",
+                        "value": "[^(}$`\"'\\\\<>]"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "\\\\(.|\\n)"
+                  }
+                ]
+              }
+            }
+          ]
         }
       }
     },
