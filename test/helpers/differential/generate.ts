@@ -370,17 +370,19 @@ class ScriptGenerator {
         break;
       }
       case 2: {
-        this.emit(`$'${this.random.pick(['a\\tb', 'x\\x41y', "it\\'s", 'a\\\\b', '\\n'])}'`);
+        this.emit(
+          `$'${this.random.pick([String.raw`a\tb`, String.raw`x\x41y`, String.raw`it\'s`, String.raw`a\\b`, String.raw`\n`])}'`
+        );
         break;
       }
       case 3: {
         const words = [
-          'a\\ b',
-          '\\$x',
-          '\\#y',
-          'a\\;b',
-          '\\"q\\"',
-          "\\'",
+          String.raw`a\ b`,
+          String.raw`\$x`,
+          String.raw`\#y`,
+          String.raw`a\;b`,
+          String.raw`\"q\"`,
+          String.raw`\'`,
           'a#b',
           'x=y',
           '--opt=v',
@@ -389,8 +391,8 @@ class ScriptGenerator {
           '"a\\\nb"',
           "'a\\\nb'",
           "'\\\n'",
-          'a\\\\',
-          '"\\\\"',
+          String.raw`a\\`,
+          String.raw`"\\"`,
         ];
         this.emit(this.random.pick(this.unjoinedClosingLine ? words.filter((word) => !word.includes('\n')) : words));
         break;
@@ -601,7 +603,9 @@ class ScriptGenerator {
         return `${tab}${this.dataText()} \\`;
       }
       case 4: {
-        return this.random.chance(0.5) ? `${tab}\\${delimiter}` : `${tab}\\$(c d${this.nextDataId++}) \\\`c d${this.nextDataId++}\\\``;
+        return this.random.chance(0.5)
+          ? `${tab}\\${delimiter}`
+          : `${tab}\\$(c d${this.nextDataId++}) \\\`c d${this.nextDataId++}\\\``;
       }
       case 5: {
         return depth < MaxDepth && !quoted ? `${tab}\${X:-$(c ${this.commandId()})}` : `${tab}$X \\$Y`;
@@ -663,7 +667,7 @@ class ScriptGenerator {
       'x\r',
       'a\vb',
       'a\fb',
-      'a\u00a0b',
+      'a\u00A0b',
       'a\u3000b',
       // Reserved words are plain words after a command's first word.
       'if',
@@ -722,6 +726,6 @@ const HeredocDelimiters: readonly (readonly [string, string, boolean])[] = [
   ["'EOF'", 'EOF', true],
   ['"EOF"', 'EOF', true],
   ['E"O"F', 'EOF', true],
-  ['\\EOF', 'EOF', true],
+  [String.raw`\EOF`, 'EOF', true],
   ["'E O'", 'E O', true],
 ];

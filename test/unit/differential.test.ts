@@ -11,7 +11,7 @@ import { generateScript } from '../helpers/differential/generate.js';
 const FirstSeed = Number(process.env.DIFFERENTIAL_SEED ?? 1);
 const Cases = Number(process.env.DIFFERENTIAL_CASES ?? 2000);
 // An unparsable value (`10_000`) would otherwise run no script and pass.
-assert(
+assert.ok(
   Number.isSafeInteger(FirstSeed) && Number.isSafeInteger(Cases) && Cases > 0,
   'DIFFERENTIAL_SEED and DIFFERENTIAL_CASES must be integers, and DIFFERENTIAL_CASES positive'
 );
@@ -49,9 +49,13 @@ test('parses generated scripts into the commands bash runs', () => {
     }
     if (outcome.kind === 'mismatch') {
       mismatches.push(
-        [`seed ${seed}:`, JSON.stringify(script), ...outcome.details, `bash stderr: ${outcome.stderr}`, outcome.tree].join(
-          '\n'
-        )
+        [
+          `seed ${seed}:`,
+          JSON.stringify(script),
+          ...outcome.details,
+          `bash stderr: ${outcome.stderr}`,
+          outcome.tree,
+        ].join('\n')
       );
     }
   }
