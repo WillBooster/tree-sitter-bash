@@ -35,6 +35,10 @@ jobs:
   # on every change, not only on scanner changes.
   fuzz:
     runs-on: ubuntu-latest
+    # The action caches its tree-sitter build and uploads a crashing input as an artifact.
+    permissions:
+      actions: write
+      contents: read
     steps:
       - uses: actions/checkout@v7.0.1
         with:
@@ -50,3 +54,5 @@ jobs:
         with:
           corpus: .tmp/fuzz-seeds
           max-time: '300'
+          # Keep in step with the tree-sitter-cli version in bun.lock.
+          tree-sitter-version: v0.27.0
