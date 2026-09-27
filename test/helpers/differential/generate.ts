@@ -16,12 +16,24 @@ class ScriptGenerator {
   private readonly random: Random;
   private output = '';
   // Heredoc bodies wait for the next newline at their substitution depth, as bash reads them.
-  private readonly pendingHeredocs: string[][] = [[]];
+  private readonly pendingHeredocs: Heredoc[][] = [[]];
+  // Bodies queued on a line whose heredoc ends at a line holding the substitution's `)`: bash reads them
+  // right after that line, at the next newline whatever its depth.
+  private readonly deferredHeredocs: Heredoc[] = [];
   private nextCommandId = 0;
   private nextDataId = 0;
   private nextFunctionId = 0;
-  // Inside backquotes, heredocs and newlines are avoided: their bodies would need nested quoting.
+  // Inside backquotes, newlines are avoided except before heredoc bodies, whose lines avoid backslashes
+  // and backquotes, which would need nested quoting.
   private inBackquotes = false;
+  // Words without quotes, expansions, or line continuations, where those would change how bash reads
+  // them.
+  private plainWords = 0;
+  // After a quoted delimiter, bash does not join the line that ends a body at the substitution's `)`, so
+  // a deferred body follows the line's first newline even after a backslash or inside quotes, and bash
+  // reads the body lines after it as code, whose words the oracle cannot count; the line then stays
+  // unbroken up to its newline.
+  private unjoinedClosingLine = false;
   private heredocsDisabled = 0;
   private substitutionsDisabled = 0;
   // Whether the last statement emitted is a compound command, after which bash reads a reserved
@@ -48,8 +60,9 @@ class ScriptGenerator {
 
   private newline(): void {
     this.emit('\n');
+    this.unjoinedClosingLine = false;
     const pending = this.pendingHeredocs.at(-1) ?? [];
-    for (const body of pending.splice(0)) this.emit(body);
+    for (const { body } of [...this.deferredHeredocs.splice(0), ...pending.splice(0)]) this.emit(body);
   }
 
   // Separates or ends a statement; a newline also starts the bodies of pending heredocs.
@@ -85,8 +98,9 @@ class ScriptGenerator {
 
   // A space between words, sometimes a tab or continued onto the next line.
   private space(): void {
-    if (this.random.chance(0.08) && !this.inBackquotes) this.emit(this.random.pick([' \\\n', ' \\\n\\\n']));
-    else this.emit(this.random.pick([' ', ' ', ' ', '\t', '  ']));
+    const continued =
+      this.random.chance(0.08) && !this.inBackquotes && this.plainWords === 0 && !this.unjoinedClosingLine;
+    this.emit(continued ? this.random.pick([' \\\n', ' \\\n\\\n']) : this.random.pick([' ', ' ', ' ', '\t', '  ']));
   }
 
   // After `|`, `&&`, and `||`, a newline continues the list, and heredoc bodies start after it.
@@ -238,6 +252,29 @@ class ScriptGenerator {
         this.statement(depth + 1);
         break;
       }
+      case 'regex': {
+        // The right side of `=~` expands its substitutions, which print nothing, so each regex matches `a`;
+        // a group holds blanks.
+        this.emit('[[ a =~ ');
+        if (this.random.chance(0.2)) {
+          this.emit('^(a|');
+          this.backquoted();
+          this.emit('x)$');
+        } else {
+          const [open, close] = this.random.pick([
+            ['a|<(', ')'],
+            ['^(a|b $(', '))'],
+            ['"$(', ')"a'],
+            ['a|( $(', ') )'],
+          ] as const);
+          this.emit(open);
+          this.regexSubstitutionBody(depth);
+          this.emit(close);
+        }
+        this.emit(' ]] && ');
+        this.statement(depth + 1);
+        break;
+      }
       case 'time': {
         this.emit(this.random.pick(['time ', 'time -p ']));
         this.simpleCommand(depth);
@@ -316,8 +353,9 @@ class ScriptGenerator {
 
   // Every argument yields exactly one word for the command, so argument lists line up.
   private argument(depth: number): void {
-    if (this.inBackquotes) {
+    if (this.inBackquotes || this.plainWords > 0) {
       // Quotes and backslashes inside backquotes follow extra rules; plain words keep the check simple.
+      // Other callers need words that bash reads as written.
       this.emit(this.random.chance(0.5) ? this.literalWord() : `'c d${this.nextDataId++}'`);
       return;
     }
@@ -336,25 +374,25 @@ class ScriptGenerator {
         break;
       }
       case 3: {
-        this.emit(
-          this.random.pick([
-            'a\\ b',
-            '\\$x',
-            '\\#y',
-            'a\\;b',
-            '\\"q\\"',
-            "\\'",
-            'a#b',
-            'x=y',
-            '--opt=v',
-            'ab\\\ncd',
-            'ab\\\n\\\ncd',
-            '"a\\\nb"',
-            "'a\\\nb'",
-            'a\\\\',
-            '"\\\\"',
-          ])
-        );
+        const words = [
+          'a\\ b',
+          '\\$x',
+          '\\#y',
+          'a\\;b',
+          '\\"q\\"',
+          "\\'",
+          'a#b',
+          'x=y',
+          '--opt=v',
+          'ab\\\ncd',
+          'ab\\\n\\\ncd',
+          '"a\\\nb"',
+          "'a\\\nb'",
+          "'\\\n'",
+          'a\\\\',
+          '"\\\\"',
+        ];
+        this.emit(this.random.pick(this.unjoinedClosingLine ? words.filter((word) => !word.includes('\n')) : words));
         break;
       }
       case 4: {
@@ -397,11 +435,9 @@ class ScriptGenerator {
         break;
       }
       case 8: {
-        this.emit('"`');
-        this.inBackquotes = true;
-        this.statement(MaxDepth);
-        this.inBackquotes = false;
-        this.emit('`"');
+        this.emit('"');
+        this.backquoted();
+        this.emit('"');
         break;
       }
       default: {
@@ -410,8 +446,31 @@ class ScriptGenerator {
     }
   }
 
+  // A simple command in backquotes, whose heredocs end inside them.
+  private backquoted(): void {
+    this.emit('`');
+    this.inBackquotes = true;
+    // Bash reads a deferred body right after its line, while the backquotes' end would cut it short
+    // for the parser.
+    const heredocs = this.deferredHeredocs.length === 0;
+    if (!heredocs) this.heredocsDisabled++;
+    this.pendingHeredocs.push([]);
+    this.statement(MaxDepth);
+    if ((this.pendingHeredocs.at(-1)?.length ?? 0) > 0) {
+      this.newline();
+      // The delimiter may end right before the closing backquote.
+      if (this.random.chance(0.5)) this.output = this.output.slice(0, -1);
+    }
+    this.pendingHeredocs.pop();
+    if (!heredocs) this.heredocsDisabled--;
+    this.inBackquotes = false;
+    this.emit('`');
+  }
+
   // The body of `$(…)` or `<(…)`: its heredocs end inside it, so a newline precedes the closer when
-  // one is pending.
+  // one is pending. Bash also ends a body at a line that starts with its delimiter and holds the `)`,
+  // and then reads the rest of that line, without its line continuations unless the delimiter is
+  // quoted, after the bodies still queued on the line.
   // Bash 5.2 drops the second and later `;` after a heredoc inside a command substitution, so a
   // substitution holds heredocs only as a lone simple command without nested substitutions.
   private substitutionBody(depth: number): void {
@@ -428,12 +487,46 @@ class ScriptGenerator {
     }
     // `$((` starts an arithmetic expansion unless bash fails to parse one, which the grammar does not model.
     if (this.output[start] === '(') this.output = `${this.output.slice(0, start)} ${this.output.slice(start)}`;
+    const pending = this.pendingHeredocs.at(-1) ?? [];
+    if (pending.length > 0 && this.random.chance(0.3)) {
+      const closing = this.random.int(pending.length);
+      // After a quoted delimiter the line is not joined, so the `)` must stay on it.
+      const plain = pending[closing]?.quoted ?? false;
+      const deferred = pending.splice(closing + 1);
+      this.newline();
+      // The last body emitted ends with its delimiter line, which now continues up to the closer.
+      this.output = this.output.slice(0, -1);
+      this.deferredHeredocs.push(...deferred);
+      if (plain && deferred.length > 0) this.unjoinedClosingLine = true;
+      if (this.random.chance(0.6)) {
+        this.emit(' ');
+        this.heredocsDisabled++;
+        this.substitutionsDisabled++;
+        if (plain) this.plainWords++;
+        this.simpleCommand(depth + 1);
+        if (plain) this.plainWords--;
+        this.substitutionsDisabled--;
+        this.heredocsDisabled--;
+      }
+    } else if (pending.length > 0) {
+      this.newline();
+    }
+    this.pendingHeredocs.pop();
+  }
+
+  // Bash 5.2 parses a substitution inside the right side of `=~` in part as a regex, rejecting a
+  // `case` or mangling a quoted argument, so its body is a simple command with plain words.
+  private regexSubstitutionBody(depth: number): void {
+    this.pendingHeredocs.push([]);
+    this.plainWords++;
+    this.simpleCommand(depth + 1);
+    this.plainWords--;
     if ((this.pendingHeredocs.at(-1)?.length ?? 0) > 0) this.newline();
     this.pendingHeredocs.pop();
   }
 
   private redirection(depth: number): void {
-    const canHeredoc = !this.inBackquotes && this.heredocsDisabled === 0;
+    const canHeredoc = this.heredocsDisabled === 0;
     switch (this.random.int(canHeredoc ? 4 : 2)) {
       case 0: {
         this.emit(
@@ -479,12 +572,14 @@ class ScriptGenerator {
     let body = '';
     const lineCount = this.random.int(4);
     for (let index = 0; index < lineCount; index++) {
-      const line = this.heredocLine(delimiter, quoted, indent, depth);
+      const line = this.inBackquotes
+        ? this.backquotedHeredocLine(delimiter)
+        : this.heredocLine(delimiter, quoted, indent, depth);
       // A continued last line would join the terminator, leaving the heredoc open to the end of input.
       body += `${index === lineCount - 1 && !quoted ? line.replace(/\\$/u, '') : line}\n`;
     }
     body += `${this.heredocTerminator(delimiter, quoted, indent)}\n`;
-    this.pendingHeredocs.at(-1)?.push(body);
+    this.pendingHeredocs.at(-1)?.push({ body, quoted });
   }
 
   private heredocLine(delimiter: string, quoted: boolean, indent: boolean, depth: number): string {
@@ -517,6 +612,21 @@ class ScriptGenerator {
       }
       default: {
         return `${tab}${this.dataText()}`;
+      }
+    }
+  }
+
+  private backquotedHeredocLine(delimiter: string): string {
+    switch (this.random.int(4)) {
+      case 0: {
+        return `x $(c ${this.commandId()}) y`;
+      }
+      case 1: {
+        return this.random.pick([`${delimiter} `, ` ${delimiter}`, `${delimiter}x`, `x${delimiter}`, `${delimiter}\r`]);
+      }
+      default: {
+        const id = `d${this.nextDataId++}`;
+        return this.random.pick([`c ${id}`, `c ${id}; c ${id}x`, `$(c ${id})`, `c ${id} | c ${id}y`]);
       }
     }
   }
@@ -575,6 +685,11 @@ class ScriptGenerator {
   }
 }
 
+interface Heredoc {
+  body: string;
+  quoted: boolean;
+}
+
 const StatementKinds = [
   'simple',
   'simple',
@@ -593,6 +708,7 @@ const StatementKinds = [
   'fallthrough',
   'function',
   'test',
+  'regex',
   'time',
   'declaration',
 ] as const;

@@ -344,6 +344,68 @@ Regex tests next to unspaced && and ||
       (word))))
 
 ================================================================================
+Regex tests with substitutions and groups
+================================================================================
+
+[[ a =~ ^(a|b $(c)) ]]
+[[ a =~ a|<(c) ]]
+[[ a =~ ( "$x" )|a ]]
+[[ a =~ ( $( [[ b =~ (c d) ]] ) )|a ]]
+[[ a =~ `c`(x;y&z<w>v) ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (test_command
+    (regex_test
+      left: (word)
+      right: (concatenation
+        (regex)
+        (command_substitution
+          (command
+            name: (command_name
+              (word))))
+        (regex))))
+  (test_command
+    (regex_test
+      left: (word)
+      right: (concatenation
+        (regex)
+        (process_substitution
+          (command
+            name: (command_name
+              (word)))))))
+  (test_command
+    (regex_test
+      left: (word)
+      right: (concatenation
+        (regex)
+        (string
+          (simple_expansion
+            (variable_name)))
+        (regex))))
+  (test_command
+    (regex_test
+      left: (word)
+      right: (concatenation
+        (regex)
+        (command_substitution
+          (test_command
+            (regex_test
+              left: (word)
+              right: (regex))))
+        (regex))))
+  (test_command
+    (regex_test
+      left: (word)
+      right: (concatenation
+        (command_substitution
+          (command
+            name: (command_name
+              (word))))
+        (regex)))))
+
+================================================================================
 Negated extglob patterns in test commands
 ================================================================================
 
