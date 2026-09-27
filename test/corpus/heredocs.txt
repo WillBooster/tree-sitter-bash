@@ -1012,6 +1012,117 @@ echo d
     argument: (word)))
 
 ================================================================================
+Deferred bodies after a quoted closing line inside a regex, an assignment value, and backquotes
+================================================================================
+
+x=$(cat <<'EOF'; cat <<END
+EOF); [[ a =~ a\
+end
+END
+b ]]
+x=$(cat <<'EOF'; cat <<END
+EOF); a=\
+end
+END
+b echo
+x=$(cat <<EOF; cat <<END
+EOF); echo `echo 'a
+$(c)
+END
+'`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (test_command
+    (regex_test
+      left: (word)
+      right: (concatenation
+        (regex)
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))
+        (regex))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end))
+      value: (word))
+    name: (command_name
+      (word)))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string
+          (string_content)
+          (heredoc_body
+            (heredoc_content)
+            (command_substitution
+              (command
+                name: (command_name
+                  (word))))
+            (heredoc_content)
+            (heredoc_end))
+          (string_content))))))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 

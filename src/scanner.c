@@ -290,6 +290,9 @@ static bool awaits_deferred_body(Scanner *scanner) {
 // expansion so that the parser can read it.
 static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t index) {
     Heredoc *heredoc = array_get(&scanner->heredocs, index);
+    // Bash reads a deferred body from the input after its line, never from the text of backquotes that the
+    // line opened, so a backquote in it is literal.
+    bool in_backquotes = scanner->backtick_depth > 0 && !heredoc->deferred;
     bool did_advance = false;
     bool at_line_start = lexer->get_column(lexer) == 0;
 
@@ -307,7 +310,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             // code. Such a line ends the content token before it and the end token after the delimiter.
             // Where the backquotes are innermost, bash fixes their extent before it reads the body, so
             // the rule is off.
-            uint16_t outside_backquotes = scanner->backtick_depth > 0 ? scanner->backtick_closers : 0;
+            uint16_t outside_backquotes = in_backquotes ? scanner->backtick_closers : 0;
             bool in_parenthesized =
                 scanner->closers.size > outside_backquotes && *array_back(&scanner->closers) == ')';
             bool prefix_marked = false;
@@ -354,7 +357,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             // innermost substitution's closer (`)` or `}`) or a closing backquote.
             bool ends_line = lexer->lookahead == '\n' || lexer->eof(lexer) ||
                              (scanner->closers.size > 0 && lexer->lookahead == *array_back(&scanner->closers)) ||
-                             (lexer->lookahead == '`' && scanner->backtick_depth > 0);
+                             (lexer->lookahead == '`' && in_backquotes);
             if (!escaped && matched == heredoc->delimiter.size && ends_line) {
                 if (did_advance) {
                     lexer->result_symbol = HEREDOC_CONTENT;
@@ -416,7 +419,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 did_advance = true;
                 // Inside backquotes a backslash also hides a backquote from a quoted body's end.
                 if (!lexer->eof(lexer) &&
-                    (!heredoc->is_raw || (scanner->backtick_depth > 0 && lexer->lookahead == '`'))) {
+                    (!heredoc->is_raw || (in_backquotes && lexer->lookahead == '`'))) {
                     // A backslash-newline joins lines before the delimiter comparison, while a
                     // backslash-CR escapes only the CR, so the LF after it still ends the line.
                     advance(lexer);
@@ -425,7 +428,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             case '`':
                 // Bash ends backquotes at the first unescaped backquote, even inside a heredoc body,
                 // and ends the body there.
-                if (scanner->backtick_depth > 0) {
+                if (in_backquotes) {
                     lexer->mark_end(lexer);
                     lexer->result_symbol = did_advance ? HEREDOC_CONTENT : HEREDOC_END;
                     if (!did_advance) {
@@ -433,7 +436,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                     }
                     return true;
                 }
-                if (!heredoc->is_raw) {
+                if (!heredoc->is_raw && scanner->backtick_depth == 0) {
                     lexer->mark_end(lexer);
                     lexer->result_symbol = HEREDOC_CONTENT;
                     return did_advance;
@@ -695,6 +698,10 @@ static bool scan_regex(Scanner *scanner, TSLexer *lexer) {
             break;
         }
         advance(lexer);
+        if (c == '\\' && lexer->lookahead == '\n' && !scanner->joined_line && awaits_deferred_body(scanner)) {
+            // The newline ends the line, after which a deferred body starts; a concatenation splits it.
+            break;
+        }
         if (c == '$' || c == '<' || c == '>') {
             int32_t next = lexer->lookahead;
             bool starts_part = c == '$' ? starts_quoted_expansion(next) || next == '\'' || next == '"' : next == '(';
@@ -1006,7 +1013,8 @@ static bool finish_word_continuations(Scanner *scanner, TSLexer *lexer, enum Tok
         }
         scanner->after_line_break = true;
         lexer->result_symbol = LINE_CONTINUATION;
-    } else if (lexer->eof(lexer) || ends_word(c, regex) || (c == '`' && scanner->backtick_depth > 0)) {
+    } else if (lexer->eof(lexer) || (ends_word(c, regex) && !(regex && scanner->regex_depth > 0)) ||
+               (c == '`' && scanner->backtick_depth > 0)) {
         scanner->after_line_break = true;
         lexer->result_symbol = LINE_CONTINUATION;
     } else {
@@ -1110,7 +1118,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         (valid_symbols[SUBSTITUTION_START] || valid_symbols[BRACE_SUBSTITUTION_START] ||
          valid_symbols[BRACKET_SUBSTITUTION_START])) {
         // Nesting too deep for the serialized state is left to the parse as an error.
-        if (serialized_size(scanner) >= TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
+        if (serialized_size(scanner) + CLOSER_SIZE > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
             return false;
         }
         lexer->result_symbol = valid_symbols[SUBSTITUTION_START]         ? SUBSTITUTION_START
@@ -1207,7 +1215,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return scan_heredoc_start(scanner, lexer);
     }
 
-    if (regex && scanner->regex_depth > 0 && !at_eof) {
+    if (regex && scanner->regex_depth > 0 && !at_eof && first != '\\') {
         lexer->result_symbol = REGEX_CONCAT;
         return true;
     }
@@ -1233,7 +1241,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return false;
     }
 
-    if (can_concat && !at_eof && !ends_word(first, regex) &&
+    if (can_concat && !at_eof && (!ends_word(first, regex) || (regex && scanner->regex_depth > 0)) &&
         !(after_line_break && lexer->get_column(lexer) == 0)) {
         int32_t c = first;
         if (c == '\\' && lexer->lookahead == '\\') {
@@ -1363,8 +1371,9 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             if (lexer->lookahead == '\n' && !scanner->joined_line && awaits_deferred_body(scanner)) {
                 // A reparse may reuse the words before the backslash as a complete command, where no
                 // concatenation is valid, so a backslash right after the previous token is taken to end a
-                // word unless a command may start there, as after an operator.
-                split_continuation(scanner, lexer, first == '\\' && !valid_symbols[VARIABLE_NAME], false);
+                // word unless a command or an assignment value may start there.
+                split_continuation(scanner, lexer,
+                                   first == '\\' && !valid_symbols[VARIABLE_NAME] && !valid_symbols[EMPTY_VALUE], false);
                 return true;
             }
             if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
@@ -1405,7 +1414,11 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     // up to the backquote, which then cannot be parsed; the quote never hides the text after it.
     if (scanner->backtick_depth > 0 && lexer->lookahead == '\'') {
         advance(lexer);
-        while (!lexer->eof(lexer) && lexer->lookahead != '\'' && lexer->lookahead != '`') {
+        lexer->mark_end(lexer);
+        // A deferred body starts at the newline that ends the line, so what follows it is read later.
+        bool breaks_line = awaits_deferred_body(scanner) && valid_symbols[CLOSER_LINE_RAW_STRING_START];
+        while (!lexer->eof(lexer) && lexer->lookahead != '\'' && lexer->lookahead != '`' &&
+               !(breaks_line && lexer->lookahead == '\n')) {
             // A backslash escapes a backquote or a backslash for finding the end of the backquotes; the
             // quote itself stays literal, so `'\'` still ends at its second quote.
             bool backslash = lexer->lookahead == '\\';
@@ -1415,6 +1428,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             }
         }
         if (lexer->lookahead != '`') {
+            // A quote that the backquotes do not cut short scans its text itself where a deferred body may
+            // start inside it.
+            if (!lexer->eof(lexer) && breaks_line) {
+                lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
+                return true;
+            }
             return false;
         }
         if (valid_symbols[BACKTICK_CLOSE]) {
