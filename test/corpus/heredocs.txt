@@ -1159,6 +1159,58 @@ echo e
     argument: (word)))
 
 ================================================================================
+Several heredocs queued before a line ending a heredoc at a substitution's paren
+================================================================================
+
+x=$(cat <<EOF; cat <<END; cat <<Z
+EOF); echo a
+e
+END
+z
+Z
+echo b
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 

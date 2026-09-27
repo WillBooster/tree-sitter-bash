@@ -1145,10 +1145,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         int32_t next = next_heredoc_index(scanner);
         // Only another deferred body starts at the newline of a split line continuation.
         bool deferred = next >= 0 && array_get(&scanner->heredocs, next)->deferred;
-        // A deferred body starts at the end of its line even inside the body of an enclosing heredoc.
+        // A deferred body starts at the end of its line even inside the body of an enclosing heredoc, but
+        // the deferred bodies of one line follow one another.
         int32_t active = active_heredoc_index(scanner);
         if (active >= 0 && (valid_symbols[HEREDOC_CONTENT] || valid_symbols[HEREDOC_END]) &&
-            !(deferred && lexer->lookahead == '\n' && valid_symbols[HEREDOC_BODY_START]) &&
+            !(deferred && !array_get(&scanner->heredocs, active)->deferred && lexer->lookahead == '\n' &&
+              valid_symbols[HEREDOC_BODY_START]) &&
             !(lexer->lookahead == '`' && !array_get(&scanner->heredocs, active)->is_raw &&
               scanner->backtick_depth == 0)) {
             return scan_heredoc_content(scanner, lexer, (uint32_t)active);
