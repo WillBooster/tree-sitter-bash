@@ -19,6 +19,7 @@ const EXTGLOB_GROUP = extglobGroup('[?*+@]', 3);
 const EXTGLOB_NEGATION = extglobGroup('!', 3);
 
 // Text inside `${…}` and subscripts stops before `<(`/`>(`, so a process substitution there is parsed.
+const EXPANSION_TEXT_BREAKS = ['}', '$', '`', '"', '\'', '\\\\', '<', '>'];
 const SUBSCRIPT_TEXT = /([^\[\]$`"'\\<>]|[<>]+[^(\[\]$`"'\\<>]|\\.)+/;
 
 const PREC = {
@@ -634,12 +635,15 @@ module.exports = grammar({
       ))),
     ),
 
-    _expansion_text: _ => token(prec(-1, /([^}$`"'\\<> \t\n]|[<>]+[^(}$`"'\\<>]|\\(.|\n))([^}$`"'\\<>]|[<>]+[^(}$`"'\\<>]|\\(.|\n))*/)),
+    _expansion_text: _ => token(prec(-1, seq(
+      choice(noneOf(...EXPANSION_TEXT_BREAKS, ' ', '\\t', '\\n'), ...expansionTextUnits().slice(1)),
+      repeat(choice(...expansionTextUnits())),
+    ))),
 
     // Text led by a blank outranks `}`: otherwise the lexer, having consumed the blank as the start of
     // text, extends it into a `}` token that swallows the blank (`${x:- }`), which a reparse after an
     // edit does not reproduce, and the blank, which bash expands, would be lost.
-    _blank_expansion_text: _ => token(prec(1, /[ \t\n]([^}$`"'\\<>]|[<>]+[^(}$`"'\\<>]|\\(.|\n))*/)),
+    _blank_expansion_text: _ => token(prec(1, seq(/[ \t\n]/, repeat(choice(...expansionTextUnits()))))),
 
     // A `<` or `>` that the text above cannot end with, e.g. before `}`. A single character, so that a
     // run before `(` leaves its last `<`/`>` to open a process substitution (`${x:-a<<(b)}`).
@@ -762,6 +766,11 @@ module.exports = grammar({
  */
 function noneOf(...characters) {
   return new RegExp(`[^${characters.join('')}]`);
+}
+
+// The units of text inside `${…}`: a character, a run of `<`/`>` not before `(`, and an escape.
+function expansionTextUnits() {
+  return [noneOf(...EXPANSION_TEXT_BREAKS), seq(/[<>]+/, noneOf('(', ...EXPANSION_TEXT_BREAKS)), /\\(.|\n)/];
 }
 
 /**
