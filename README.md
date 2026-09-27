@@ -16,14 +16,20 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 
 ## Usage
 
-```js
-const Parser = require('tree-sitter');
-const Bash = require('@willbooster/tree-sitter-bash');
+The npm package ships `tree-sitter-bash.wasm` for [web-tree-sitter](https://www.npmjs.com/package/web-tree-sitter):
 
+```js
+import { fileURLToPath } from 'node:url';
+import { Language, Parser } from 'web-tree-sitter';
+
+await Parser.init();
 const parser = new Parser();
-parser.setLanguage(Bash);
+const wasmPath = fileURLToPath(import.meta.resolve('@willbooster/tree-sitter-bash/tree-sitter-bash.wasm'));
+parser.setLanguage(await Language.load(wasmPath));
 const tree = parser.parse('cat <<EOF; echo done\n$(date)\nEOF\n');
 ```
+
+The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
 ## Development
 
@@ -41,7 +47,6 @@ script/parse-examples
 - an incremental-parsing check (`test/unit/incremental.test.ts`): `tree-sitter fuzz` edits each corpus case at random,
   reparses it, undoes the edits, and reparses again. `TREE_SITTER_SEED`, `TREE_SITTER_ITERATIONS`, and
   `TREE_SITTER_EDITS` run other or more edits;
-- the Node.js binding test;
 - a check that real-world scripts cloned into `examples/` fail to parse exactly as listed in
   `script/known-failures.txt`. The first run clones them, which takes a few minutes. The example repositories are
   pinned to commits in `script/parse-examples`. After a grammar change or a moved pin alters that list,
@@ -50,12 +55,12 @@ script/parse-examples
   scripts and runs them with the bash that `mise.toml` pins. It checks that the syntax tree shows exactly the commands
   bash runs, with as many words and the same value for each word without expansions, and that the tree has no
   `ERROR` or `MISSING` node for a script bash accepts. A failure prints the seed; `DIFFERENTIAL_SEED` and
-  `DIFFERENTIAL_CASES` run other or more scripts. It loads the Node.js addon, which `bun run build/ci` rebuilds after
-  regenerating the parser;
+  `DIFFERENTIAL_CASES` run other or more scripts. It loads the Wasm build through web-tree-sitter, which `bun run build/ci`
+  rebuilds after regenerating the parser;
 - a performance check (`test/unit/performance.test.ts`) that a 240 KB line parses in linear time, since consumers
   parse untrusted scripts.
 
-CI also runs these tests on every platform that gets a prebuild, and fuzzes the parser with libFuzzer and sanitizers
+CI also runs these tests on Linux arm64 and macOS, and fuzzes the parser with libFuzzer and sanitizers
 (`.github/workflows/robustness.yml`).
 
 ### References

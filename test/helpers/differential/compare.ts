@@ -2,28 +2,30 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import Parser from 'tree-sitter';
+import { Language, type Node, Parser, type Tree } from 'web-tree-sitter';
 
 const Root = path.join(import.meta.dir, '../../..');
-// Bun cannot use node-gyp-build's lookup, so the addon that `bun install` builds is loaded directly.
-const AddonPath = path.join(Root, 'build/Release/tree_sitter_bash_binding.node');
-// oxlint-disable-next-line unicorn/prefer-module -- Node native addons are loaded through require.
-const Bash = require(AddonPath) as Parser.Language;
+// The Wasm build is the one the package ships.
+const WasmPath = path.join(Root, 'tree-sitter-bash.wasm');
 
-// Rebuilding here would race with other test files loading the addon, so a stale one is reported.
-export function isAddonStale(): boolean {
-  // src/parser.c is generated from grammar.js, so an edit to the grammar alone also makes the addon stale.
+// Rebuilding here would race with other test files loading the Wasm build, so a stale one is reported.
+export function isWasmStale(): boolean {
+  // src/parser.c is generated from grammar.js, so an edit to the grammar alone also makes the Wasm build stale.
   const sources = ['grammar.js', 'src/parser.c', 'src/scanner.c'].map(
     (name) => fs.statSync(path.join(Root, name)).mtimeMs
   );
-  return Math.max(...sources) > fs.statSync(AddonPath).mtimeMs;
+  return Math.max(...sources) > fs.statSync(WasmPath).mtimeMs;
 }
 
+await Parser.init();
 const parser = new Parser();
-parser.setLanguage(Bash);
+parser.setLanguage(await Language.load(WasmPath));
 
-export function parse(script: string): Parser.Tree {
-  return parser.parse(script);
+// The tree lives in the Wasm heap, so the caller must `delete()` it.
+export function parse(script: string): Tree {
+  const tree = parser.parse(script);
+  if (!tree) throw new Error('The parser returned no tree');
+  return tree;
 }
 
 // Each run of `c` writes its words to a file of its own in $C_LOG: appending to one file could
@@ -107,12 +109,17 @@ export class Oracle {
     if (lines.length > unterminated || unterminated > cutShortQuotes) return { kind: 'invalid', reason: stderr };
     const executed = readInvocations(logPath);
 
-    const tree = parser.parse(script);
-    const details: string[] = [];
-    if (tree.rootNode.hasError) details.push('the tree has ERROR or MISSING nodes although bash -n accepts the script');
-    details.push(...diffInvocations(executed, collectInvocations(tree.rootNode)));
-    if (details.length === 0) return { kind: 'match' };
-    return { kind: 'mismatch', details, stderr, tree: tree.rootNode.toString() };
+    const tree = parse(script);
+    try {
+      const details: string[] = [];
+      if (tree.rootNode.hasError)
+        details.push('the tree has ERROR or MISSING nodes although bash -n accepts the script');
+      details.push(...diffInvocations(executed, collectInvocations(tree.rootNode)));
+      if (details.length === 0) return { kind: 'match' };
+      return { kind: 'mismatch', details, stderr, tree: tree.rootNode.toString() };
+    } finally {
+      tree.delete();
+    }
   }
 }
 
@@ -129,9 +136,9 @@ function readInvocations(directory: string): Map<string, string[][]> {
 
 // Every `c` command in the tree, grouped by its first word, wherever it is: substitutions, heredoc
 // bodies, and function bodies included.
-function collectInvocations(root: Parser.SyntaxNode): Map<string, Invocation[]> {
+function collectInvocations(root: Node): Map<string, Invocation[]> {
   const invocations = new Map<string, Invocation[]>();
-  const visit = (node: Parser.SyntaxNode): void => {
+  const visit = (node: Node): void => {
     const name = node.type === 'command' ? node.childForFieldName('name')?.firstChild : undefined;
     if (name && literalValue(name) === 'c') {
       const words = node.childrenForFieldName('argument').map((argument) => literalValue(argument));
@@ -172,7 +179,7 @@ function diffInvocations(executed: Map<string, string[][]>, parsed: Map<string, 
 }
 
 // The word after quote removal when it holds no expansion; `undefined` otherwise.
-function literalValue(node: Parser.SyntaxNode): string | undefined {
+function literalValue(node: Node): string | undefined {
   switch (node.type) {
     case 'word': {
       return node.text.replaceAll(/\\([\s\S])/gu, (_, next: string) => (next === '\n' ? '' : next));
@@ -201,7 +208,7 @@ function literalValue(node: Parser.SyntaxNode): string | undefined {
   }
 }
 
-function quotedText(node: Parser.SyntaxNode): string {
+function quotedText(node: Node): string {
   return node.namedChildren
     .filter((child) => child.type === 'string_content')
     .map((child) => child.text)

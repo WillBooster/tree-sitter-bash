@@ -14,25 +14,18 @@
   },
   "license": "MIT",
   "author": "WillBooster Inc.",
-  "main": "bindings/node",
-  "types": "bindings/node",
   "files": [
     "grammar.js",
     "tree-sitter.json",
-    "binding.gyp",
-    "prebuilds/**",
-    "bindings/node/*",
     "queries/*",
     "src/**",
     "*.wasm"
   ],
   "scripts": {
-    "build-prebuilds": "prebuildify --napi --strip --name tree-sitter-bash",
     "build-wasm": "tree-sitter build --wasm",
-    "build/ci": "tree-sitter generate && node-gyp rebuild",
+    "build/ci": "tree-sitter generate && tree-sitter build --wasm",
     "cleanup": "bun wb lint --fix --format",
     "format": "bun wb lint --format",
-    "install": "node-gyp-build",
     "lint": "bun wb lint",
     "lint-fix": "bun wb lint --fix",
     "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
@@ -46,10 +39,6 @@
     "verify": "bun wb verify",
     "verify-full": "bun wb verify --full"
   },
-  "dependencies": {
-    "node-addon-api": "^8.2.1",
-    "node-gyp-build": "^4.8.2"
-  },
   "devDependencies": {
     "@semantic-release/exec": "7.1.0",
     "@tsconfig/bun": "1.0.11",
@@ -59,22 +48,20 @@
     "@willbooster/wb": "22.8.0",
     "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.14",
-    "node-gyp": "13.0.2",
     "oxfmt": "0.68.0",
     "oxlint": "1.83.0",
     "oxlint-tsgolint": "7.0.2002",
-    "prebuildify": "^6.0.1",
     "semantic-release": "25.0.9",
     "sort-package-json": "4.0.0",
-    "tree-sitter": "^0.25.0",
-    "tree-sitter-cli": "^0.27.0",
-    "typescript": "7.0.2"
+    "tree-sitter-cli": "0.27.0",
+    "typescript": "7.0.2",
+    "web-tree-sitter": "0.27.0"
   },
   "peerDependencies": {
-    "tree-sitter": "^0.25.0"
+    "web-tree-sitter": "^0.27.0"
   },
   "peerDependenciesMeta": {
-    "tree-sitter": {
+    "web-tree-sitter": {
       "optional": true
     }
   },

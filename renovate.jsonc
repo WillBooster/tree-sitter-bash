@@ -1,4 +1,11 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>WillBooster/willbooster-configs:renovate.jsonc"],
+  "packageRules": [
+    {
+      // The Wasm build that tree-sitter-cli emits must load in the web-tree-sitter release of the same version.
+      "matchPackageNames": ["tree-sitter-cli", "web-tree-sitter"],
+      "groupName": "tree-sitter",
+    },
+  ],
 }
