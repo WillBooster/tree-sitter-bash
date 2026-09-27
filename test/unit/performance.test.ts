@@ -9,6 +9,10 @@ test.each([
   ['a line after a line continuation', `x \\\n${Array.from({ length: 40_000 }, () => 'a"b"').join(' ')}\n`],
 ])('parses a 240 KB line of %s in linear time', (_, script) => {
   const start = performance.now();
-  expect(parse(script).rootNode.hasError).toBe(false);
-  expect(performance.now() - start).toBeLessThan(3000);
+  const tree = parse(script);
+  const elapsed = performance.now() - start;
+  const { hasError } = tree.rootNode;
+  tree.delete();
+  expect(hasError).toBe(false);
+  expect(elapsed).toBeLessThan(3000);
 });

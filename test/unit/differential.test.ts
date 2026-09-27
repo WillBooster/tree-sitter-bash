@@ -1,7 +1,7 @@
 import { afterAll, expect, test } from 'bun:test';
 import assert from 'node:assert';
 
-import { isAddonStale, Oracle } from '../helpers/differential/compare.js';
+import { isWasmStale, Oracle } from '../helpers/differential/compare.js';
 import { generateScript } from '../helpers/differential/generate.js';
 
 // Generated scripts are run by bash (mise.toml pins it) and parsed by the grammar; every command bash
@@ -23,8 +23,8 @@ const bash = Bun.spawnSync(['bash', '-c', 'echo "$BASH"']).stdout.toString().tri
 const oracle = new Oracle(bash);
 afterAll(() => oracle.dispose());
 
-test('uses a Node.js addon built from the current parser', () => {
-  expect(isAddonStale(), 'grammar.js or src/ changed after the addon was built; run `bun run build/ci`').toBe(false);
+test('uses a Wasm build of the current parser', () => {
+  expect(isWasmStale(), 'grammar.js or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
 });
 
 test('uses bash 5.2 or later as the oracle', () => {

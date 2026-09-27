@@ -11,8 +11,8 @@ concurrency:
 permissions:
   contents: read
 jobs:
-  # The scanner depends on the C library (e.g. `iswalpha`), so the tests run on every platform that the
-  # Release workflow builds a prebuild for; the Test workflow covers ubuntu-latest.
+  # The scanner depends on the C library (e.g. `iswalpha`), and the C, Go, Python, and Swift bindings compile
+  # it natively, so the tests run on other common platforms too; the Test workflow covers ubuntu-latest.
   test:
     strategy:
       fail-fast: false
@@ -50,5 +50,5 @@ jobs:
         with:
           corpus: .tmp/fuzz-seeds
           max-time: '300'
-          # Keep in step with the tree-sitter-cli version in bun.lock.
+          # Keep in step with the tree-sitter-cli version in package.json.
           tree-sitter-version: v0.27.0

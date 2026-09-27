@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# Collects the Wasm build that the Release workflow's wasm job uploaded in this run, so the published
+# package loads in web-tree-sitter. semantic-release runs it before publishing.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+rm -f tree-sitter-bash.wasm
+gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name wasm --dir .
+test -f tree-sitter-bash.wasm
