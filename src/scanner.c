@@ -83,6 +83,9 @@ typedef struct {
     bool split_continuation;
     bool split_continuation_in_word;
     bool split_continuation_in_regex;
+    // A quoted string on a line that ended a body at the substitution's `)` has just opened; its first text
+    // token may be empty, so that it always has one and joining them gives its value.
+    bool closer_line_string_opened;
     // The number of unclosed parentheses in the regex being read, which hold blanks and metacharacters.
     uint16_t regex_depth;
     uint16_t backtick_regex_depth;
@@ -191,6 +194,7 @@ static void scanner_reset(Scanner *scanner) {
     scanner->split_continuation = false;
     scanner->split_continuation_in_word = false;
     scanner->split_continuation_in_regex = false;
+    scanner->closer_line_string_opened = false;
     scanner->regex_depth = 0;
     scanner->backtick_regex_depth = 0;
 }
@@ -1048,7 +1052,8 @@ static bool finish_bare_dollar(TSLexer *lexer) {
 // the line, where a deferred body starts.
 static bool scan_closer_line_string_content(Scanner *scanner, TSLexer *lexer, bool ansi_c) {
     bool line_open = scanner->joined_line || awaits_deferred_body(scanner);
-    bool did_advance = false;
+    bool did_advance = scanner->closer_line_string_opened;
+    scanner->closer_line_string_opened = false;
     for (;;) {
         lexer->mark_end(lexer);
         if (lexer->eof(lexer) || lexer->lookahead == '\'') {
@@ -1315,6 +1320,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         if (lexer->lookahead == '\'' && valid_symbols[CLOSER_LINE_RAW_STRING_START]) {
             advance(lexer);
             lexer->mark_end(lexer);
+            scanner->closer_line_string_opened = true;
             lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
             return true;
         }
@@ -1332,6 +1338,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             if (lexer->lookahead == '\'') {
                 advance(lexer);
                 lexer->mark_end(lexer);
+                scanner->closer_line_string_opened = true;
                 lexer->result_symbol = CLOSER_LINE_ANSI_C_STRING_START;
                 return true;
             }
@@ -1348,6 +1355,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->lookahead == '\'' && valid_symbols[CLOSER_LINE_ANSI_C_STRING_START]) {
             advance(lexer);
             lexer->mark_end(lexer);
+            scanner->closer_line_string_opened = true;
             lexer->result_symbol = CLOSER_LINE_ANSI_C_STRING_START;
             return true;
         }
@@ -1437,6 +1445,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             // A quote that the backquotes do not cut short scans its text itself where a deferred body may
             // start inside it.
             if (!lexer->eof(lexer) && breaks_line) {
+                scanner->closer_line_string_opened = true;
                 lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
                 return true;
             }
@@ -1552,7 +1561,7 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
     size += sizeof(scanner->backtick_closers);
     buffer[size++] = (char)(scanner->terminator_owed | scanner->after_line_break << 1 | scanner->joined_line << 2 |
                             scanner->split_continuation << 3 | scanner->split_continuation_in_word << 4 |
-                            scanner->split_continuation_in_regex << 5);
+                            scanner->split_continuation_in_regex << 5 | scanner->closer_line_string_opened << 6);
     memcpy(&buffer[size], &scanner->regex_depth, sizeof(scanner->regex_depth));
     size += sizeof(scanner->regex_depth);
     memcpy(&buffer[size], &scanner->backtick_regex_depth, sizeof(scanner->backtick_regex_depth));
@@ -1599,7 +1608,8 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
     scanner->joined_line = (buffer[size] & 4) != 0;
     scanner->split_continuation = (buffer[size] & 8) != 0;
     scanner->split_continuation_in_word = (buffer[size] & 16) != 0;
-    scanner->split_continuation_in_regex = (buffer[size++] & 32) != 0;
+    scanner->split_continuation_in_regex = (buffer[size] & 32) != 0;
+    scanner->closer_line_string_opened = (buffer[size++] & 64) != 0;
     memcpy(&scanner->regex_depth, &buffer[size], sizeof(scanner->regex_depth));
     size += sizeof(scanner->regex_depth);
     memcpy(&scanner->backtick_regex_depth, &buffer[size], sizeof(scanner->backtick_regex_depth));

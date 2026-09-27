@@ -1211,6 +1211,38 @@ echo b
     argument: (word)))
 
 ================================================================================
+Quoted strings made only of line continuations on a line ending a heredoc at a substitution's paren
+================================================================================
+
+echo "$(cat <<EOF
+EOF)" '\
+' $'\
+' ''
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))))
+    argument: (raw_string
+      (string_content))
+    argument: (ansi_c_string
+      (string_content))
+    argument: (raw_string
+      (string_content))))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 

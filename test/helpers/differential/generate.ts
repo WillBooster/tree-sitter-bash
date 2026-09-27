@@ -388,6 +388,7 @@ class ScriptGenerator {
           'ab\\\n\\\ncd',
           '"a\\\nb"',
           "'a\\\nb'",
+          "'\\\n'",
           'a\\\\',
           '"\\\\"',
         ];
