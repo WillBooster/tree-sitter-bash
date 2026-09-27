@@ -7,12 +7,15 @@ import Parser from 'tree-sitter';
 const Root = path.join(import.meta.dir, '../../..');
 // Bun cannot use node-gyp-build's lookup, so the addon that `bun install` builds is loaded directly.
 const AddonPath = path.join(Root, 'build/Release/tree_sitter_bash_binding.node');
+// oxlint-disable-next-line unicorn/prefer-module -- Node native addons are loaded through require.
 const Bash = require(AddonPath) as Parser.Language;
 
 // Rebuilding here would race with other test files loading the addon, so a stale one is reported.
 export function isAddonStale(): boolean {
   // src/parser.c is generated from grammar.js, so an edit to the grammar alone also makes the addon stale.
-  const sources = ['grammar.js', 'src/parser.c', 'src/scanner.c'].map((name) => fs.statSync(path.join(Root, name)).mtimeMs);
+  const sources = ['grammar.js', 'src/parser.c', 'src/scanner.c'].map(
+    (name) => fs.statSync(path.join(Root, name)).mtimeMs
+  );
   return Math.max(...sources) > fs.statSync(AddonPath).mtimeMs;
 }
 
@@ -155,7 +158,9 @@ function diffInvocations(executed: Map<string, string[][]>, parsed: Map<string, 
       invocation.words.length !== words.length ||
       invocation.words.some((word, index) => word !== undefined && word !== words[index])
     ) {
-      details.push(`\`c ${id}\` receives ${JSON.stringify(words)} in bash but ${JSON.stringify(invocation.words)} in the tree`);
+      details.push(
+        `\`c ${id}\` receives ${JSON.stringify(words)} in bash but ${JSON.stringify(invocation.words)} in the tree`
+      );
     }
   }
   for (const [id, invocations] of parsed) {

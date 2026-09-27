@@ -16,7 +16,9 @@ export function testCommand(
   test(
     name,
     async () => {
-      const child = spawn(command[0], command.slice(1), {
+      const [executable, ...args] = command;
+      if (executable === undefined) throw new Error('Command must not be empty');
+      const child = spawn(executable, args, {
         cwd: `${import.meta.dir}/../..`,
         detached: true,
         env: { ...process.env, ...options.env },

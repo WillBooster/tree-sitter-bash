@@ -42,6 +42,7 @@
     "start": "tree-sitter playground",
     "test": "bun wb test",
     "test/ci": "bun wb test-on-ci",
+    "typecheck": "bun wb typecheck",
     "verify": "bun wb verify",
     "verify-full": "bun wb verify --full"
   },
@@ -51,15 +52,23 @@
   },
   "devDependencies": {
     "@semantic-release/exec": "7.1.0",
+    "@tsconfig/bun": "1.0.11",
+    "@types/bun": "1.4.2",
+    "@willbooster/oxfmt-config": "1.2.2",
+    "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/wb": "22.8.0",
     "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.14",
     "node-gyp": "13.0.2",
+    "oxfmt": "0.68.0",
+    "oxlint": "1.83.0",
+    "oxlint-tsgolint": "7.0.2002",
     "prebuildify": "^6.0.1",
     "semantic-release": "25.0.9",
     "sort-package-json": "4.0.0",
     "tree-sitter": "^0.25.0",
-    "tree-sitter-cli": "^0.27.0"
+    "tree-sitter-cli": "^0.27.0",
+    "typescript": "7.0.2"
   },
   "peerDependencies": {
     "tree-sitter": "^0.25.0"
