@@ -25,9 +25,27 @@ export function testCommand(
       let output = '';
       child.stdout.on('data', (data) => (output += data));
       child.stderr.on('data', (data) => (output += data));
-      const timer = setTimeout(() => process.kill(-child.pid!, 'SIGKILL'), timeout);
+      const killGroup = (): void => {
+        try {
+          process.kill(-child.pid!, 'SIGKILL');
+        } catch {
+          // The group has already exited.
+        }
+      };
+      // The group no longer receives the terminal's Ctrl-C, so the runner forwards its own end to it.
+      const onSignal = (signal: NodeJS.Signals): void => {
+        killGroup();
+        process.kill(process.pid, signal);
+      };
+      process.on('exit', killGroup);
+      process.once('SIGINT', onSignal);
+      process.once('SIGTERM', onSignal);
+      const timer = setTimeout(killGroup, timeout);
       const exitCode = await new Promise((resolve) => child.on('close', resolve));
       clearTimeout(timer);
+      process.off('exit', killGroup);
+      process.off('SIGINT', onSignal);
+      process.off('SIGTERM', onSignal);
       expect(exitCode, output).toBe(0);
       options.check?.(output);
     },
