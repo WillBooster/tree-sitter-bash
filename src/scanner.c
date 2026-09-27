@@ -701,6 +701,10 @@ static bool scan_regex(Scanner *scanner, TSLexer *lexer) {
             (depth == 0 && (is_separator(c) || c == '&' || c == ';' || c == ')'))) {
             break;
         }
+        // A deferred body starts at the newline that ends the line, even inside a group.
+        if (c == '\n' && awaits_deferred_body(scanner)) {
+            break;
+        }
         advance(lexer);
         if (c == '\\' && lexer->lookahead == '\n' && !scanner->joined_line && awaits_deferred_body(scanner)) {
             // The newline ends the line, after which a deferred body starts; a concatenation splits it.
@@ -1164,7 +1168,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         // deferred body, which bash reads right after its line wherever that line ends.
         bool in_quotes = valid_symbols[STRING_CONTENT] || valid_symbols[CLOSER_LINE_RAW_STRING_CONTENT] ||
                          valid_symbols[CLOSER_LINE_ANSI_C_STRING_CONTENT];
-        if (next >= 0 && valid_symbols[HEREDOC_BODY_START] && !in_regex_group &&
+        if (next >= 0 && valid_symbols[HEREDOC_BODY_START] && (!in_regex_group || deferred) &&
             (deferred || (!in_quotes && !scanner->split_continuation))) {
             while (is_blank(lexer->lookahead) && !in_quotes) {
                 skip(lexer);

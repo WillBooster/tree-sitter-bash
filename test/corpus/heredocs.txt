@@ -1243,6 +1243,77 @@ EOF)" '\
       (string_content))))
 
 ================================================================================
+Deferred bodies inside a regex group on a line ending a heredoc at a substitution's paren
+================================================================================
+
+x=$(cat <<'EOF'; cat <<END
+EOF); [[ xab =~ (a\
+end
+END
+b) ]]
+x=$(cat <<EOF; cat <<END
+EOF); [[ xab =~ (a\
+end
+END
+b) ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (test_command
+    (regex_test
+      left: (word)
+      right: (concatenation
+        (regex)
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))
+        (regex))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (test_command
+    (regex_test
+      left: (word)
+      right: (concatenation
+        (regex)
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))
+        (regex)))))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 
