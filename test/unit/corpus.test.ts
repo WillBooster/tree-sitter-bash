@@ -1,9 +1,3 @@
-import { test } from 'bun:test';
+import { testCommand } from './run.js';
 
-import { expectToSucceed } from './run.js';
-
-const Timeout = 300_000;
-
-test('parses the corpus in test/corpus as expected', () => {
-  expectToSucceed(['bun', 'run', 'tree-sitter', 'test'], Timeout);
-}, Timeout);
+testCommand('parses the corpus in test/corpus as expected', ['bun', 'run', 'tree-sitter', 'test'], 300_000);
