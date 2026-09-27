@@ -973,6 +973,45 @@ b'
       (string_content))))
 
 ================================================================================
+Line ending a heredoc at a substitution's paren ends at a newline inside backquotes
+================================================================================
+
+echo $(cat <<EOF
+EOF) `echo a
+echo b` # c\
+echo d
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end)))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (command
+        name: (command_name
+          (word))
+        argument: (word))))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 

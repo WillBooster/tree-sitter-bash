@@ -1286,8 +1286,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     // The rest of a line that ended a body at the substitution's `)` scans its single-quoted strings itself,
     // to remove their line continuations where the line is joined, and to end the line inside them. Inside
-    // backquotes, the next backquote ends a quote, as handled below.
-    if ((scanner->joined_line || awaits_deferred_body(scanner)) && scanner->backtick_depth == 0 && !error_recovery) {
+    // backquotes, the next backquote ends a quote, as handled below, but a newline still ends the line.
+    if ((scanner->joined_line || awaits_deferred_body(scanner)) && !error_recovery) {
         while (is_blank(lexer->lookahead) && !in_regex_group) {
             skip(lexer);
         }
@@ -1300,6 +1300,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->result_symbol = valid_symbols[NEWLINE] ? NEWLINE : LINE_CONTINUATION;
             return true;
         }
+    }
+    if ((scanner->joined_line || awaits_deferred_body(scanner)) && scanner->backtick_depth == 0 && !error_recovery) {
         if (lexer->lookahead == '\'' && valid_symbols[CLOSER_LINE_RAW_STRING_START]) {
             advance(lexer);
             lexer->mark_end(lexer);
