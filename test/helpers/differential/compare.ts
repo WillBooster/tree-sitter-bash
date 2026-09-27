@@ -185,8 +185,9 @@ function literalValue(node: Parser.SyntaxNode): string | undefined {
     case 'ansi_c_string': {
       return decodeAnsiC(node.namedChildCount > 0 ? quotedText(node) : node.text.slice(2, -1));
     }
+    // A deferred heredoc body may split a word where bash removes a line continuation.
     case 'concatenation': {
-      const parts = node.children.map((child) => literalValue(child));
+      const parts = node.children.filter((child) => child.type !== 'heredoc_body').map((child) => literalValue(child));
       return parts.includes(undefined) ? undefined : parts.join('');
     }
     default: {
