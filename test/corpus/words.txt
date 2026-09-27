@@ -819,17 +819,18 @@ echo ${# y} ${! y} "${# y}" ${y }
     name: (command_name
       (word))
     argument: (expansion
-      prefix: (operator)
-      parameter: (variable_name))
+      parameter: (special_variable_name)
+      argument: (word))
     argument: (expansion
-      prefix: (operator)
-      parameter: (variable_name))
+      parameter: (special_variable_name)
+      argument: (word))
     argument: (string
       (expansion
-        prefix: (operator)
-        parameter: (variable_name)))
+        parameter: (special_variable_name)
+        argument: (word)))
     argument: (expansion
-      parameter: (variable_name))))
+      parameter: (variable_name)
+      argument: (word))))
 
 ================================================================================
 Nested subscripts and text after an expansion parameter
