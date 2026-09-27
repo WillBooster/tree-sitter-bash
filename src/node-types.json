@@ -136,6 +136,21 @@
     ]
   },
   {
+    "type": "ansi_c_string",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "string_content",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "arithmetic_command",
     "named": true,
     "fields": {},
@@ -889,6 +904,12 @@
     }
   },
   {
+    "type": "comment",
+    "named": true,
+    "extra": true,
+    "fields": {}
+  },
+  {
     "type": "compound_statement",
     "named": true,
     "fields": {},
@@ -937,6 +958,10 @@
         },
         {
           "type": "raw_string",
+          "named": true
+        },
+        {
+          "type": "regex",
           "named": true
         },
         {
@@ -2399,6 +2424,21 @@
     }
   },
   {
+    "type": "raw_string",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "string_content",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "redirected_statement",
     "named": true,
     "fields": {
@@ -2541,7 +2581,47 @@
         "required": true,
         "types": [
           {
+            "type": "ansi_c_string",
+            "named": true
+          },
+          {
+            "type": "arithmetic_expansion",
+            "named": true
+          },
+          {
+            "type": "command_substitution",
+            "named": true
+          },
+          {
+            "type": "concatenation",
+            "named": true
+          },
+          {
+            "type": "expansion",
+            "named": true
+          },
+          {
+            "type": "process_substitution",
+            "named": true
+          },
+          {
+            "type": "raw_string",
+            "named": true
+          },
+          {
             "type": "regex",
+            "named": true
+          },
+          {
+            "type": "simple_expansion",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "translated_string",
             "named": true
           }
         ]
@@ -3210,6 +3290,10 @@
     "named": false
   },
   {
+    "type": "'",
+    "named": false
+  },
+  {
     "type": "(",
     "named": false
   },
@@ -3430,17 +3514,8 @@
     "named": false
   },
   {
-    "type": "ansi_c_string",
-    "named": true
-  },
-  {
     "type": "case",
     "named": false
-  },
-  {
-    "type": "comment",
-    "named": true,
-    "extra": true
   },
   {
     "type": "coproc",
@@ -3504,10 +3579,6 @@
   },
   {
     "type": "operator",
-    "named": true
-  },
-  {
-    "type": "raw_string",
     "named": true
   },
   {

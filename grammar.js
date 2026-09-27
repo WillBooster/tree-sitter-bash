@@ -78,6 +78,13 @@ module.exports = grammar({
     $._line_continuation,
     $._brace_substitution_start,
     $._bracket_substitution_start,
+    $._regex_start,
+    $._regex_concat,
+    $._closer_line_raw_string_start,
+    $._closer_line_ansi_c_string_start,
+    $._closer_line_raw_string_content,
+    $._closer_line_ansi_c_string_content,
+    $._joined_comment,
     $.__error_recovery,
   ],
 
@@ -350,11 +357,18 @@ module.exports = grammar({
       field('right', $._argument),
     )),
 
+    // Like bash, the right side is one word whose parenthesized groups may hold blanks and
+    // metacharacters; its quotes and expansions are parsed as in any other word.
     regex_test: $ => prec(PREC.COMPARE, seq(
       field('left', $._word),
       field('operator', '=~'),
-      field('right', $.regex),
+      $._regex_start,
+      field('right', choice($._regex_part, alias($._regex_concatenation, $.concatenation))),
     )),
+
+    _regex_concatenation: $ => prec.right(seq($._regex_part, repeat1(seq($._regex_concat, $._regex_part)))),
+
+    _regex_part: $ => choice($.regex, $._quoted_or_expansion),
 
     _test_negation: $ => prec(PREC.UNARY, seq('!', $._test_expression)),
 
@@ -551,9 +565,23 @@ module.exports = grammar({
       '"',
     ),
 
-    raw_string: _ => /'[^']*'/,
+    // Where a heredoc inside `$( )` ends on a line that holds the `)`, bash reads the rest of that line
+    // with its line continuations removed, even inside single quotes, and reads the bodies still queued
+    // before that line right after it, even where it ends inside quotes; the scanner then splits the
+    // quoted text around the continuations and the bodies.
+    raw_string: $ => choice(
+      /'[^']*'/,
+      seq($._closer_line_raw_string_start, repeat(alias($._closer_line_raw_string_content, $.string_content)), '\''),
+    ),
 
-    ansi_c_string: _ => /\$'([^'\\]|\\(.|\n))*'/,
+    ansi_c_string: $ => choice(
+      /\$'([^'\\]|\\(.|\n))*'/,
+      seq(
+        $._closer_line_ansi_c_string_start,
+        repeat(alias($._closer_line_ansi_c_string_content, $.string_content)),
+        '\'',
+      ),
+    ),
 
     translated_string: $ => seq('$"', repeat(choice(
       $.string_content,
@@ -754,7 +782,8 @@ module.exports = grammar({
 
     _arithmetic_parenthesized: $ => seq('(', $._arithmetic_expression, ')'),
 
-    comment: _ => token(prec(-10, /#.*/)),
+    // A comment on such a line also continues past each line continuation.
+    comment: $ => choice(token(prec(-10, /#.*/)), $._joined_comment),
   },
 });
 

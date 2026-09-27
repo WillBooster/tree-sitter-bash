@@ -3999,7 +3999,11 @@ Upstream: Test commands with regexes
               name: (variable_name)
               index: (word)))
           (string_content))
-        right: (regex))))
+        right: (string
+          (string_content)
+          (simple_expansion
+            (variable_name))
+          (string_content)))))
   (negated_command
     (test_command
       (regex_test
@@ -4012,13 +4016,23 @@ Upstream: Test commands with regexes
       left: (string
         (simple_expansion
           (special_variable_name)))
-      right: (regex)))
+      right: (concatenation
+        (regex)
+        (expansion
+          parameter: (variable_name))
+        (expansion
+          parameter: (variable_name))
+        (regex))))
   (test_command
     (regex_test
       left: (string
         (simple_expansion
           (special_variable_name)))
-      right: (regex)))
+      right: (concatenation
+        (regex)
+        (expansion
+          parameter: (variable_name))
+        (regex))))
   (test_command
     (binary_test
       left: (expansion
@@ -4136,11 +4150,21 @@ Upstream: Test commands with regexes
             index: (word))
           operator: (operator)
           argument: (word)))
-      right: (regex)))
+      right: (concatenation
+        (regex)
+        (expansion
+          parameter: (subscript
+            name: (variable_name)
+            index: (word))
+          operator: (operator)
+          argument: (word))
+        (regex))))
   (test_command
     (regex_test
       left: (raw_string)
-      right: (regex)))
+      right: (concatenation
+        (raw_string)
+        (regex))))
   (test_command
     (binary_test
       left: (simple_expansion

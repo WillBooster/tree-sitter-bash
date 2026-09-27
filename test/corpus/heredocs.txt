@@ -766,6 +766,213 @@ EOF
           (heredoc_end))))))
 
 ================================================================================
+Line ending a heredoc at a substitution's paren is read without its line continuations
+================================================================================
+
+echo "$(cat <<EOF
+EOF)" 'a\
+b' $'c\
+d' # e\
+f
+echo $(cat <<'EOF'
+EOF) 'a\
+b'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))))
+    argument: (raw_string
+      (string_content)
+      (string_content))
+    argument: (ansi_c_string
+      (string_content)
+      (string_content)))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end)))
+    argument: (raw_string)))
+
+================================================================================
+Heredocs queued before a line ending a heredoc at a substitution's paren start after that line
+================================================================================
+
+v=$(cat <<EOF; cat <<END
+body
+EOF) echo x
+end
+END
+echo "$(cat <<EOF; cat <<END
+EOF) y
+end
+END
+)"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end))))
+    name: (command_name
+      (word))
+    argument: (word))
+  (heredoc_body
+    (heredoc_content)
+    (heredoc_end))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))
+      (string_content)
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end))
+      (string_content))))
+
+================================================================================
+Line ending a quoted heredoc at a substitution's paren ends at its first newline
+================================================================================
+
+echo $(cat <<'EOF'; cat <<END
+EOF) a \
+end
+END
+b
+echo $(cat <<'EOF'; cat <<END
+EOF) a\
+end
+END
+b
+echo $(cat <<'EOF'; cat <<END
+EOF) 'a
+end
+END
+b'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end)))
+    argument: (word)
+    (heredoc_body
+      (heredoc_content)
+      (heredoc_end))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end)))
+    argument: (concatenation
+      (word)
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end))
+      (word)))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (command
+        name: (command_name
+          (word))
+        redirect: (heredoc_redirect
+          delimiter: (heredoc_start)))
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end)))
+    argument: (raw_string
+      (string_content)
+      (heredoc_body
+        (heredoc_content)
+        (heredoc_end))
+      (string_content))))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 

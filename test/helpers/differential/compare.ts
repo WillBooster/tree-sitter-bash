@@ -172,15 +172,18 @@ function literalValue(node: Parser.SyntaxNode): string | undefined {
     case 'word': {
       return node.text.replaceAll(/\\([\s\S])/gu, (_, next: string) => (next === '\n' ? '' : next));
     }
+    // Split into `string_content` children where bash removes line continuations inside the quotes. A heredoc
+    // body inside the quotes is read before the line after it, and is no part of the word.
     case 'raw_string': {
-      return node.text.slice(1, -1);
+      return node.namedChildCount > 0 ? quotedText(node) : node.text.slice(1, -1);
     }
     case 'string': {
-      if (node.namedChildren.some((child) => child.type !== 'string_content')) return undefined;
-      return node.text.slice(1, -1).replaceAll(/\\([$`"\\\n])/gu, (_, next: string) => (next === '\n' ? '' : next));
+      const parts = new Set(['string_content', 'heredoc_body']);
+      if (node.namedChildren.some((child) => !parts.has(child.type))) return undefined;
+      return quotedText(node).replaceAll(/\\([$`"\\\n])/gu, (_, next: string) => (next === '\n' ? '' : next));
     }
     case 'ansi_c_string': {
-      return decodeAnsiC(node.text.slice(2, -1));
+      return decodeAnsiC(node.namedChildCount > 0 ? quotedText(node) : node.text.slice(2, -1));
     }
     case 'concatenation': {
       const parts = node.children.map((child) => literalValue(child));
@@ -190,6 +193,13 @@ function literalValue(node: Parser.SyntaxNode): string | undefined {
       return undefined;
     }
   }
+}
+
+function quotedText(node: Parser.SyntaxNode): string {
+  return node.namedChildren
+    .filter((child) => child.type === 'string_content')
+    .map((child) => child.text)
+    .join('');
 }
 
 function decodeAnsiC(text: string): string {

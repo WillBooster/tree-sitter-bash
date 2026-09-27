@@ -30,6 +30,13 @@ enum TokenType {
     LINE_CONTINUATION,
     BRACE_SUBSTITUTION_START,
     BRACKET_SUBSTITUTION_START,
+    REGEX_START,
+    REGEX_CONCAT,
+    CLOSER_LINE_RAW_STRING_START,
+    CLOSER_LINE_ANSI_C_STRING_START,
+    CLOSER_LINE_RAW_STRING_CONTENT,
+    CLOSER_LINE_ANSI_C_STRING_CONTENT,
+    JOINED_COMMENT,
     ERROR_RECOVERY,
 };
 
@@ -43,6 +50,9 @@ typedef struct {
     bool is_raw;
     bool allows_indent;
     bool started;
+    // Queued on the same line as a heredoc whose body ended at a line holding the substitution's `)`:
+    // bash then reads this body right after that line, wherever the line ends.
+    bool deferred;
     uint16_t depth;
     CodePoints delimiter;
 } Heredoc;
@@ -54,6 +64,8 @@ typedef struct {
     uint8_t backtick_depth;
     // The closer (`)`, `}`, or `]`) of each open substitution, innermost last.
     Array(uint8_t) closers;
+    // The regex group depth when each open substitution started, restored when it ends.
+    Array(uint16_t) closer_regex_depths;
     // How many closers were open when the backquotes opened; the ones after them are nested inside.
     uint16_t backtick_closers;
     // A heredoc body ended before the end of its line (at a `${ list; }` closer, or at a delimiter
@@ -63,6 +75,17 @@ typedef struct {
     // The last token of this scanner was a line continuation that ended a line; nothing concatenates at
     // the start of the next one.
     bool after_line_break;
+    // The rest of a line that ended a heredoc body at the substitution's `)` is being read: bash reads it
+    // with its line continuations removed, even inside single quotes and comments.
+    bool joined_line;
+    // A line continuation was split before its newline, where a deferred body started; its newline is still
+    // to be read, at the end of a word (`in_word`, of a regex if `in_regex`) or between words.
+    bool split_continuation;
+    bool split_continuation_in_word;
+    bool split_continuation_in_regex;
+    // The number of unclosed parentheses in the regex being read, which hold blanks and metacharacters.
+    uint16_t regex_depth;
+    uint16_t backtick_regex_depth;
 } Scanner;
 
 static inline uint16_t current_depth(Scanner *scanner) {
@@ -130,14 +153,17 @@ static unsigned decode_varint(const char *in, unsigned available, int32_t *c) {
     return 0;
 }
 
-// Serialized layout: backtick depth, the closer count when the backquotes opened (uint16), the owed-terminator and
-// line-break flags, the closers of the open substitutions
-// (uint16 count, then one byte each), and heredoc count, then per heredoc its flags, depth (uint16),
-// delimiter length (uint16), and the delimiter as varints.
+// Serialized layout: backtick depth, the closer count when the backquotes opened (uint16), the owed-terminator,
+// line-break, joined-line, and split-continuation flags, the regex depth and the one saved when the backquotes
+// opened (uint16 each), the closers of the open substitutions (uint16 count, then one byte each, then their
+// saved regex depths as uint16), and heredoc count, then per heredoc its flags, depth (uint16), delimiter
+// length (uint16), and the delimiter as varints.
+#define SCANNER_HEADER_SIZE (2 + 4 * sizeof(uint16_t))
+#define CLOSER_SIZE (1 + sizeof(uint16_t))
 #define HEREDOC_HEADER_SIZE (3 + 2 * sizeof(uint16_t))
 
 static unsigned serialized_size(Scanner *scanner) {
-    unsigned size = 3 + 2 * sizeof(uint16_t) + scanner->closers.size;
+    unsigned size = SCANNER_HEADER_SIZE + CLOSER_SIZE * scanner->closers.size + 1;
     for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i);
         size += HEREDOC_HEADER_SIZE;
@@ -157,9 +183,16 @@ static void scanner_reset(Scanner *scanner) {
     array_clear(&scanner->heredocs);
     scanner->backtick_depth = 0;
     array_clear(&scanner->closers);
+    array_clear(&scanner->closer_regex_depths);
     scanner->backtick_closers = 0;
     scanner->terminator_owed = false;
     scanner->after_line_break = false;
+    scanner->joined_line = false;
+    scanner->split_continuation = false;
+    scanner->split_continuation_in_word = false;
+    scanner->split_continuation_in_regex = false;
+    scanner->regex_depth = 0;
+    scanner->backtick_regex_depth = 0;
 }
 
 // The body being read: the most deeply nested started heredoc.
@@ -174,16 +207,24 @@ static int32_t active_heredoc_index(Scanner *scanner) {
     return active;
 }
 
-// The next body to start: the first unstarted heredoc opened at the current substitution depth.
+// The next body to start: the first deferred heredoc, or else the first unstarted heredoc opened at the
+// current substitution depth.
 static int32_t next_heredoc_index(Scanner *scanner) {
     uint16_t depth = current_depth(scanner);
+    int32_t next = -1;
     for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i);
-        if (!heredoc->started && heredoc->depth == depth) {
+        if (heredoc->started) {
+            continue;
+        }
+        if (heredoc->deferred) {
             return (int32_t)i;
         }
+        if (next < 0 && heredoc->depth == depth) {
+            next = (int32_t)i;
+        }
     }
-    return -1;
+    return next;
 }
 
 // An entry without a delimiter belongs to an operator whose delimiter was rejected.
@@ -194,7 +235,7 @@ static void drop_unstarted_heredocs_at_depth(Scanner *scanner) {
     uint16_t depth = current_depth(scanner);
     for (uint32_t i = scanner->heredocs.size; i > 0; i--) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i - 1);
-        if (!heredoc->started && heredoc->depth == depth) {
+        if (!heredoc->started && !heredoc->deferred && heredoc->depth == depth) {
             heredoc_delete(heredoc);
             array_erase(&scanner->heredocs, i - 1);
         }
@@ -211,10 +252,37 @@ static void discard_unstarted_heredocs(Scanner *scanner) {
     uint16_t depth = current_depth(scanner);
     for (uint32_t i = scanner->heredocs.size; i > 0; i--) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i - 1);
-        if (!heredoc->started && heredoc->depth > depth) {
+        if (!heredoc->started && !heredoc->deferred && heredoc->depth > depth) {
             remove_heredoc(scanner, i - 1);
         }
     }
+}
+
+// Ends a body at a line that holds the substitution's `)`. Like bash, the bodies still queued on the line
+// that began this one are then read right after that line, and the rest of the line is read without its
+// line continuations unless the delimiter was quoted.
+static void end_heredoc_at_closer_line(Scanner *scanner, uint32_t index) {
+    Heredoc *ended = array_get(&scanner->heredocs, index);
+    scanner->joined_line = !ended->is_raw;
+    for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
+        Heredoc *heredoc = array_get(&scanner->heredocs, i);
+        if (!heredoc->started && heredoc->depth == ended->depth) {
+            heredoc->deferred = true;
+        }
+    }
+    remove_heredoc(scanner, index);
+}
+
+// Whether a deferred body waits for the end of the line that ended a body at the substitution's `)`. That
+// line ends at its first newline even after a backslash or inside quotes, unless it is joined.
+static bool awaits_deferred_body(Scanner *scanner) {
+    for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
+        Heredoc *heredoc = array_get(&scanner->heredocs, i);
+        if (heredoc->deferred && !heredoc->started) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Heredoc bodies: the body starts at the newline ending the header line and ends with the delimiter
@@ -295,22 +363,27 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 lexer->mark_end(lexer);
                 lexer->result_symbol = HEREDOC_END;
                 scanner->terminator_owed = lexer->lookahead == '}';
-                remove_heredoc(scanner, index);
+                if (in_parenthesized && lexer->lookahead == ')') {
+                    end_heredoc_at_closer_line(scanner, index);
+                } else {
+                    remove_heredoc(scanner, index);
+                }
                 return true;
             }
             if (prefix_marked) {
-                // The line is read after joining its backslash-newlines, as for the delimiter.
+                // The line is read after joining its backslash-newlines, as for the delimiter; any other
+                // escaped character is kept with its backslash, so a newline after it ends the line.
                 while (!lexer->eof(lexer) && lexer->lookahead != '\n' && lexer->lookahead != ')') {
                     bool backslash = lexer->lookahead == '\\' && !heredoc->is_raw;
                     advance(lexer);
-                    if (backslash && lexer->lookahead == '\n') {
+                    if (backslash && !lexer->eof(lexer) && lexer->lookahead != ')') {
                         advance(lexer);
                     }
                 }
                 if (escaped_after_prefix == ')' || lexer->lookahead == ')') {
                     lexer->result_symbol = HEREDOC_END;
                     scanner->terminator_owed = true;
-                    remove_heredoc(scanner, index);
+                    end_heredoc_at_closer_line(scanner, index);
                 } else {
                     lexer->result_symbol = HEREDOC_CONTENT;
                 }
@@ -336,6 +409,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 advance(lexer);
                 did_advance = true;
                 at_line_start = true;
+                scanner->joined_line = false;
                 break;
             case '\\':
                 advance(lexer);
@@ -485,7 +559,17 @@ static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
                 quote = 0;
                 continue;
             }
-            if (ansi_c && c == '\\') {
+            if (scanner->joined_line && c == '\\' && lexer->lookahead == '\n') {
+                advance(lexer);
+                continue;
+            }
+            if (scanner->joined_line && quote == '\'' && !ansi_c && c == '\\' && lexer->lookahead != '\'' &&
+                !lexer->eof(lexer)) {
+                // The character after a backslash is kept as it is, so it cannot begin a line continuation.
+                array_push(&heredoc->delimiter, c);
+                c = lexer->lookahead;
+                advance(lexer);
+            } else if (ansi_c && c == '\\') {
                 if (!lexer->eof(lexer)) {
                     push_ansi_c_escape(lexer, &heredoc->delimiter);
                 }
@@ -589,53 +673,57 @@ static bool scan_heredoc_arrow(Scanner *scanner, TSLexer *lexer, const bool *val
     return scan_heredoc_arrow_after_first(scanner, lexer, valid_symbols);
 }
 
-// The right side of `=~` extends to an unquoted space, tab, or newline outside parentheses.
-static bool scan_regex(TSLexer *lexer) {
-    while (is_blank(lexer->lookahead)) {
-        skip(lexer);
+// The literal text of the right side of `=~`, which, like bash, reads `(` and `|` as regex characters
+// and a parenthesized group, blanks and metacharacters included, as part of the word up to its matching
+// `)`. Quotes and expansions are separate parts, so the group depth is kept for the text after them.
+static bool scan_regex(Scanner *scanner, TSLexer *lexer) {
+    uint32_t depth = scanner->regex_depth;
+    if (depth == 0) {
+        while (is_blank(lexer->lookahead)) {
+            skip(lexer);
+        }
     }
-    uint32_t depth = 0;
     bool did_advance = false;
-    while (!lexer->eof(lexer)) {
+    for (;;) {
         lexer->mark_end(lexer);
+        if (lexer->eof(lexer)) {
+            break;
+        }
         int32_t c = lexer->lookahead;
-        if (depth == 0 && is_separator(c)) {
+        if (c == '\'' || c == '"' || c == '`' ||
+            (depth == 0 && (is_separator(c) || c == '&' || c == ';' || c == ')'))) {
             break;
         }
-        // Like bash, treat `|` and parentheses as regex characters, while other metacharacters end
-        // the regex even without surrounding blanks (`[[ a =~ a&&b ]]`).
-        if (depth == 0 && (c == '&' || c == ';' || c == '<' || c == '>')) {
-            break;
-        }
-        if (c == '\\') {
-            advance(lexer);
-        } else if (c == '\'' || c == '"') {
-            advance(lexer);
-            while (!lexer->eof(lexer) && lexer->lookahead != c) {
-                if (c == '"' && lexer->lookahead == '\\') {
-                    advance(lexer);
-                }
+        advance(lexer);
+        if (c == '$' || c == '<' || c == '>') {
+            int32_t next = lexer->lookahead;
+            bool starts_part = c == '$' ? starts_quoted_expansion(next) || next == '\'' || next == '"' : next == '(';
+            if (starts_part || (c != '$' && depth == 0)) {
+                break;
+            }
+        } else if (c == '\\') {
+            if (!lexer->eof(lexer)) {
                 advance(lexer);
             }
         } else if (c == '(') {
             depth++;
         } else if (c == ')') {
-            if (depth == 0) {
-                break;
-            }
             depth--;
+        } else if (c == '\n') {
+            scanner->joined_line = false;
         }
-        advance(lexer);
         did_advance = true;
     }
-    if (lexer->eof(lexer)) {
-        lexer->mark_end(lexer);
+    if (!did_advance || depth > UINT16_MAX) {
+        return false;
     }
+    scanner->regex_depth = (uint16_t)depth;
     lexer->result_symbol = REGEX;
-    return did_advance;
+    return true;
 }
 
-static bool scan_string_content(TSLexer *lexer) {
+static bool scan_string_content(Scanner *scanner, TSLexer *lexer) {
+    bool line_breaks = !scanner->joined_line && awaits_deferred_body(scanner);
     bool did_advance = false;
     for (;;) {
         lexer->mark_end(lexer);
@@ -646,11 +734,18 @@ static bool scan_string_content(TSLexer *lexer) {
         if (c == '"' || c == '`') {
             break;
         }
+        if (c == '\n' && (scanner->joined_line || line_breaks)) {
+            // A deferred body starts right before the newline that ends the line.
+            if (did_advance) {
+                break;
+            }
+            scanner->joined_line = false;
+        }
         advance(lexer);
         if (c == '$' && starts_quoted_expansion(lexer->lookahead)) {
             break;
         }
-        if (c == '\\' && !lexer->eof(lexer)) {
+        if (c == '\\' && !lexer->eof(lexer) && !(line_breaks && lexer->lookahead == '\n')) {
             advance(lexer);
         }
         did_advance = true;
@@ -661,6 +756,11 @@ static bool scan_string_content(TSLexer *lexer) {
 
 static inline bool is_word_break(int32_t c) {
     return is_separator(c) || is_metacharacter(c) || c == '"' || c == '\'' || c == '`' || c == '$' || c == '\\';
+}
+
+// Whether `c` ends a word; `(` and `|` are regex characters in the right side of `=~`.
+static inline bool ends_word(int32_t c, bool regex) {
+    return is_separator(c) || (is_metacharacter(c) && !(regex && (c == '(' || c == '|')));
 }
 
 static inline bool is_extglob_operator(int32_t c) { return c == '?' || c == '*' || c == '+' || c == '@' || c == '!'; }
@@ -873,6 +973,120 @@ static bool at_closing_reserved_word(TSLexer *lexer) {
     return false;
 }
 
+// After a line continuation inside a word: bash removes every backslash-newline before it splits words, so
+// further continuations right after this one are part of the token (`a\` + `\` + `b` is `ab`), which is a
+// concatenation if the word continues on the next line. Otherwise the continuations themselves are the token,
+// so that whatever follows them is lexed as it would be without them.
+static bool finish_word_continuations(Scanner *scanner, TSLexer *lexer, enum TokenType concat, bool regex) {
+    int32_t c;
+    for (;;) {
+        c = lexer->lookahead;
+        if (c != '\\') {
+            break;
+        }
+        advance(lexer);
+        if (lexer->eof(lexer)) {
+            lexer->mark_end(lexer);
+            lexer->result_symbol = LINE_CONTINUATION;
+            return true;
+        }
+        if (lexer->lookahead != '\n') {
+            // An escaped character continues the word.
+            lexer->result_symbol = concat;
+            return true;
+        }
+        advance(lexer);
+        lexer->mark_end(lexer);
+    }
+    if ((c == '<' || c == '>')) {
+        advance(lexer);
+        if (lexer->lookahead == '(') {
+            lexer->result_symbol = concat;
+            return true;
+        }
+        scanner->after_line_break = true;
+        lexer->result_symbol = LINE_CONTINUATION;
+    } else if (lexer->eof(lexer) || ends_word(c, regex) || (c == '`' && scanner->backtick_depth > 0)) {
+        scanner->after_line_break = true;
+        lexer->result_symbol = LINE_CONTINUATION;
+    } else {
+        lexer->result_symbol = concat;
+    }
+    return true;
+}
+
+// Ends a line continuation's token at its backslash, since its newline ends the line after which a deferred
+// body starts; the newline is read after the body.
+static void split_continuation(Scanner *scanner, TSLexer *lexer, bool in_word, bool in_regex) {
+    lexer->mark_end(lexer);
+    scanner->split_continuation = true;
+    scanner->split_continuation_in_word = in_word;
+    scanner->split_continuation_in_regex = in_regex;
+    lexer->result_symbol = LINE_CONTINUATION;
+}
+
+// After `$`, a bare dollar sign unless it begins an expansion or a quote.
+static bool finish_bare_dollar(TSLexer *lexer) {
+    lexer->mark_end(lexer);
+    int32_t c = lexer->lookahead;
+    lexer->result_symbol = BARE_DOLLAR;
+    return lexer->eof(lexer) || !(starts_quoted_expansion(c) || c == '\'' || c == '"');
+}
+
+// The text of a single-quoted string on a line that ended a body at the substitution's `)`. Where the line
+// is joined, the text is split at its line continuations, which are tokens of their own, and, as when bash
+// joins the line, the character after any other backslash is kept with it; in a raw string that backslash
+// is literal, so a quote after it still ends the string. The text also ends before the newline that ends
+// the line, where a deferred body starts.
+static bool scan_closer_line_string_content(Scanner *scanner, TSLexer *lexer, bool ansi_c) {
+    bool line_open = scanner->joined_line || awaits_deferred_body(scanner);
+    bool did_advance = false;
+    for (;;) {
+        lexer->mark_end(lexer);
+        if (lexer->eof(lexer) || lexer->lookahead == '\'') {
+            break;
+        }
+        int32_t c = lexer->lookahead;
+        // A deferred body starts right before the newline that ends the line.
+        if (c == '\n' && line_open && did_advance) {
+            break;
+        }
+        advance(lexer);
+        if (c == '\\' && scanner->joined_line && lexer->lookahead == '\n') {
+            if (did_advance) {
+                break;
+            }
+            advance(lexer);
+            lexer->mark_end(lexer);
+            lexer->result_symbol = LINE_CONTINUATION;
+            return true;
+        }
+        if (c == '\\' && !lexer->eof(lexer) && lexer->lookahead != '\n' && (ansi_c || lexer->lookahead != '\'')) {
+            advance(lexer);
+        } else if (c == '\n') {
+            scanner->joined_line = false;
+            line_open = false;
+        }
+        did_advance = true;
+    }
+    lexer->result_symbol = ansi_c ? CLOSER_LINE_ANSI_C_STRING_CONTENT : CLOSER_LINE_RAW_STRING_CONTENT;
+    return did_advance;
+}
+
+// A comment on a joined line, which continues past each line continuation.
+static bool scan_joined_comment(TSLexer *lexer) {
+    while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
+        bool backslash = lexer->lookahead == '\\';
+        advance(lexer);
+        if (backslash && !lexer->eof(lexer)) {
+            advance(lexer);
+        }
+    }
+    lexer->mark_end(lexer);
+    lexer->result_symbol = JOINED_COMMENT;
+    return true;
+}
+
 static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool error_recovery = valid_symbols[ERROR_RECOVERY];
     // Tokens that must touch the previous one (concatenation, an empty assignment value) are decided
@@ -906,29 +1120,48 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
                          : lexer->result_symbol == BRACE_SUBSTITUTION_START ? '}'
                                                                             : ']';
         array_push(&scanner->closers, closer);
+        array_push(&scanner->closer_regex_depths, scanner->regex_depth);
         return true;
     }
 
+    if (!error_recovery && valid_symbols[REGEX_START]) {
+        scanner->regex_depth = 0;
+        lexer->result_symbol = REGEX_START;
+        return true;
+    }
+
+    // Blanks, metacharacters, and newlines inside a regex group are part of the regex.
+    bool in_regex_group = scanner->regex_depth > 0 && (valid_symbols[REGEX] || valid_symbols[REGEX_CONCAT]);
+
     if (scanner->heredocs.size > 0) {
+        int32_t next = next_heredoc_index(scanner);
+        // Only another deferred body starts at the newline of a split line continuation.
+        bool deferred = next >= 0 && array_get(&scanner->heredocs, next)->deferred;
+        // A deferred body starts at the end of its line even inside the body of an enclosing heredoc.
         int32_t active = active_heredoc_index(scanner);
         if (active >= 0 && (valid_symbols[HEREDOC_CONTENT] || valid_symbols[HEREDOC_END]) &&
+            !(deferred && lexer->lookahead == '\n' && valid_symbols[HEREDOC_BODY_START]) &&
             !(lexer->lookahead == '`' && !array_get(&scanner->heredocs, active)->is_raw &&
               scanner->backtick_depth == 0)) {
             return scan_heredoc_content(scanner, lexer, (uint32_t)active);
         }
-        // A newline inside a string is part of it, so bodies start only outside strings.
-        int32_t next = next_heredoc_index(scanner);
-        if (next >= 0 && valid_symbols[HEREDOC_BODY_START] && !valid_symbols[STRING_CONTENT]) {
-            while (is_blank(lexer->lookahead)) {
+        // A newline inside a string is part of it, so bodies start only outside strings, except for a
+        // deferred body, which bash reads right after its line wherever that line ends.
+        bool in_quotes = valid_symbols[STRING_CONTENT] || valid_symbols[CLOSER_LINE_RAW_STRING_CONTENT] ||
+                         valid_symbols[CLOSER_LINE_ANSI_C_STRING_CONTENT];
+        if (next >= 0 && valid_symbols[HEREDOC_BODY_START] && !in_regex_group &&
+            (deferred || (!in_quotes && !scanner->split_continuation))) {
+            while (is_blank(lexer->lookahead) && !in_quotes) {
                 skip(lexer);
             }
             if (lexer->lookahead == '\n') {
                 // The line's heredocs cannot be located once one of them was rejected, so none gets a
                 // body; scanning continues so that the change is kept with the token found below.
-                if (is_rejected(array_get(&scanner->heredocs, next))) {
+                if (is_rejected(array_get(&scanner->heredocs, next)) && !deferred) {
                     drop_unstarted_heredocs_at_depth(scanner);
                 } else {
                     array_get(&scanner->heredocs, next)->started = true;
+                    scanner->joined_line = false;
                     lexer->result_symbol = HEREDOC_BODY_START;
                     return true;
                 }
@@ -940,26 +1173,58 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return false;
     }
 
+    // The right side of `=~` joins its parts with a concatenation of its own, since `(` and `|` continue
+    // it and a group continues it up to its matching `)`.
+    bool regex = valid_symbols[REGEX_CONCAT] && !valid_symbols[CONCAT];
+    enum TokenType concat = regex ? REGEX_CONCAT : CONCAT;
+    bool can_concat = valid_symbols[CONCAT] || regex;
+
+    // The word goes on after the body even where the parse state no longer allows a concatenation: that
+    // state comes from a reparse that reused the words before the body as a complete command, which the
+    // concatenation then breaks down again.
+    if (scanner->split_continuation && lexer->lookahead == '\n') {
+        scanner->split_continuation = false;
+        advance(lexer);
+        lexer->mark_end(lexer);
+        if (scanner->split_continuation_in_word) {
+            bool in_regex = scanner->split_continuation_in_regex;
+            return finish_word_continuations(scanner, lexer, in_regex ? REGEX_CONCAT : CONCAT, in_regex);
+        }
+        scanner->after_line_break = true;
+        lexer->result_symbol = LINE_CONTINUATION;
+        return true;
+    }
+
     if (valid_symbols[STRING_CONTENT] && lexer->lookahead != '`') {
-        return scan_string_content(lexer);
+        return scan_string_content(scanner, lexer);
+    }
+
+    if (valid_symbols[CLOSER_LINE_RAW_STRING_CONTENT] || valid_symbols[CLOSER_LINE_ANSI_C_STRING_CONTENT]) {
+        return scan_closer_line_string_content(scanner, lexer, valid_symbols[CLOSER_LINE_ANSI_C_STRING_CONTENT]);
     }
 
     if (valid_symbols[HEREDOC_START] && scanner->heredocs.size > 0) {
         return scan_heredoc_start(scanner, lexer);
     }
 
+    if (regex && scanner->regex_depth > 0 && !at_eof) {
+        lexer->result_symbol = REGEX_CONCAT;
+        return true;
+    }
+
     // A line continuation after a blank separates words, so nothing concatenates at the start of the
     // next line. The column costs a scan back to the line start, so it is computed only right after
     // such a continuation and only where a concatenation could start; a concatenation then clears the
     // flag, which bounds the scans to one per continuation.
+
     // Like bash, `a<(cmd)` is one word. `<` and `>` end a word part otherwise, so the concatenation
     // needs a look at the next character, and a `<<` read along the way is scanned as a heredoc arrow.
-    if (valid_symbols[CONCAT] && (first == '<' || first == '>') &&
+    if (can_concat && (first == '<' || first == '>') &&
         !(after_line_break && lexer->get_column(lexer) == 0)) {
         lexer->mark_end(lexer);
         advance(lexer);
         if (lexer->lookahead == '(') {
-            lexer->result_symbol = CONCAT;
+            lexer->result_symbol = concat;
             return true;
         }
         if (first == '<' && (valid_symbols[HEREDOC_ARROW] || valid_symbols[HEREDOC_ARROW_DASH])) {
@@ -968,7 +1233,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return false;
     }
 
-    if (valid_symbols[CONCAT] && !at_eof && !is_separator(first) && !is_metacharacter(first) &&
+    if (can_concat && !at_eof && !ends_word(first, regex) &&
         !(after_line_break && lexer->get_column(lexer) == 0)) {
         int32_t c = first;
         if (c == '\\' && lexer->lookahead == '\\') {
@@ -982,53 +1247,19 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
                 return true;
             }
             if (lexer->lookahead != '\n') {
-                lexer->result_symbol = CONCAT;
+                lexer->result_symbol = concat;
+                return true;
+            }
+            if (!scanner->joined_line && awaits_deferred_body(scanner)) {
+                split_continuation(scanner, lexer, true, regex);
                 return true;
             }
             advance(lexer);
             lexer->mark_end(lexer);
-            // Bash removes every backslash-newline before it splits words, so further continuations
-            // right after this one are part of the token (`a\` + `\` + `b` is `ab`).
-            for (;;) {
-                c = lexer->lookahead;
-                if (c != '\\') {
-                    break;
-                }
-                advance(lexer);
-                if (lexer->eof(lexer)) {
-                    lexer->mark_end(lexer);
-                    lexer->result_symbol = LINE_CONTINUATION;
-                    return true;
-                }
-                if (lexer->lookahead != '\n') {
-                    // An escaped character continues the word.
-                    lexer->result_symbol = CONCAT;
-                    return true;
-                }
-                advance(lexer);
-                lexer->mark_end(lexer);
-            }
-            // The word continues only if the next line does; otherwise the continuations themselves are
-            // the token, so that whatever follows them is lexed as it would be without them.
-            if ((c == '<' || c == '>')) {
-                advance(lexer);
-                if (lexer->lookahead == '(') {
-                    lexer->result_symbol = CONCAT;
-                    return true;
-                }
-                scanner->after_line_break = true;
-                lexer->result_symbol = LINE_CONTINUATION;
-            } else if (lexer->eof(lexer) || is_separator(c) || is_metacharacter(c) ||
-                       (c == '`' && scanner->backtick_depth > 0)) {
-                scanner->after_line_break = true;
-                lexer->result_symbol = LINE_CONTINUATION;
-            } else {
-                lexer->result_symbol = CONCAT;
-            }
-            return true;
+            return finish_word_continuations(scanner, lexer, concat, regex);
         }
         if (c != '`' || scanner->backtick_depth == 0) {
-            lexer->result_symbol = CONCAT;
+            lexer->result_symbol = concat;
             return true;
         }
     }
@@ -1053,8 +1284,61 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         }
     }
 
+    // The rest of a line that ended a body at the substitution's `)` scans its single-quoted strings itself,
+    // to remove their line continuations where the line is joined, and to end the line inside them. Inside
+    // backquotes, the next backquote ends a quote, as handled below.
+    if ((scanner->joined_line || awaits_deferred_body(scanner)) && scanner->backtick_depth == 0 && !error_recovery) {
+        while (is_blank(lexer->lookahead) && !in_regex_group) {
+            skip(lexer);
+        }
+        if (lexer->lookahead == '\n' && scanner->joined_line && !in_regex_group) {
+            // The joined line ends here; a token is returned even where the newline is only whitespace,
+            // so that the line's end is kept.
+            advance(lexer);
+            lexer->mark_end(lexer);
+            scanner->joined_line = false;
+            lexer->result_symbol = valid_symbols[NEWLINE] ? NEWLINE : LINE_CONTINUATION;
+            return true;
+        }
+        if (lexer->lookahead == '\'' && valid_symbols[CLOSER_LINE_RAW_STRING_START]) {
+            advance(lexer);
+            lexer->mark_end(lexer);
+            lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
+            return true;
+        }
+        // Only a `#` after a blank is known to begin a word, and so a comment.
+        if (lexer->lookahead == '#' && is_blank(first) && scanner->joined_line && valid_symbols[JOINED_COMMENT]) {
+            return scan_joined_comment(lexer);
+        }
+        // A regex reads `$` as text unless it begins a part, so it looks for `$'` itself.
+        if (lexer->lookahead == '$' && valid_symbols[CLOSER_LINE_ANSI_C_STRING_START] && !valid_symbols[REGEX]) {
+            advance(lexer);
+            if (lexer->lookahead == '\'') {
+                advance(lexer);
+                lexer->mark_end(lexer);
+                lexer->result_symbol = CLOSER_LINE_ANSI_C_STRING_START;
+                return true;
+            }
+            return valid_symbols[BARE_DOLLAR] && finish_bare_dollar(lexer);
+        }
+    }
+
     if (valid_symbols[REGEX]) {
-        return scan_regex(lexer);
+        if (scan_regex(scanner, lexer)) {
+            return true;
+        }
+        // Having found no text, the scan stopped before a quote, or after the `$` of `$'`.
+        if ((scanner->joined_line || awaits_deferred_body(scanner)) && scanner->backtick_depth == 0 &&
+            lexer->lookahead == '\'' && valid_symbols[CLOSER_LINE_ANSI_C_STRING_START]) {
+            advance(lexer);
+            lexer->mark_end(lexer);
+            lexer->result_symbol = CLOSER_LINE_ANSI_C_STRING_START;
+            return true;
+        }
+        // Backquotes are the only other part that the scanner opens.
+        if (lexer->lookahead != '`') {
+            return false;
+        }
     }
 
     // A newline ends a statement where a terminator may follow and is whitespace elsewhere.
@@ -1074,6 +1358,13 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             // after one; a backslash escaping a word's first character can only start an extglob prefix
             // (`\foo@($x)`), and the word token handles it otherwise.
             advance(lexer);
+            if (lexer->lookahead == '\n' && !scanner->joined_line && awaits_deferred_body(scanner)) {
+                // A reparse may reuse the words before the backslash as a complete command, where no
+                // concatenation is valid, so a backslash right after the previous token is taken to end a
+                // word unless a command may start there, as after an operator.
+                split_continuation(scanner, lexer, first == '\\' && !valid_symbols[VARIABLE_NAME], false);
+                return true;
+            }
             if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
                 advance(lexer);
                 lexer->mark_end(lexer);
@@ -1099,6 +1390,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     if (end != ERROR_RECOVERY) {
         if (scanner->closers.size > 0) {
             array_pop(&scanner->closers);
+            scanner->regex_depth = array_pop(&scanner->closer_regex_depths);
         }
         discard_unstarted_heredocs(scanner);
         lexer->result_symbol = end;
@@ -1127,6 +1419,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             advance(lexer);
             lexer->mark_end(lexer);
             scanner->backtick_depth--;
+            scanner->regex_depth = scanner->backtick_regex_depth;
             discard_unstarted_heredocs(scanner);
             lexer->result_symbol = BACKTICK_CLOSE;
             return true;
@@ -1141,6 +1434,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             advance(lexer);
             lexer->mark_end(lexer);
             scanner->backtick_depth--;
+            scanner->regex_depth = scanner->backtick_regex_depth;
             discard_unstarted_heredocs(scanner);
             lexer->result_symbol = BACKTICK_CLOSE;
             return true;
@@ -1150,6 +1444,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->mark_end(lexer);
             scanner->backtick_depth++;
             scanner->backtick_closers = (uint16_t)scanner->closers.size;
+            scanner->backtick_regex_depth = scanner->regex_depth;
             lexer->result_symbol = BACKTICK_OPEN;
             return true;
         }
@@ -1186,10 +1481,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     if (valid_symbols[BARE_DOLLAR] && lexer->lookahead == '$') {
         advance(lexer);
-        lexer->mark_end(lexer);
-        int32_t c = lexer->lookahead;
-        lexer->result_symbol = BARE_DOLLAR;
-        return lexer->eof(lexer) || !(starts_quoted_expansion(c) || c == '\'' || c == '"');
+        return finish_bare_dollar(lexer);
     }
 
     // Bash reads a reserved word right after a compound command without a separator (`if (x) then`,
@@ -1208,6 +1500,7 @@ void *tree_sitter_bash_external_scanner_create(void) {
     Scanner *scanner = ts_calloc(1, sizeof(Scanner));
     array_init(&scanner->heredocs);
     array_init(&scanner->closers);
+    array_init(&scanner->closer_regex_depths);
     return scanner;
 }
 
@@ -1216,6 +1509,7 @@ void tree_sitter_bash_external_scanner_destroy(void *payload) {
     scanner_reset(scanner);
     array_delete(&scanner->heredocs);
     array_delete(&scanner->closers);
+    array_delete(&scanner->closer_regex_depths);
     ts_free(scanner);
 }
 
@@ -1229,20 +1523,28 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
     buffer[size++] = (char)scanner->backtick_depth;
     memcpy(&buffer[size], &scanner->backtick_closers, sizeof(scanner->backtick_closers));
     size += sizeof(scanner->backtick_closers);
-    buffer[size++] = (char)(scanner->terminator_owed | scanner->after_line_break << 1);
+    buffer[size++] = (char)(scanner->terminator_owed | scanner->after_line_break << 1 | scanner->joined_line << 2 |
+                            scanner->split_continuation << 3 | scanner->split_continuation_in_word << 4 |
+                            scanner->split_continuation_in_regex << 5);
+    memcpy(&buffer[size], &scanner->regex_depth, sizeof(scanner->regex_depth));
+    size += sizeof(scanner->regex_depth);
+    memcpy(&buffer[size], &scanner->backtick_regex_depth, sizeof(scanner->backtick_regex_depth));
+    size += sizeof(scanner->backtick_regex_depth);
     uint16_t closer_count = (uint16_t)scanner->closers.size;
     memcpy(&buffer[size], &closer_count, sizeof(closer_count));
     size += sizeof(closer_count);
     if (scanner->closers.size > 0) {
         memcpy(&buffer[size], scanner->closers.contents, scanner->closers.size);
         size += scanner->closers.size;
+        memcpy(&buffer[size], scanner->closer_regex_depths.contents, closer_count * sizeof(uint16_t));
+        size += closer_count * sizeof(uint16_t);
     }
     buffer[size++] = (char)scanner->heredocs.size;
     for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i);
         buffer[size++] = (char)heredoc->is_raw;
         buffer[size++] = (char)heredoc->allows_indent;
-        buffer[size++] = (char)heredoc->started;
+        buffer[size++] = (char)(heredoc->started | heredoc->deferred << 1);
         memcpy(&buffer[size], &heredoc->depth, sizeof(heredoc->depth));
         size += sizeof(heredoc->depth);
         uint16_t length = (uint16_t)heredoc->delimiter.size;
@@ -1258,7 +1560,7 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
 void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
     Scanner *scanner = (Scanner *)payload;
     scanner_reset(scanner);
-    if (length < 2 + 2 * sizeof(uint16_t)) {
+    if (length < SCANNER_HEADER_SIZE) {
         return;
     }
     unsigned size = 0;
@@ -1266,23 +1568,36 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
     memcpy(&scanner->backtick_closers, &buffer[size], sizeof(scanner->backtick_closers));
     size += sizeof(scanner->backtick_closers);
     scanner->terminator_owed = buffer[size] & 1;
-    scanner->after_line_break = (buffer[size++] & 2) != 0;
+    scanner->after_line_break = (buffer[size] & 2) != 0;
+    scanner->joined_line = (buffer[size] & 4) != 0;
+    scanner->split_continuation = (buffer[size] & 8) != 0;
+    scanner->split_continuation_in_word = (buffer[size] & 16) != 0;
+    scanner->split_continuation_in_regex = (buffer[size++] & 32) != 0;
+    memcpy(&scanner->regex_depth, &buffer[size], sizeof(scanner->regex_depth));
+    size += sizeof(scanner->regex_depth);
+    memcpy(&scanner->backtick_regex_depth, &buffer[size], sizeof(scanner->backtick_regex_depth));
+    size += sizeof(scanner->backtick_regex_depth);
     uint16_t closer_count;
     memcpy(&closer_count, &buffer[size], sizeof(closer_count));
     size += sizeof(closer_count);
-    if (size + closer_count >= length) {
+    if (size + CLOSER_SIZE * closer_count >= length) {
         return;
     }
     array_reserve(&scanner->closers, closer_count);
     memcpy(scanner->closers.contents, &buffer[size], closer_count);
     scanner->closers.size = closer_count;
     size += closer_count;
+    array_reserve(&scanner->closer_regex_depths, closer_count);
+    memcpy(scanner->closer_regex_depths.contents, &buffer[size], closer_count * sizeof(uint16_t));
+    scanner->closer_regex_depths.size = closer_count;
+    size += closer_count * sizeof(uint16_t);
     uint8_t count = (uint8_t)buffer[size++];
     for (uint8_t i = 0; i < count && size + HEREDOC_HEADER_SIZE <= length; i++) {
         Heredoc heredoc = {.delimiter = array_new()};
         heredoc.is_raw = buffer[size++];
         heredoc.allows_indent = buffer[size++];
-        heredoc.started = buffer[size++];
+        heredoc.started = buffer[size] & 1;
+        heredoc.deferred = (buffer[size++] & 2) != 0;
         memcpy(&heredoc.depth, &buffer[size], sizeof(heredoc.depth));
         size += sizeof(heredoc.depth);
         uint16_t delimiter_length;

@@ -1603,15 +1603,75 @@
             }
           },
           {
+            "type": "SYMBOL",
+            "name": "_regex_start"
+          },
+          {
             "type": "FIELD",
             "name": "right",
             "content": {
-              "type": "SYMBOL",
-              "name": "regex"
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_regex_part"
+                },
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_regex_concatenation"
+                  },
+                  "named": true,
+                  "value": "concatenation"
+                }
+              ]
             }
           }
         ]
       }
+    },
+    "_regex_concatenation": {
+      "type": "PREC_RIGHT",
+      "value": 0,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "SYMBOL",
+            "name": "_regex_part"
+          },
+          {
+            "type": "REPEAT1",
+            "content": {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_regex_concat"
+                },
+                {
+                  "type": "SYMBOL",
+                  "name": "_regex_part"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "_regex_part": {
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "SYMBOL",
+          "name": "regex"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_quoted_or_expansion"
+        }
+      ]
     },
     "_test_negation": {
       "type": "PREC",
@@ -2881,12 +2941,72 @@
       ]
     },
     "raw_string": {
-      "type": "PATTERN",
-      "value": "'[^']*'"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "PATTERN",
+          "value": "'[^']*'"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_closer_line_raw_string_start"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_closer_line_raw_string_content"
+                },
+                "named": true,
+                "value": "string_content"
+              }
+            },
+            {
+              "type": "STRING",
+              "value": "'"
+            }
+          ]
+        }
+      ]
     },
     "ansi_c_string": {
-      "type": "PATTERN",
-      "value": "\\$'([^'\\\\]|\\\\(.|\\n))*'"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "PATTERN",
+          "value": "\\$'([^'\\\\]|\\\\(.|\\n))*'"
+        },
+        {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_closer_line_ansi_c_string_start"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_closer_line_ansi_c_string_content"
+                },
+                "named": true,
+                "value": "string_content"
+              }
+            },
+            {
+              "type": "STRING",
+              "value": "'"
+            }
+          ]
+        }
+      ]
     },
     "translated_string": {
       "type": "SEQ",
@@ -4689,15 +4809,24 @@
       ]
     },
     "comment": {
-      "type": "TOKEN",
-      "content": {
-        "type": "PREC",
-        "value": -10,
-        "content": {
-          "type": "PATTERN",
-          "value": "#.*"
+      "type": "CHOICE",
+      "members": [
+        {
+          "type": "TOKEN",
+          "content": {
+            "type": "PREC",
+            "value": -10,
+            "content": {
+              "type": "PATTERN",
+              "value": "#.*"
+            }
+          }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_joined_comment"
         }
-      }
+      ]
     }
   },
   "extras": [
@@ -4825,6 +4954,34 @@
     {
       "type": "SYMBOL",
       "name": "_bracket_substitution_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_regex_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_regex_concat"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_closer_line_raw_string_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_closer_line_ansi_c_string_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_closer_line_raw_string_content"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_closer_line_ansi_c_string_content"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_joined_comment"
     },
     {
       "type": "SYMBOL",
