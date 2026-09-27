@@ -6,20 +6,13 @@
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
 [![wbfy](https://img.shields.io/badge/wbfy-20.20.0-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
 
-Bash grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), rewritten from
-[tree-sitter/tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash). The syntax trees differ from the
-original grammar's.
+Bash grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), forked from
+[tree-sitter/tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash). We are grateful to its authors and
+contributors. This is not an official release of that project.
 
-- Heredoc bodies are parsed wherever bash reads them: from the newline that ends the line holding the `<<` operator,
-  in operator order. Any statement may follow the operator on that line (`cat <<EOF; echo done`), and several heredocs
-  may share a line. A `heredoc_body` node appears as an extra next to the command that opened it. A heredoc whose
-  delimiter does not fit the parser's 1 KiB scanner state is an `ERROR` rather than a guessed body.
-- Redirections stay inside the command they belong to, in source order (`npm > out run x`), and a command may
-  consist of assignments and redirections only.
-- `$((…))` is always an arithmetic expansion, including inside heredoc bodies; escaped `\$` and `` \` `` are literal.
-- A newline is a statement terminator only where one may end a statement; elsewhere it is whitespace.
-- Like bash, only a space, a tab, and a newline separate words. Any other whitespace is part of a word, including
-  the CR of a CRLF line ending, so a CRLF script parses as bash runs it (`echo a` + CRLF passes `a` + CR).
+This fork aims to parse scripts exactly as bash runs them, so that tools can tell code from data in untrusted
+scripts. It fixes parsing bugs and raises conformance with bash, checked by differential tests against bash itself.
+As a result, its syntax trees differ from the original grammar's; review your queries when migrating.
 
 ## Usage
 
