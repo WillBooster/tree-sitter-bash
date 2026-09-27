@@ -8,9 +8,7 @@ name: Robustness
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-# Both jobs' actions use the Actions cache, and the fuzz action uploads a crashing input as an artifact.
 permissions:
-  actions: write
   contents: read
 jobs:
   # The scanner depends on the C library (e.g. `iswalpha`), so the tests run on every platform that the
