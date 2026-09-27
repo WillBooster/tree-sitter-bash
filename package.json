@@ -30,7 +30,6 @@
     "lint-fix": "bun wb lint --fix",
     "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
     "release": "wb release",
-    "release-test": "node node_modules/semantic-release/bin/semantic-release.js --dry-run --plugins @semantic-release/commit-analyzer @semantic-release/release-notes-generator",
     "prestart": "bun run build-wasm",
     "start": "tree-sitter playground",
     "test": "bun wb test",
