@@ -1,0 +1,23 @@
+#!/usr/bin/env node
+// Prints the version that the next release will publish, or nothing when no release is due. It runs
+// semantic-release with only the commit analyzer from .releaserc.json, since the other plugins need
+// publishing credentials; passing plugin names on the command line would drop the analyzer's preset.
+
+const fs = require('node:fs');
+const path = require('node:path');
+
+async function main() {
+  const config = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '.releaserc.json'), 'utf8'));
+  const plugins = config.plugins.filter(
+    (plugin) => (Array.isArray(plugin) ? plugin[0] : plugin) === '@semantic-release/commit-analyzer'
+  );
+  const { default: semanticRelease } = await import('semantic-release');
+  // semantic-release logs to stdout, which carries only the version here.
+  const result = await semanticRelease({ dryRun: true, plugins }, { stdout: process.stderr, stderr: process.stderr });
+  if (result) console.info(result.nextRelease.version);
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
