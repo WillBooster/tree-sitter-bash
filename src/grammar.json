@@ -4851,7 +4851,12 @@
       "name": "_line_continuation"
     }
   ],
-  "conflicts": [["_statements", "_last_case_item"]],
+  "conflicts": [
+    [
+      "_statements",
+      "_last_case_item"
+    ]
+  ],
   "precedences": [],
   "externals": [
     {
@@ -4983,7 +4988,13 @@
       "name": "__error_recovery"
     }
   ],
-  "inline": ["_terminator", "_command_statement"],
-  "supertypes": ["_statement", "_arithmetic_expression"],
+  "inline": [
+    "_terminator",
+    "_command_statement"
+  ],
+  "supertypes": [
+    "_statement",
+    "_arithmetic_expression"
+  ],
   "reserved": {}
 }
