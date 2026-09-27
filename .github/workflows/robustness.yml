@@ -45,7 +45,7 @@ jobs:
             state != 2 && /^=+$/ { if (++state == 2) file = sprintf("%s/%d", dir, ++n); next }
             state == 2 && /^---+$/ { state = 0; close(file); next }
             state == 2 { print > file }
-          ' test/corpus/*.txt
+          ' $(find test/corpus -name '*.txt' | LC_ALL=C sort)
       - uses: tree-sitter/fuzz-action@v4
         with:
           corpus: .tmp/fuzz-seeds

@@ -8,7 +8,8 @@ const CorpusDir = path.join(import.meta.dir, '../corpus');
 // Each case opens with a name between two lines of `=`.
 const CaseCount =
   fs
-    .readdirSync(CorpusDir)
+    .readdirSync(CorpusDir, { encoding: 'utf8', recursive: true })
+    .filter((name) => name.endsWith('.txt'))
     .flatMap((name) => fs.readFileSync(path.join(CorpusDir, name), 'utf8').split('\n'))
     .filter((line) => /^=+$/.test(line)).length / 2;
 
