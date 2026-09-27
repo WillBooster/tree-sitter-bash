@@ -19,6 +19,7 @@ const EXTGLOB_GROUP = extglobGroup('[?*+@]', 3);
 const EXTGLOB_NEGATION = extglobGroup('!', 3);
 
 // Text inside `${…}` and subscripts stops before `<(`/`>(`, so a process substitution there is parsed.
+const EXPANSION_TEXT_BREAKS = ['}', '$', '`', '"', '\'', '\\\\', '<', '>'];
 const SUBSCRIPT_TEXT = /([^\[\]$`"'\\<>]|[<>]+[^(\[\]$`"'\\<>]|\\.)+/;
 
 const PREC = {
@@ -582,10 +583,6 @@ module.exports = grammar({
             alias(token.immediate(/[0-9]+|[*@?$_-]/), $.special_variable_name),
             alias(token.immediate(choice('#', '!')), $.special_variable_name),
             alias($._expansion_subscript, $.subscript),
-            // A blank directly after `${` opens a function substitution, so these only take effect
-            // after a prefix (`${# y}`), which bash parses and rejects only when expanding.
-            alias(/[A-Za-z_][A-Za-z0-9_]*/, $.variable_name),
-            alias(/[0-9]+|[*@?$_-]/, $.special_variable_name),
           )),
           optional($._expansion_operation),
         ),
@@ -594,6 +591,7 @@ module.exports = grammar({
         // `$name` expansion is left out, since its `$` would tie with the special parameter in `${$}`.
         repeat(field('argument', choice(
           alias($._expansion_text, $.word),
+          alias($._blank_expansion_text, $.word),
           alias($._angle_text, $.word),
           $.string,
           $.raw_string,
@@ -621,6 +619,7 @@ module.exports = grammar({
         )),
         repeat(field('argument', choice(
           alias($._expansion_text, $.word),
+          alias($._blank_expansion_text, $.word),
           alias($._angle_text, $.word),
           $._quoted_or_expansion,
           alias($._bare_dollar, $.word),
@@ -630,12 +629,21 @@ module.exports = grammar({
       // Text without an operator (`${x y}`) is rejected by bash only when expanding.
       repeat1(field('argument', choice(
         alias($._expansion_text, $.word),
+        alias($._blank_expansion_text, $.word),
         alias($._angle_text, $.word),
         $._quoted_or_expansion,
       ))),
     ),
 
-    _expansion_text: _ => token(prec(-1, /([^}$`"'\\<>]|[<>]+[^(}$`"'\\<>]|\\(.|\n))+/)),
+    _expansion_text: _ => token(prec(-1, seq(
+      choice(noneOf(...EXPANSION_TEXT_BREAKS, ' ', '\\t', '\\n'), ...expansionTextUnits().slice(1)),
+      repeat(choice(...expansionTextUnits())),
+    ))),
+
+    // Text led by a blank outranks `}`: otherwise the lexer, having consumed the blank as the start of
+    // text, extends it into a `}` token that swallows the blank (`${x:- }`), which a reparse after an
+    // edit does not reproduce, and the blank, which bash expands, would be lost.
+    _blank_expansion_text: _ => token(prec(1, seq(/[ \t\n]/, repeat(choice(...expansionTextUnits()))))),
 
     // A `<` or `>` that the text above cannot end with, e.g. before `}`. A single character, so that a
     // run before `(` leaves its last `<`/`>` to open a process substitution (`${x:-a<<(b)}`).
@@ -758,6 +766,11 @@ module.exports = grammar({
  */
 function noneOf(...characters) {
   return new RegExp(`[^${characters.join('')}]`);
+}
+
+// The units of text inside `${…}`: a character, a run of `<`/`>` not before `(`, and an escape.
+function expansionTextUnits() {
+  return [noneOf(...EXPANSION_TEXT_BREAKS), seq(/[<>]+/, noneOf('(', ...EXPANSION_TEXT_BREAKS)), /\\(.|\n)/];
 }
 
 /**

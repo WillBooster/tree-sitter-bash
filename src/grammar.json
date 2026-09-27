@@ -3072,24 +3072,6 @@
                         },
                         "named": true,
                         "value": "subscript"
-                      },
-                      {
-                        "type": "ALIAS",
-                        "content": {
-                          "type": "PATTERN",
-                          "value": "[A-Za-z_][A-Za-z0-9_]*"
-                        },
-                        "named": true,
-                        "value": "variable_name"
-                      },
-                      {
-                        "type": "ALIAS",
-                        "content": {
-                          "type": "PATTERN",
-                          "value": "[0-9]+|[*@?$_-]"
-                        },
-                        "named": true,
-                        "value": "special_variable_name"
                       }
                     ]
                   }
@@ -3146,6 +3128,15 @@
                       "content": {
                         "type": "SYMBOL",
                         "name": "_expansion_text"
+                      },
+                      "named": true,
+                      "value": "word"
+                    },
+                    {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "_blank_expansion_text"
                       },
                       "named": true,
                       "value": "word"
@@ -3379,6 +3370,15 @@
                       "type": "ALIAS",
                       "content": {
                         "type": "SYMBOL",
+                        "name": "_blank_expansion_text"
+                      },
+                      "named": true,
+                      "value": "word"
+                    },
+                    {
+                      "type": "ALIAS",
+                      "content": {
+                        "type": "SYMBOL",
                         "name": "_angle_text"
                       },
                       "named": true,
@@ -3449,6 +3449,15 @@
                   "type": "ALIAS",
                   "content": {
                     "type": "SYMBOL",
+                    "name": "_blank_expansion_text"
+                  },
+                  "named": true,
+                  "value": "word"
+                },
+                {
+                  "type": "ALIAS",
+                  "content": {
+                    "type": "SYMBOL",
                     "name": "_angle_text"
                   },
                   "named": true,
@@ -3470,8 +3479,109 @@
         "type": "PREC",
         "value": -1,
         "content": {
-          "type": "PATTERN",
-          "value": "([^}$`\"'\\\\<>]|[<>]+[^(}$`\"'\\\\<>]|\\\\(.|\\n))+"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "PATTERN",
+                  "value": "[^}$`\"'\\\\<> \\t\\n]"
+                },
+                {
+                  "type": "SEQ",
+                  "members": [
+                    {
+                      "type": "PATTERN",
+                      "value": "[<>]+"
+                    },
+                    {
+                      "type": "PATTERN",
+                      "value": "[^(}$`\"'\\\\<>]"
+                    }
+                  ]
+                },
+                {
+                  "type": "PATTERN",
+                  "value": "\\\\(.|\\n)"
+                }
+              ]
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "PATTERN",
+                    "value": "[^}$`\"'\\\\<>]"
+                  },
+                  {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "PATTERN",
+                        "value": "[<>]+"
+                      },
+                      {
+                        "type": "PATTERN",
+                        "value": "[^(}$`\"'\\\\<>]"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "\\\\(.|\\n)"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    "_blank_expansion_text": {
+      "type": "TOKEN",
+      "content": {
+        "type": "PREC",
+        "value": 1,
+        "content": {
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "PATTERN",
+              "value": "[ \\t\\n]"
+            },
+            {
+              "type": "REPEAT",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "PATTERN",
+                    "value": "[^}$`\"'\\\\<>]"
+                  },
+                  {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "PATTERN",
+                        "value": "[<>]+"
+                      },
+                      {
+                        "type": "PATTERN",
+                        "value": "[^(}$`\"'\\\\<>]"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "PATTERN",
+                    "value": "\\\\(.|\\n)"
+                  }
+                ]
+              }
+            }
+          ]
         }
       }
     },

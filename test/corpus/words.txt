@@ -807,7 +807,7 @@ echo @($x #b) @( #b $x) @(a b) # real comment
   (comment))
 
 ================================================================================
-Parameter expansions with a blank after the prefix
+Parameter expansions with a blank after the parameter
 ================================================================================
 
 echo ${# y} ${! y} "${# y}" ${y }
@@ -819,17 +819,18 @@ echo ${# y} ${! y} "${# y}" ${y }
     name: (command_name
       (word))
     argument: (expansion
-      prefix: (operator)
-      parameter: (variable_name))
+      parameter: (special_variable_name)
+      argument: (word))
     argument: (expansion
-      prefix: (operator)
-      parameter: (variable_name))
+      parameter: (special_variable_name)
+      argument: (word))
     argument: (string
       (expansion
-        prefix: (operator)
-        parameter: (variable_name)))
+        parameter: (special_variable_name)
+        argument: (word)))
     argument: (expansion
-      parameter: (variable_name))))
+      parameter: (variable_name)
+      argument: (word))))
 
 ================================================================================
 Nested subscripts and text after an expansion parameter

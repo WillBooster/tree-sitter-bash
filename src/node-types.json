@@ -3094,11 +3094,6 @@
     }
   },
   {
-    "type": "variable_name",
-    "named": true,
-    "fields": {}
-  },
-  {
     "type": "while_statement",
     "named": true,
     "fields": {
@@ -3546,6 +3541,10 @@
   {
     "type": "until",
     "named": false
+  },
+  {
+    "type": "variable_name",
+    "named": true
   },
   {
     "type": "while",

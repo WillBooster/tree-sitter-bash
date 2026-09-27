@@ -1107,13 +1107,15 @@ echo ${abc:- -quiet}
       (word))
     argument: (expansion
       parameter: (variable_name)
-      operator: (operator)))
+      operator: (operator)
+      argument: (word)))
   (command
     name: (command_name
       (word))
     argument: (expansion
       parameter: (variable_name)
-      operator: (operator)))
+      operator: (operator)
+      argument: (word)))
   (command
     name: (command_name
       (word))
@@ -1177,7 +1179,8 @@ L="${M/'N'*/O}"
           parameter: (subscript
             name: (variable_name)
             index: (word))
-          operator: (operator)))))
+          operator: (operator)
+          argument: (word)))))
   (command
     assignment: (variable_assignment
       name: (variable_name)
@@ -1788,7 +1791,8 @@ echo "${kw}? ( ${cond:+${cond}? (} ${baseuri}-${ver}-${kw}.${suff} ${cond:+) })"
     name: (command_name
       (expansion
         prefix: (operator)
-        parameter: (special_variable_name))))
+        parameter: (special_variable_name)
+        argument: (word))))
   (command
     name: (command_name
       (expansion
@@ -1798,7 +1802,8 @@ echo "${kw}? ( ${cond:+${cond}? (} ${baseuri}-${ver}-${kw}.${suff} ${cond:+) })"
     name: (command_name
       (expansion
         parameter: (special_variable_name)
-        operator: (operator))))
+        operator: (operator)
+        argument: (word))))
   (command
     name: (command_name
       (expansion
@@ -1887,14 +1892,16 @@ some-command ${foo:+--arg <(printf '%s\n' "$foo")}
     name: (command_name
       (expansion
         parameter: (variable_name)
-        operator: (operator))))
+        operator: (operator)
+        argument: (word))))
   (command
     name: (command_name
       (expansion
         parameter: (subscript
           name: (variable_name)
           index: (word))
-        operator: (operator))))
+        operator: (operator)
+        argument: (word))))
   (command
     name: (command_name
       (expansion
@@ -1971,6 +1978,7 @@ some-command ${foo:+--arg <(printf '%s\n' "$foo")}
         (expansion
           parameter: (special_variable_name)
           operator: (operator)
+          argument: (word)
           argument: (expansion
             parameter: (special_variable_name))))))
   (command
@@ -2086,7 +2094,8 @@ reff="${f/'-roff2html'*/'-ref'}.html"
           (command
             name: (command_name
               (word))
-            argument: (word))))))
+            argument: (word)))
+        argument: (word))))
   (command
     assignment: (variable_assignment
       name: (variable_name)
