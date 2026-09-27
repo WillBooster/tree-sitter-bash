@@ -1123,6 +1123,42 @@ END
           (string_content))))))
 
 ================================================================================
+Comment after an operator on a line ending a heredoc at a substitution's paren
+================================================================================
+
+x=$(cat <<EOF
+EOF);# a\
+echo b
+echo c&# d\
+echo e
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          redirect: (heredoc_redirect
+            delimiter: (heredoc_start)))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
 Heredoc delimiter too long for the scanner state is an error
 ================================================================================
 

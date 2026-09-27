@@ -1316,8 +1316,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
             return true;
         }
-        // Only a `#` after a blank is known to begin a word, and so a comment.
-        if (lexer->lookahead == '#' && is_blank(first) && scanner->joined_line && valid_symbols[JOINED_COMMENT]) {
+        // A `#` begins a word, and so a comment, after a blank or an operator. Right after a word part, where
+        // another part may follow, it continues the word; a command may also start there, as after `;`, but
+        // a reparse may reuse the statements before it as a complete list, where no part may follow.
+        bool in_word = valid_symbols[BARE_DOLLAR] && !valid_symbols[VARIABLE_NAME];
+        if (lexer->lookahead == '#' && (is_blank(first) || !in_word) && scanner->joined_line &&
+            valid_symbols[JOINED_COMMENT]) {
             return scan_joined_comment(lexer);
         }
         // A regex reads `$` as text unless it begins a part, so it looks for `$'` itself.
