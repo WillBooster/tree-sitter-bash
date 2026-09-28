@@ -1,4 +1,8 @@
-import { expect } from 'bun:test';
+import { expect, test } from 'bun:test';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 import { testCommand } from './run.js';
 
@@ -18,3 +22,49 @@ testCommand('reparses the corpus consistently after random edits', ['bun', 'run'
     expect(output).not.toContain('failed fuzzing');
   },
 });
+
+// Edits that the random ones reach only rarely. Each inserts `text` at `position` of `before`.
+const edits = [
+  {
+    name: 'a newline after a special parameter in a heredoc body makes the next line its delimiter',
+    before: 'cat <<EOF\n$1EOF\n$y\nEOF\n',
+    position: 12,
+    text: '\n',
+  },
+  ...['a;', 'a&', 'f a;', 'a=1;'].map((statements) => {
+    const before = `c i1 $(cat <<'EOF'; cat <<END\nEOF) ${statements}\\\n`;
+    return {
+      name: `a deferred body after \`${statements}\` and a backslash-newline is appended`,
+      before,
+      position: before.length,
+      text: 'e1\nEND\nc i1b\n',
+    };
+  }),
+];
+
+for (const { name, before, position, text } of edits) {
+  test(`reparses as a fresh parse after an edit: ${name}`, () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tree-sitter-bash-'));
+    try {
+      const beforePath = path.join(dir, 'before.sh');
+      const afterPath = path.join(dir, 'after.sh');
+      fs.writeFileSync(beforePath, before);
+      fs.writeFileSync(afterPath, before.slice(0, position) + text + before.slice(position));
+      const incremental = parseWithCli([beforePath, '--edits', `${position} 0 ${text}`]);
+      expect(incremental).not.toContain('ERROR');
+      expect(incremental).toBe(parseWithCli([afterPath]));
+    } finally {
+      fs.rmSync(dir, { force: true, recursive: true });
+    }
+  }, 120_000);
+}
+
+function parseWithCli(args: string[]): string {
+  const result = spawnSync('bun', ['run', 'tree-sitter', 'parse', ...args], {
+    cwd: path.join(import.meta.dir, '../..'),
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  expect(result.status, result.stderr).toBe(0);
+  return result.stdout;
+}
