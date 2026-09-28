@@ -91,8 +91,8 @@ typedef struct {
     // an expansion in the middle of a line at a line start that an edit created before it.
     bool heredoc_line_start;
     // A deferred body after the line that ended a body at the substitution's `)` ends at a line holding a `)`
-    // too, so a terminator is owed after the substitution's `)`.
-    bool terminator_owed_after_closer;
+    // too, so a terminator is owed after that `)`: the number of closers open up to and including it, or 0.
+    uint16_t terminator_owed_closers;
     // The number of unclosed parentheses in the regex being read, which hold blanks and metacharacters.
     uint16_t regex_depth;
     uint16_t backtick_regex_depth;
@@ -164,12 +164,12 @@ static unsigned decode_varint(const char *in, unsigned available, int32_t *c) {
 }
 
 // Serialized layout: backtick depth, the closer count when the backquotes opened (uint16), the owed-terminator,
-// line-break, joined-line, split-continuation, string-opened, and heredoc-line-start flags, the flag owing a
-// terminator after the substitution's `)`, the regex depth and the one saved when the backquotes opened (uint16
+// line-break, joined-line, split-continuation, string-opened, and heredoc-line-start flags, the closer count
+// owing a terminator after its `)`, the regex depth, and the one saved when the backquotes opened (uint16
 // each), the closers of the open substitutions (uint16 count, then one byte each, then their saved regex depths
 // as uint16), and heredoc count, then per heredoc its flags, depth (uint16), delimiter length (uint16), and the
 // delimiter as varints.
-#define SCANNER_HEADER_SIZE (3 + 4 * sizeof(uint16_t))
+#define SCANNER_HEADER_SIZE (2 + 5 * sizeof(uint16_t))
 #define CLOSER_SIZE (1 + sizeof(uint16_t))
 #define HEREDOC_HEADER_SIZE (3 + 2 * sizeof(uint16_t))
 
@@ -204,7 +204,7 @@ static void scanner_reset(Scanner *scanner) {
     scanner->split_continuation_in_regex = false;
     scanner->closer_line_string_opened = false;
     scanner->heredoc_line_start = false;
-    scanner->terminator_owed_after_closer = false;
+    scanner->terminator_owed_closers = 0;
     scanner->regex_depth = 0;
     scanner->backtick_regex_depth = 0;
 }
@@ -361,7 +361,8 @@ static void end_heredoc_at_closer_line(Scanner *scanner, TSLexer *lexer, uint32_
     }
     // The deferred bodies are read after the `)`, in the enclosing substitution.
     bool in_parenthesized = scanner->closers.size > 1 && *array_get(&scanner->closers, scanner->closers.size - 2) == ')';
-    scanner->terminator_owed_after_closer = in_parenthesized && deferred_body_ends_at_closer_line(scanner, lexer);
+    scanner->terminator_owed_closers =
+        in_parenthesized && deferred_body_ends_at_closer_line(scanner, lexer) ? (uint16_t)scanner->closers.size : 0;
     remove_heredoc(scanner, index);
 }
 
@@ -1527,13 +1528,16 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
                          : valid_symbols[BRACKET_SUBSTITUTION_END] && lexer->lookahead == ']' ? BRACKET_SUBSTITUTION_END
                                                                                               : ERROR_RECOVERY;
     if (end != ERROR_RECOVERY) {
+        // A substitution nested in the rest of the closing line (`EOF $(y)) c`) closes before the owed one.
+        if (scanner->terminator_owed_closers > 0 && scanner->terminator_owed_closers >= scanner->closers.size) {
+            scanner->terminator_owed = scanner->terminator_owed_closers == scanner->closers.size;
+            scanner->terminator_owed_closers = 0;
+        }
         if (scanner->closers.size > 0) {
             array_pop(&scanner->closers);
             scanner->regex_depth = array_pop(&scanner->closer_regex_depths);
         }
         discard_unstarted_heredocs(scanner);
-        scanner->terminator_owed = scanner->terminator_owed_after_closer;
-        scanner->terminator_owed_after_closer = false;
         lexer->result_symbol = end;
         return true;
     }
@@ -1682,7 +1686,8 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
                             scanner->split_continuation << 3 | scanner->split_continuation_in_word << 4 |
                             scanner->split_continuation_in_regex << 5 | scanner->closer_line_string_opened << 6 |
                             scanner->heredoc_line_start << 7);
-    buffer[size++] = (char)scanner->terminator_owed_after_closer;
+    memcpy(&buffer[size], &scanner->terminator_owed_closers, sizeof(scanner->terminator_owed_closers));
+    size += sizeof(scanner->terminator_owed_closers);
     memcpy(&buffer[size], &scanner->regex_depth, sizeof(scanner->regex_depth));
     size += sizeof(scanner->regex_depth);
     memcpy(&buffer[size], &scanner->backtick_regex_depth, sizeof(scanner->backtick_regex_depth));
@@ -1732,7 +1737,8 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
     scanner->split_continuation_in_regex = (buffer[size] & 32) != 0;
     scanner->closer_line_string_opened = (buffer[size] & 64) != 0;
     scanner->heredoc_line_start = (buffer[size++] & 128) != 0;
-    scanner->terminator_owed_after_closer = buffer[size++] != 0;
+    memcpy(&scanner->terminator_owed_closers, &buffer[size], sizeof(scanner->terminator_owed_closers));
+    size += sizeof(scanner->terminator_owed_closers);
     memcpy(&scanner->regex_depth, &buffer[size], sizeof(scanner->regex_depth));
     size += sizeof(scanner->regex_depth);
     memcpy(&scanner->backtick_regex_depth, &buffer[size], sizeof(scanner->backtick_regex_depth));

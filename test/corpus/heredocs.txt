@@ -888,6 +888,10 @@ v=$(echo $(cat <<EOF; cat <<END
 x
 EOF) c i1
 END)
+v=$(echo $(cat <<EOF; cat <<END
+x
+EOF $(y)) c i2
+END)
 
 --------------------------------------------------------------------------------
 
@@ -913,6 +917,40 @@ END)
             (heredoc_body
               (heredoc_content)
               (heredoc_end))))
+        (command
+          name: (command_name
+            (word))
+          argument: (word))
+        (heredoc_body
+          (heredoc_content)
+          (heredoc_end)))))
+  (command
+    assignment: (variable_assignment
+      name: (variable_name)
+      value: (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (command_substitution
+            (command
+              name: (command_name
+                (word))
+              redirect: (heredoc_redirect
+                delimiter: (heredoc_start)))
+            (command
+              name: (command_name
+                (word))
+              redirect: (heredoc_redirect
+                delimiter: (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              name: (command_name
+                (command_substitution
+                  (command
+                    name: (command_name
+                      (word))))))))
         (command
           name: (command_name
             (word))
