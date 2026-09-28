@@ -72,7 +72,8 @@ $RECYCLE.BIN/
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
@@ -542,36 +543,7 @@ dist
 # Project-specific settings (tail)
 # Node artifacts
 build/
-prebuilds/
 node_modules/
-
-# Swift artifacts
-.build/
-Package.resolved
-
-# Go artifacts
-_obj/
-
-# Python artifacts
-.venv/
-dist/
-*.egg-info
-*.whl
-
-# C artifacts
-*.a
-*.so
-*.so.*
-*.dylib
-*.dll
-*.pc
-*.exp
-*.lib
-
-# Zig artifacts
-.zig-cache/
-zig-cache/
-zig-out/
 
 # Example dirs
 /examples/*/

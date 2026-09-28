@@ -60,8 +60,7 @@ script/parse-examples
 - a performance check (`test/unit/performance.test.ts`) that a 240 KB line parses in linear time, since consumers
   parse untrusted scripts.
 
-CI also runs these tests on Linux arm64 and macOS, and fuzzes the parser with libFuzzer and sanitizers
-(`.github/workflows/robustness.yml`).
+CI also fuzzes the parser with libFuzzer and sanitizers (`.github/workflows/robustness.yml`).
 
 ### References
 

@@ -18,7 +18,7 @@
     "grammar.js",
     "tree-sitter.json",
     "queries/*",
-    "src/**",
+    "src/node-types.json",
     "*.wasm"
   ],
   "scripts": {
