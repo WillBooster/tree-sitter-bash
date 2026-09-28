@@ -11,25 +11,6 @@ concurrency:
 permissions:
   contents: read
 jobs:
-  # The scanner depends on the C library (e.g. `iswalpha`), and the C, Go, Python, and Swift bindings compile
-  # it natively, so the tests run on other common platforms too; the Test workflow covers ubuntu-latest.
-  test:
-    strategy:
-      fail-fast: false
-      matrix:
-        runner:
-          - ubuntu-24.04-arm
-          - macos-latest
-          - macos-15-intel
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v7.0.1
-        with:
-          persist-credentials: false
-      - uses: jdx/mise-action@v4.3.0
-      - run: bun install --frozen-lockfile
-      - run: bun run build/ci
-      - run: bun run test/ci
   # Runs the parser under libFuzzer with AddressSanitizer and UndefinedBehaviorSanitizer, seeded with the
   # input of each corpus case. A grammar change alters which tokens the scanner is asked for, so it runs
   # on every change, not only on scanner changes.

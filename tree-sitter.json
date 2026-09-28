@@ -22,13 +22,5 @@
     "links": {
       "repository": "https://github.com/WillBooster/tree-sitter-bash"
     }
-  },
-  "bindings": {
-    "c": true,
-    "go": true,
-    "node": false,
-    "python": true,
-    "rust": false,
-    "swift": true
   }
 }
