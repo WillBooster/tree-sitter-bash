@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -61,7 +61,7 @@ for (const { name, before, position, text } of edits) {
 
 function parseWithCli(args: string[]): string {
   const result = spawnSync('bun', ['run', 'tree-sitter', 'parse', ...args], {
-    cwd: path.join(import.meta.dir, '../..'),
+    cwd: path.join(import.meta.dirname, '../..'),
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });

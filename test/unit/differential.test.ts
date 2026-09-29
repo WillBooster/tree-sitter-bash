@@ -1,5 +1,6 @@
-import { afterAll, expect, test } from 'bun:test';
+import { afterAll, expect, test } from 'vitest';
 import assert from 'node:assert';
+import { spawnSync } from 'node:child_process';
 
 import { isWasmStale, Oracle } from '../helpers/differential/compare.js';
 import { generateScript } from '../helpers/differential/generate.js';
@@ -19,7 +20,7 @@ const MaxReportedMismatches = 5;
 
 // `$BASH` is the executable itself: a version manager's shim would pick another bash in the scripts'
 // temporary directory.
-const bash = Bun.spawnSync(['bash', '-c', 'echo "$BASH"']).stdout.toString().trim();
+const bash = spawnSync('bash', ['-c', 'echo "$BASH"'], { encoding: 'utf8' }).stdout.trim();
 const oracle = new Oracle(bash);
 afterAll(() => oracle.dispose());
 
@@ -28,9 +29,9 @@ test('uses a Wasm build of the current parser', () => {
 });
 
 test('uses bash 5.2 or later as the oracle', () => {
-  const version = Bun.spawnSync([bash, '-c', 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"'])
-    .stdout.toString()
-    .trim();
+  const version = spawnSync(bash, ['-c', 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"'], {
+    encoding: 'utf8',
+  }).stdout.trim();
   expect(Number.parseFloat(version), `${bash} is bash ${version}; run \`mise install\``).toBeGreaterThanOrEqual(5.2);
 });
 
