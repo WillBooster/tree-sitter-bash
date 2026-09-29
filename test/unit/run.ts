@@ -1,7 +1,7 @@
-import { expect, test } from 'bun:test';
+import { expect, test } from 'vitest';
 import { spawn } from 'node:child_process';
 
-// Leaves time to kill the command and report its output before bun's own test timeout.
+// Leaves time to kill the command and report its output before the test's own timeout.
 const KillMargin = 10_000;
 
 // Tests that a command run from the repository root exits zero within the timeout, and passes its output to
@@ -19,7 +19,7 @@ export function testCommand(
       const [executable, ...args] = command;
       if (executable === undefined) throw new Error('Command must not be empty');
       const child = spawn(executable, args, {
-        cwd: `${import.meta.dir}/../..`,
+        cwd: `${import.meta.dirname}/../..`,
         detached: true,
         env: { ...process.env, ...options.env },
         stdio: ['ignore', 'pipe', 'pipe'],

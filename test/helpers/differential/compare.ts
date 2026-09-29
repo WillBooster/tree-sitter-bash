@@ -1,10 +1,11 @@
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { Language, type Node, Parser, type Tree } from 'web-tree-sitter';
+import { Language, type Node, Parser, type Tree } from '@willbooster/web-tree-sitter';
 
-const Root = path.join(import.meta.dir, '../../..');
+const Root = path.join(import.meta.dirname, '../../..');
 // The Wasm build is the one the package ships.
 const WasmPath = path.join(Root, 'tree-sitter-bash.wasm');
 
@@ -16,6 +17,9 @@ export function isWasmStale(): boolean {
   );
   return Math.max(...sources) > fs.statSync(WasmPath).mtimeMs;
 }
+
+// Waiting on a cell that nothing notifies is Node.js's synchronous sleep.
+const SleepCell = new Int32Array(new SharedArrayBuffer(4));
 
 await Parser.init();
 const parser = new Parser();
@@ -73,34 +77,33 @@ export class Oracle {
 
   private compareAt(script: string, scriptPath: string, logPath: string): Outcome {
     fs.writeFileSync(scriptPath, script);
-    const syntax = Bun.spawnSync([this.bash, '-n', scriptPath], { stderr: 'pipe' });
-    if (syntax.exitCode !== 0) return { kind: 'invalid', reason: syntax.stderr.toString() };
+    const syntax = spawnSync(this.bash, ['-n', scriptPath], { encoding: 'utf8', stdio: ['ignore', 'ignore', 'pipe'] });
+    if (syntax.status !== 0) return { kind: 'invalid', reason: syntax.stderr };
 
     fs.mkdirSync(logPath);
-    const run = Bun.spawnSync([this.bash, '--norc', '--noprofile', scriptPath], {
+    const run = spawnSync(this.bash, ['--norc', '--noprofile', scriptPath], {
       cwd: this.directory,
+      encoding: 'utf8',
       env: { BASH_ENV: this.preludePath, C_LOG: logPath, PATH: process.env.PATH ?? '' },
-      stdin: 'ignore',
-      stderr: 'pipe',
-      stdout: 'ignore',
+      stdio: ['ignore', 'ignore', 'pipe'],
       timeout: 10_000,
     });
     // `wait` covers jobs but not process substitutions, which may still be running `c`. Subshells are
     // forks that keep the script path in their arguments.
     const deadline = Date.now() + 10_000;
-    while (Bun.spawnSync(['pgrep', '-f', scriptPath]).exitCode === 0) {
-      if (run.exitCode === null || Date.now() > deadline) {
-        Bun.spawnSync(['pkill', '-f', scriptPath]);
+    while (spawnSync('pgrep', ['-f', scriptPath]).status === 0) {
+      if (run.status === null || Date.now() > deadline) {
+        spawnSync('pkill', ['-f', scriptPath]);
         return { kind: 'invalid', reason: 'bash timed out' };
       }
-      Bun.sleepSync(10);
+      Atomics.wait(SleepCell, 0, 0, 10);
     }
-    if (run.exitCode === null) return { kind: 'invalid', reason: 'bash timed out' };
+    if (run.status === null) return { kind: 'invalid', reason: 'bash timed out' };
     // Any error means that some command did not run as generated; `bash -n` also skips the bodies of
     // command substitutions, whose syntax errors show up only here. `time` reports, warnings about
     // heredocs that reach the end of input, and the unterminated quote of a generated `"`: '`"` are
     // expected.
-    const stderr = run.stderr.toString();
+    const { stderr } = run;
     const lines = stderr.split('\n').filter((line) => line && !/^(real|user|sys)\s|warning: here-document/u.test(line));
     // Each generated quote cut short by a backquote runs once and reports once; any other report means
     // that a substitution body bash could not parse did not run.
