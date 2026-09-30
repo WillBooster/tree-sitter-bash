@@ -28,23 +28,45 @@ const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding
 // The registries trust this workflow file for publishing.
 const dispatch = (ref) => github('POST', 'actions/workflows/release.yml/dispatches', { ref });
 const pendingBranchPrefix = 'release-pending/';
-const args = process.argv.slice(2);
-const separator = args.includes('--') ? args.indexOf('--') : args.length;
-// `wb release` does not run semantic-release with its own dry-run options; semantic-release, which receives the
-// arguments after `--`, accepts only `--dry-run` and `-d` (it releases for real on `--dry`), and runs dry outside CI
-// unless `--no-ci` is given.
-const dryRun =
-  args.slice(0, separator).some((arg) => ['--dry-run', '--dry', '-d'].includes(arg)) ||
-  args.slice(separator + 1).some((arg) => ['--dry-run', '-d'].includes(arg)) ||
-  (!env.CI && !args.includes('--no-ci'));
+const dryRun = parseDryRun(process.argv.slice(2));
 
-if (!dryRun && env.GITHUB_REF_NAME?.startsWith(pendingBranchPrefix)) {
+// A dry run takes the same path as a real run but only reports the remote writes it would make.
+if (env.GITHUB_REF_NAME?.startsWith(pendingBranchPrefix)) {
   await completePendingRelease(env.GITHUB_REF_NAME.slice(pendingBranchPrefix.length));
-  await dispatch(releaseConfig.branches[0]);
-  // After the dispatch, since the reusable workflow skips re-runs on a deleted branch.
-  await github('DELETE', `git/refs/heads/${env.GITHUB_REF_NAME}`);
+  if (dryRun) {
+    console.info(`Would dispatch a run on ${releaseConfig.branches[0]} and delete the branch ${env.GITHUB_REF_NAME}.`);
+  } else {
+    await dispatch(releaseConfig.branches[0]);
+    // After the dispatch, since the reusable workflow skips re-runs on a deleted branch.
+    await github('DELETE', `git/refs/heads/${env.GITHUB_REF_NAME}`);
+  }
 } else if (!(await deferToPendingRelease())) {
-  execFileSync('wb', ['release', ...args], { cwd: rootDir, stdio: 'inherit' });
+  execFileSync('wb', ['release', ...process.argv.slice(2)], { cwd: rootDir, stdio: 'inherit' });
+}
+
+/**
+ * Returns whether the run is a dry run: the arguments request the dry run of `wb release` or, after `--`, of
+ * semantic-release, or the run is outside CI without semantic-release's `--no-ci`, where semantic-release runs dry too.
+ * Only these options and semantic-release's `--debug` are accepted: both parsers accept many more spellings of them
+ * (e.g., `--d`, `--dry-run=true`, `-vd`, `--ci=false`), and a spelling this script misread would make remote writes in a
+ * dry run, or skip them in a run that semantic-release reads as real.
+ */
+function parseDryRun(args) {
+  const forwardedFrom = args.includes('--') ? args.indexOf('--') + 1 : args.length;
+  let dryRun = false;
+  for (const [index, arg] of args.entries()) {
+    const isForwarded = index >= forwardedFrom;
+    const dryRunOptions = isForwarded ? ['--dry-run', '-d'] : ['--dry-run', '--dry', '-d'];
+    const otherOptions = isForwarded ? ['--debug', '--no-ci'] : ['--'];
+    if (dryRunOptions.includes(arg)) {
+      dryRun = true;
+    } else if (!otherOptions.includes(arg)) {
+      throw new Error(
+        `Unsupported argument \`${arg}\`: the script accepts wb's dry-run options --dry-run, --dry, and -d, and after \`--\` semantic-release's --dry-run, -d, --debug, and --no-ci.`
+      );
+    }
+  }
+  return dryRun || (!env.CI && !args.slice(forwardedFrom).includes('--no-ci'));
 }
 
 async function completePendingRelease(tag) {
@@ -52,6 +74,10 @@ async function completePendingRelease(tag) {
   if (draft) {
     if (draft.target_commitish !== head) {
       throw new Error(`The draft release ${tag} targets ${draft.target_commitish}, not ${head}.`);
+    }
+    if (dryRun) {
+      console.info(`Would build and publish the pending release ${tag}.`);
+      return;
     }
     const version = tag.replace(/^v/, '');
     execFileSync(path.join(rootDir, 'script', 'build-release'), [version], { cwd: rootDir, stdio: 'inherit' });
@@ -62,10 +88,7 @@ async function completePendingRelease(tag) {
   }
 }
 
-/**
- * Returns whether a pending release of an older commit must be completed before releasing this commit. A dry run only
- * reports what a real run would do.
- */
+/** Returns whether a pending release of an older commit must be completed before releasing this commit. */
 async function deferToPendingRelease() {
   // Oldest first, since versions are released in order.
   const drafts = await listPendingReleases(github);
@@ -103,7 +126,8 @@ async function createBranch(branch, commit) {
   try {
     await github('POST', 'git/refs', { ref: `refs/heads/${branch}`, sha: commit });
   } catch (error) {
-    const existing = await github('GET', `git/ref/heads/${branch}`);
-    if (existing.object.sha !== commit) throw error;
+    // An earlier attempt created it.
+    const existing = await github('GET', `git/ref/heads/${branch}`).catch(() => {});
+    if (existing?.object.sha !== commit) throw error;
   }
 }
