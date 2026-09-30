@@ -28,8 +28,13 @@ const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: rootDir, encoding
 // The registries trust this workflow file for publishing.
 const dispatch = (ref) => github('POST', 'actions/workflows/release.yml/dispatches', { ref });
 const pendingBranchPrefix = 'release-pending/';
-// The dry-run options of `wb release` and of semantic-release (forwarded after `--`).
-const dryRun = process.argv.slice(2).some((arg) => ['--dry-run', '--dry', '-d'].includes(arg));
+const args = process.argv.slice(2);
+const separator = args.includes('--') ? args.indexOf('--') : args.length;
+// `wb release` does not run semantic-release with its own dry-run options, and semantic-release, which receives the
+// arguments after `--`, accepts only `--dry-run` and `-d` (it releases for real on `--dry`).
+const dryRun =
+  args.slice(0, separator).some((arg) => ['--dry-run', '--dry', '-d'].includes(arg)) ||
+  args.slice(separator + 1).some((arg) => ['--dry-run', '-d'].includes(arg));
 
 if (!dryRun && env.GITHUB_REF_NAME.startsWith(pendingBranchPrefix)) {
   await completePendingRelease(env.GITHUB_REF_NAME.slice(pendingBranchPrefix.length));
@@ -37,7 +42,7 @@ if (!dryRun && env.GITHUB_REF_NAME.startsWith(pendingBranchPrefix)) {
   // After the dispatch, since the reusable workflow skips re-runs on a deleted branch.
   await github('DELETE', `git/refs/heads/${env.GITHUB_REF_NAME}`);
 } else if (!(await deferToPendingRelease())) {
-  execFileSync('wb', ['release', ...process.argv.slice(2)], { cwd: rootDir, stdio: 'inherit' });
+  execFileSync('wb', ['release', ...args], { cwd: rootDir, stdio: 'inherit' });
 }
 
 async function completePendingRelease(tag) {
