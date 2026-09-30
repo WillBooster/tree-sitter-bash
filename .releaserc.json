@@ -11,17 +11,13 @@
     [
       "@semantic-release/exec",
       {
-        "prepareCmd": "script/set-grammar-version ${nextRelease.version} && bun run build-wasm"
+        "prepareCmd": "script/build-release ${nextRelease.version}"
       }
     ],
-    "@semantic-release/npm",
     [
-      "@semantic-release/github",
+      "./script/releasePlugin.mjs",
       {
-        "successCommentCondition": false,
-        "failCommentCondition": false,
-        "labels": ["r: semantic-release"],
-        "releasedLabels": ["released :bookmark:"]
+        "pkgRoot": "."
       }
     ]
   ]

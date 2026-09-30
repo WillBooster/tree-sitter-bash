@@ -29,7 +29,7 @@
     "lint": "bun wb lint",
     "lint-fix": "bun wb lint --fix",
     "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
-    "release": "wb release",
+    "release": "node script/release.mjs",
     "prestart": "bun run build-wasm",
     "start": "tree-sitter playground",
     "test": "bun wb test",
