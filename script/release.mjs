@@ -30,13 +30,15 @@ const dispatch = (ref) => github('POST', 'actions/workflows/release.yml/dispatch
 const pendingBranchPrefix = 'release-pending/';
 const args = process.argv.slice(2);
 const separator = args.includes('--') ? args.indexOf('--') : args.length;
-// `wb release` does not run semantic-release with its own dry-run options, and semantic-release, which receives the
-// arguments after `--`, accepts only `--dry-run` and `-d` (it releases for real on `--dry`).
+// `wb release` does not run semantic-release with its own dry-run options; semantic-release, which receives the
+// arguments after `--`, accepts only `--dry-run` and `-d` (it releases for real on `--dry`), and runs dry outside CI
+// unless `--no-ci` is given.
 const dryRun =
   args.slice(0, separator).some((arg) => ['--dry-run', '--dry', '-d'].includes(arg)) ||
-  args.slice(separator + 1).some((arg) => ['--dry-run', '-d'].includes(arg));
+  args.slice(separator + 1).some((arg) => ['--dry-run', '-d'].includes(arg)) ||
+  (!env.CI && !args.includes('--no-ci'));
 
-if (!dryRun && env.GITHUB_REF_NAME.startsWith(pendingBranchPrefix)) {
+if (!dryRun && env.GITHUB_REF_NAME?.startsWith(pendingBranchPrefix)) {
   await completePendingRelease(env.GITHUB_REF_NAME.slice(pendingBranchPrefix.length));
   await dispatch(releaseConfig.branches[0]);
   // After the dispatch, since the reusable workflow skips re-runs on a deleted branch.
