@@ -36,7 +36,7 @@ if (!dryRun && env.GITHUB_REF_NAME.startsWith(pendingBranchPrefix)) {
   await dispatch(releaseConfig.branches[0]);
   // After the dispatch, since the reusable workflow skips re-runs on a deleted branch.
   await github('DELETE', `git/refs/heads/${env.GITHUB_REF_NAME}`);
-} else if (!(await deferToPendingRelease()) || dryRun) {
+} else if (!(await deferToPendingRelease())) {
   execFileSync('wb', ['release', ...process.argv.slice(2)], { cwd: rootDir, stdio: 'inherit' });
 }
 
