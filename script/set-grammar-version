@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Writes the release version into tree-sitter.json and into the language metadata of the generated
-// src/parser.c, neither of which semantic-release updates.
+// Writes the release version into tree-sitter.json, the language metadata of the generated src/parser.c, and
+// package.json, none of which semantic-release updates.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -21,3 +21,8 @@ const parser = fs.readFileSync(parserFile, 'utf8');
 const metadata = /(\.metadata = \{\s*\.major_version = )\d+(,\s*\.minor_version = )\d+(,\s*\.patch_version = )\d+/;
 if (!metadata.test(parser)) throw new Error('src/parser.c has no language metadata block');
 fs.writeFileSync(parserFile, parser.replace(metadata, `$1${major}$2${minor}$3${patch}`));
+
+const packageFile = path.join(root, 'package.json');
+const pkg = JSON.parse(fs.readFileSync(packageFile, 'utf8'));
+pkg.version = version;
+fs.writeFileSync(packageFile, `${JSON.stringify(pkg, null, 2)}\n`);

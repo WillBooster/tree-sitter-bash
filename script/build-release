@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+# Writes the release version given as the argument and builds every artifact the release publishes.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+script/set-grammar-version "$1"
+bun run build-wasm
