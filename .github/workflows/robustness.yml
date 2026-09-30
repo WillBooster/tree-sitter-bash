@@ -13,12 +13,32 @@ permissions:
 jobs:
   # Runs the parser under libFuzzer with AddressSanitizer and UndefinedBehaviorSanitizer, seeded with the
   # input of each corpus case. A grammar change alters which tokens the scanner is asked for, so it runs
-  # on every change, not only on scanner changes.
+  # on every change, not only on scanner changes. The parser runs on WillBooster/tree-sitter at the
+  # @willbooster/web-tree-sitter version in package.json, the runtime the Wasm tests use: the error recovery of
+  # upstream's runtime never ends on some inputs.
   fuzz:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
         with:
+          persist-credentials: false
+      - id: runtime
+        run: |
+          version=$(jq -r '.devDependencies["@willbooster/web-tree-sitter"] // empty' package.json)
+          echo "ref=v${version:?package.json pins no @willbooster/web-tree-sitter}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: WillBooster/tree-sitter
+          ref: ${{ steps.runtime.outputs.ref }}
+          path: .tmp/tree-sitter
+          persist-credentials: false
+      # tree-sitter/fuzz-action can only build upstream's runtime, so only its harness and sanitizer ignore list are
+      # used, and its build is reproduced below.
+      - uses: actions/checkout@v7.0.1
+        with:
+          repository: tree-sitter/fuzz-action
+          ref: v4
+          path: .tmp/fuzz-action
           persist-credentials: false
       - run: |
           mkdir -p .tmp/fuzz-seeds
@@ -27,9 +47,25 @@ jobs:
             state == 2 && /^---+$/ { state = 0; close(file); next }
             state == 2 { print > file }
           ' $(find test/corpus -name '*.txt' | LC_ALL=C sort)
-      - uses: tree-sitter/fuzz-action@v4
+      - name: Build the fuzzer
+        run: |
+          jq '.. | select((.type? == "STRING" or (.type? == "ALIAS" and .named? == false)) and .value? != "") | .value' \
+            src/grammar.json | grep -v '\\' | iconv -c -f UTF-8 -t ASCII//TRANSLIT > .tmp/fuzz-dict
+          # Like tree-sitter/fuzz-action, only the grammar is instrumented, not the runtime.
+          clang -std=c11 -Og -g -c -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -I.tmp/tree-sitter/lib/include \
+            -I.tmp/tree-sitter/lib/src .tmp/tree-sitter/lib/src/lib.c -o .tmp/tree-sitter.o
+          clang -std=c11 -Og -g -fsanitize=fuzzer,address,undefined \
+            -fsanitize-ignorelist=.tmp/fuzz-action/ignorelist.ini -I.tmp/tree-sitter/lib/include -Isrc \
+            -DTS_LANG="tree_sitter_$(jq -r .name src/grammar.json)" .tmp/fuzz-action/fuzzer.c src/parser.c \
+            $(ls src/scanner.c 2> /dev/null) .tmp/tree-sitter.o -o .tmp/fuzzer
+      - name: Fuzz
+        run: |
+          mkdir -p .tmp/fuzz-out .tmp/fuzz-artifacts
+          .tmp/fuzzer .tmp/fuzz-out .tmp/fuzz-seeds -dict=.tmp/fuzz-dict -artifact_prefix=.tmp/fuzz-artifacts/ \
+            -timeout=10 -max_total_time=300 -max_len=4096
+      - uses: actions/upload-artifact@v7.0.1
+        if: failure()
         with:
-          corpus: .tmp/fuzz-seeds
-          max-time: '300'
-          # Keep in step with the tree-sitter-cli version in package.json.
-          tree-sitter-version: v0.27.0
+          name: fuzzer-artifacts
+          path: .tmp/fuzz-artifacts/
+          retention-days: 7
