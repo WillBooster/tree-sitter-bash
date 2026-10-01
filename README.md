@@ -75,16 +75,19 @@ bun run test
 script/parse-examples
 ```
 
+The scripts and tests generate, build, test, and parse with `script/tree-sitter`, the tree-sitter CLI of the
+WillBooster/tree-sitter runtime version that `package.json` pins as `@willbooster/web-tree-sitter`, since the generator
+and the runtime of upstream's CLI are not the ones this package ships with. Its first run downloads that CLI from the
+runtime's GitHub Release, or builds it with `cargo` (which needs CMake) when the download fails or the release has no
+binary that runs here. Run other CLI commands through it as well (e.g. `script/tree-sitter parse script.sh`).
+
 `bun run test` runs:
 
 - the corpus in `test/corpus`, with the native build and with the Wasm build (the first run downloads the WASI SDK);
 - an incremental-parsing check (`test/unit/incremental.test.ts`): `script/fuzz-corpus` runs `tree-sitter fuzz`, which
   edits each corpus case at random, reparses it, undoes the edits, and reparses again. `TREE_SITTER_SEED`,
   `TREE_SITTER_ITERATIONS`, and `TREE_SITTER_EDITS` run other or more edits. It also applies edits that random ones
-  rarely reach and compares each incremental reparse with a fresh parse. Both run on the CLI of the
-  WillBooster/tree-sitter runtime version that `package.json` pins as `@willbooster/web-tree-sitter` (`script/fork-cli`;
-  the first run downloads that CLI from its GitHub Release, or builds it with `cargo` when the download fails or the
-  release has no binary that runs here);
+  rarely reach and compares each incremental reparse with a fresh parse;
 - a check that real-world scripts cloned into `examples/` fail to parse exactly as listed in
   `script/known-failures.txt`. The first run clones them, which takes a few minutes. The example repositories are
   pinned to commits in `script/parse-examples`. After a grammar change or a moved pin alters that list,

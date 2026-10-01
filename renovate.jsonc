@@ -3,9 +3,9 @@
   "extends": ["github>WillBooster/willbooster-configs:renovate.jsonc"],
   "packageRules": [
     {
-      // The Wasm build that tree-sitter-cli emits must load in @willbooster/web-tree-sitter, so the tests check them
-      // together.
-      "matchPackageNames": ["tree-sitter-cli", "@willbooster/web-tree-sitter"],
+      // script/tree-sitter generates, builds, and tests the parser with the CLI of the runtime version pinned as
+      // @willbooster/web-tree-sitter, so a runtime update also regenerates the parser.
+      "matchPackageNames": ["@willbooster/web-tree-sitter"],
       "groupName": "tree-sitter",
     },
   ],

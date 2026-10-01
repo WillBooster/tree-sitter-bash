@@ -45,13 +45,10 @@ const edits = [
 
 const parserDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tree-sitter-bash-parser-'));
 const parserPath = path.join(parserDir, 'bash.parser');
-let cli = '';
-
 // The timeout leaves room for building the CLI when its download fails or its release has no binary that runs here,
 // which takes over 10 minutes on GitHub's Intel macOS runner.
 beforeAll(() => {
-  cli = execFileSync('script/fork-cli', { cwd: repositoryRoot, encoding: 'utf8', env: cliEnv }).trim();
-  execFileSync('bun', ['run', 'tree-sitter', 'build', '-o', parserPath], { cwd: repositoryRoot, env: cliEnv });
+  execFileSync('script/tree-sitter', ['build', '-o', parserPath], { cwd: repositoryRoot, env: cliEnv });
 }, 1_800_000);
 
 afterAll(() => {
@@ -76,7 +73,7 @@ for (const { name, before, position, text } of edits) {
 }
 
 function parseWithCli(args: string[]): string {
-  const result = spawnSync(cli, ['parse', '--lib-path', parserPath, '--lang-name', 'bash', ...args], {
+  const result = spawnSync('script/tree-sitter', ['parse', '--lib-path', parserPath, '--lang-name', 'bash', ...args], {
     cwd: repositoryRoot,
     encoding: 'utf8',
     env: cliEnv,

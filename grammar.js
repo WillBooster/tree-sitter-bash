@@ -3,9 +3,6 @@
  * @license MIT
  */
 
-/// <reference types="tree-sitter-cli/dsl" />
-// @ts-check
-
 // Characters that end an unquoted word part: metacharacters, quotes, and characters that begin an
 // expansion. `#` only starts a comment at the beginning of a word, so it is handled separately. Like
 // bash, only a space, a tab, and a newline separate words; any other whitespace (CR, a no-break space)

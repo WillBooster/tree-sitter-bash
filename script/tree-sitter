@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
-# Prints the path of the tree-sitter CLI of WillBooster/tree-sitter at the runtime version that script/runtime-version
-# prints, since the runtime embedded in the upstream CLI is not the one this package ships. The first run downloads that
-# CLI into .tmp/ from the GitHub Release of the version, or builds it when the download fails or the release has no
-# binary that runs here, which takes over 10 minutes on GitHub's Intel macOS runner.
+# Runs the tree-sitter CLI of WillBooster/tree-sitter at the runtime version that script/runtime-version prints with the
+# given arguments, so that the parser is generated, built, and tested by the generator and runtime this package ships
+# with. The first run downloads that CLI into .tmp/ from the GitHub Release of the version, or builds it when the
+# download fails or the release has no binary that runs here, which takes over 10 minutes on GitHub's Intel macOS
+# runner.
 
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
-
-version=$(script/runtime-version)
-cli=.tmp/tree-sitter-cli/$version
+root=$(cd "$(dirname "$0")/.." && pwd)
+version=$("$root/script/runtime-version")
+cli=$root/.tmp/tree-sitter-cli/$version
 if [[ ! -x $cli/bin/tree-sitter ]]; then
   case $(uname -s)-$(uname -m) in
     Linux-x86_64) platform=linux-x64 ;;
@@ -33,10 +33,13 @@ if [[ ! -x $cli/bin/tree-sitter ]]; then
     tar -xzf "$staging/cli.tar.gz" -C "$staging" && "$staging/tree-sitter" --version > /dev/null; then
     mv "$staging/tree-sitter" "$cli/bin/tree-sitter"
   else
-    # The default `qjs-rt` feature only serves `tree-sitter generate`, which stays on the pinned upstream CLI.
-    cargo install --quiet --locked --no-default-features --root "$staging/root" \
+    # `tree-sitter test --wasm` needs the `wasm` feature, which the released binaries are built with as well and whose
+    # build needs CMake.
+    cargo install --quiet --locked --features wasm --root "$staging/root" \
       --git https://github.com/WillBooster/tree-sitter --tag "v$version" tree-sitter-cli >&2
     mv "$staging/root/bin/tree-sitter" "$cli/bin/tree-sitter"
   fi
+  rm -rf "$staging"
+  trap - EXIT
 fi
-echo "$PWD/$cli/bin/tree-sitter"
+exec "$cli/bin/tree-sitter" "$@"

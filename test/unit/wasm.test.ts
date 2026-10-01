@@ -4,6 +4,6 @@ import { testCommand } from './run.js';
 // first run downloads the WASI SDK.
 testCommand(
   'parses the corpus in test/corpus as expected with the Wasm build',
-  ['bun', 'run', 'tree-sitter', 'test', '--wasm'],
+  ['script/tree-sitter', 'test', '--wasm'],
   900_000
 );
