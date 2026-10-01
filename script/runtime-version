@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Prints the version of the WillBooster/tree-sitter runtime that package.json pins as @willbooster/web-tree-sitter,
-# which the Wasm tests use and on which the fuzz job and the incremental checks run.
+# which the Wasm tests use and on which the fuzz job and script/tree-sitter run.
 
 set -euo pipefail
 

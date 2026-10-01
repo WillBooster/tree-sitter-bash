@@ -2,3 +2,8 @@
 node = "24.21.0"
 bun = "1.4.2"
 "conda:bash" = "5.2.37"
+
+[env]
+# The tree-sitter CLI caches compiled parsers by language name in a directory shared by every checkout and reuses one
+# that is newer than the sources, so commands run in this checkout would otherwise test another checkout's parser.
+TREE_SITTER_LIBDIR = "{{config_root}}/.tmp/tree-sitter-lib"

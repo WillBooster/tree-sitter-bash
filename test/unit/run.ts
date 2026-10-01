@@ -13,7 +13,7 @@ const KillMargin = 10_000;
 
 // Tests that a command run from the repository root exits zero within the timeout, and passes its output to
 // `check`. The command runs in its own process group, which the timeout kills as a whole: a scanner stuck in
-// a loop keeps busy the native binary that `bun run tree-sitter` starts through Node.js, not the direct child.
+// a loop keeps busy the native binary that a script such as script/fuzz-corpus starts, not the direct child.
 export function testCommand(
   name: string,
   command: string[],

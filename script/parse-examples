@@ -59,7 +59,7 @@ find examples -type f \( -name '*.sh' -or -path 'examples/bash-it/*.bash' -or -p
 
 # The CLI exits non-zero whenever a file fails, so the output decides success. `--time` makes it print
 # a line for each file, including files that exceed `--timeout` (2 s), which bounds a runaway parse.
-bun run tree-sitter parse --grammar-path . -q -s --time --timeout 2000000 \
+script/tree-sitter parse --grammar-path . -q -s --time --timeout 2000000 \
   --paths "$files" > "$output" || true
 if ! grep -q '^Total parses' "$output"; then
   cat "$output" >&2

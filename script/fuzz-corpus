@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 
-# Runs `tree-sitter fuzz` of the CLI that script/fork-cli provides: it edits each corpus case at random, reparses it
-# incrementally, undoes the edits, and reparses again.
+# Runs `tree-sitter fuzz`: it edits each corpus case at random, reparses it incrementally, undoes the edits, and reparses
+# again.
 
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-cli=$(script/fork-cli)
 mkdir -p .tmp/fuzz
 # Runs in the same checkout may overlap, so each builds the parser into a file of its own.
 parser=$(mktemp .tmp/fuzz/bash.XXXXXX)
 trap 'rm -f "$parser"' EXIT
-bun run tree-sitter build -o "$parser"
-"$cli" fuzz --lib-path "$parser" --lang-name bash
+script/tree-sitter build -o "$parser"
+script/tree-sitter fuzz --lib-path "$parser" --lang-name bash

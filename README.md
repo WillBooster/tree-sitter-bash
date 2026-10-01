@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/npm/l/@willbooster/tree-sitter-bash.svg)](https://www.npmjs.com/package/@willbooster/tree-sitter-bash)
 [![Test](https://github.com/WillBooster/tree-sitter-bash/actions/workflows/test.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-bash/actions/workflows/test.yml)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
-[![wbfy](https://img.shields.io/badge/wbfy-20.28.6-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
+[![wbfy](https://img.shields.io/badge/wbfy-20.28.7-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
 
 Bash grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), forked from
 [tree-sitter/tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash). We are grateful to its authors and
@@ -75,16 +75,19 @@ bun run test
 script/parse-examples
 ```
 
+The scripts and tests generate, build, test, and parse with `script/tree-sitter`, the tree-sitter CLI of the
+WillBooster/tree-sitter runtime version that `package.json` pins as `@willbooster/web-tree-sitter`, since the generator
+and the runtime of upstream's CLI are not the ones this package ships with. Its first run downloads that CLI from the
+runtime's GitHub Release, or builds it with `cargo` (which needs CMake) when the download fails or the release has no
+binary that runs here. Run other CLI commands through it as well (e.g. `script/tree-sitter parse script.sh`).
+
 `bun run test` runs:
 
 - the corpus in `test/corpus`, with the native build and with the Wasm build (the first run downloads the WASI SDK);
 - an incremental-parsing check (`test/unit/incremental.test.ts`): `script/fuzz-corpus` runs `tree-sitter fuzz`, which
   edits each corpus case at random, reparses it, undoes the edits, and reparses again. `TREE_SITTER_SEED`,
   `TREE_SITTER_ITERATIONS`, and `TREE_SITTER_EDITS` run other or more edits. It also applies edits that random ones
-  rarely reach and compares each incremental reparse with a fresh parse. Both run on the CLI of the
-  WillBooster/tree-sitter runtime version that `package.json` pins as `@willbooster/web-tree-sitter` (`script/fork-cli`;
-  the first run downloads that CLI from its GitHub Release, or builds it with `cargo` when the download fails or the
-  release has no binary that runs here);
+  rarely reach and compares each incremental reparse with a fresh parse;
 - a check that real-world scripts cloned into `examples/` fail to parse exactly as listed in
   `script/known-failures.txt`. The first run clones them, which takes a few minutes. The example repositories are
   pinned to commits in `script/parse-examples`. After a grammar change or a moved pin alters that list,
