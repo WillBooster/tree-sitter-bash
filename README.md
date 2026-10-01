@@ -92,7 +92,7 @@ script/parse-examples
   `ERROR` or `MISSING` node for a script bash accepts. A failure prints the seed; `DIFFERENTIAL_SEED` and
   `DIFFERENTIAL_CASES` run other or more scripts. It loads the Wasm build through @willbooster/web-tree-sitter, which
   `bun run build/ci` rebuilds after regenerating the parser;
-- a performance check (`test/unit/performance.test.ts`) that a 240 KB line parses in linear time, since consumers
+- a performance check (`test/unit/performance.test.ts`) that a long line parses in linear time, since consumers
   parse untrusted scripts;
 - checks that the Wasm build parses in Chromium (`test/unit/web.browser.test.ts`) and in Cloudflare Workers with and
   without Node.js compatibility (`test/unit/workers.test.ts`, with the Worker in `test/fixtures/worker`), loading it as

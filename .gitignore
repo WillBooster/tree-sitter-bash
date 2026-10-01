@@ -529,3 +529,6 @@ node_modules/
 *.zip
 
 .tmp/
+
+# Vitest failure screenshots
+.vitest/

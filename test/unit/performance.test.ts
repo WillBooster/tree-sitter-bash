@@ -2,17 +2,28 @@ import { expect, test } from 'vitest';
 
 import { parse } from '../helpers/differential/compare.js';
 
-// Consumers parse untrusted scripts, so a long line must not make parsing superlinear. Linear
-// parsing takes about 0.1 s here; a quadratic scanner took over 20 s.
+// Consumers parse untrusted scripts, so a long line must not make parsing superlinear: ten times the words take about
+// ten times as long, against a hundred times for a quadratic scanner. The ratio, unlike an absolute limit, holds on
+// slow CI runners. The parses are timed in the CPU time of this test file's process (see `pool` in vitest.config.mts),
+// not in wall-clock time, which other processes inflate unevenly. Each size keeps its fastest run to filter out the
+// remaining noise, such as garbage collection.
 test.each([
-  ['words that concatenate with strings', `echo ${Array.from({ length: 40_000 }, () => 'a"b";').join(' ')}\n`],
-  ['a line after a line continuation', `x \\\n${Array.from({ length: 40_000 }, () => 'a"b"').join(' ')}\n`],
-])('parses a 240 KB line of %s in linear time', (_, script) => {
-  const start = performance.now();
-  const tree = parse(script);
-  const elapsed = performance.now() - start;
-  const { hasError } = tree.rootNode;
-  tree.delete();
-  expect(hasError).toBe(false);
-  expect(elapsed).toBeLessThan(3000);
+  ['words that concatenate with strings', (words: number) => `echo ${'a"b"; '.repeat(words)}\n`],
+  ['a line after a line continuation', (words: number) => `x \\\n${'a"b" '.repeat(words)}\n`],
+])('parses a long line of %s in linear time', { timeout: 60_000 }, (_, script) => {
+  expect(fastestParseCpuTime(script(40_000)) / fastestParseCpuTime(script(4000))).toBeLessThan(30);
 });
+
+function fastestParseCpuTime(script: string): number {
+  let fastest = Infinity;
+  for (let run = 0; run < 3; run++) {
+    const start = process.cpuUsage();
+    const tree = parse(script);
+    const { system, user } = process.cpuUsage(start);
+    fastest = Math.min(fastest, system + user);
+    const { hasError } = tree.rootNode;
+    tree.delete();
+    expect(hasError).toBe(false);
+  }
+  return fastest;
+}

@@ -14,6 +14,9 @@ export default defineConfig({
           exclude: [BrowserTests],
           // Several tests run the tree-sitter CLI, which builds the parser into a shared cache.
           fileParallelism: false,
+          // test/unit/performance.test.ts times parses in process CPU time, which counts only that test file while
+          // each worker is a process of its own; threads would share it with other test files.
+          pool: 'forks',
         },
       },
       {
