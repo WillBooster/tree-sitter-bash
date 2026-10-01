@@ -1,6 +1,12 @@
 import { expect, test } from 'vitest';
 
-import { parse } from '../helpers/differential/compare.js';
+import { isWasmStale, parse } from '../helpers/differential/compare.js';
+
+// Only `bun run build/ci` rebuilds the Wasm build, so a check against a stale one would pass after a source edit that
+// brings the slowdown back.
+test('uses a Wasm build of the current parser', () => {
+  expect(isWasmStale(), 'grammar.js or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
+});
 
 // Consumers parse untrusted scripts, so a long line must not make parsing superlinear: ten times the words take about
 // ten times as long, against a hundred times for a quadratic scanner. The ratio, unlike an absolute limit, holds on
