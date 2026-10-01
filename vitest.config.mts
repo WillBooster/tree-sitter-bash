@@ -5,6 +5,8 @@ const BrowserTests = 'test/unit/**/*.browser.test.ts';
 
 export default defineConfig({
   test: {
+    // tsconfig.json declares the `vitest/globals` types, so the runner must provide those globals.
+    globals: true,
     projects: [
       {
         extends: true,
@@ -12,11 +14,8 @@ export default defineConfig({
           name: 'node',
           include: ['test/unit/**/*.test.ts'],
           exclude: [BrowserTests],
-          // Several tests run the tree-sitter CLI, which builds the parser into a shared cache.
+          // Several tests run the tree-sitter CLI, which builds the parser into one cache in this checkout.
           fileParallelism: false,
-          // test/unit/performance.test.ts times parses in process CPU time, which counts only that test file while
-          // each worker is a process of its own; threads would share it with other test files.
-          pool: 'forks',
         },
       },
       {

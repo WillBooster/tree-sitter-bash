@@ -24,8 +24,8 @@ jobs:
           persist-credentials: false
       - id: runtime
         run: |
-          version=$(jq -r '.devDependencies["@willbooster/web-tree-sitter"] // empty' package.json)
-          echo "ref=v${version:?package.json pins no @willbooster/web-tree-sitter}" >> "$GITHUB_OUTPUT"
+          version=$(script/runtime-version)
+          echo "ref=v$version" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7.0.1
         with:
           repository: WillBooster/tree-sitter

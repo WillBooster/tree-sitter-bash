@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+# Prints the version of the WillBooster/tree-sitter runtime that package.json pins as @willbooster/web-tree-sitter,
+# which the Wasm tests use and on which the fuzz job and the incremental checks run.
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+version=$(jq -r '.devDependencies["@willbooster/web-tree-sitter"] // empty' package.json)
+echo "${version:?package.json pins no @willbooster/web-tree-sitter}"

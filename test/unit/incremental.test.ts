@@ -1,17 +1,18 @@
-import { expect, test } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { afterAll, beforeAll, expect, test } from 'vitest';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { testCommand } from './run.js';
+import { cliEnv, repositoryRoot, testCommand } from './run.js';
 
 // Edits each corpus case at random and reparses it incrementally, then undoes the edits and reparses
 // again: the changed ranges must cover every change and the final tree must match the corpus. The CLI
 // exits zero even when a case fails or no corpus is found, so its output decides: it must list the cases
 // it fuzzed and print no failure summary. TREE_SITTER_SEED, TREE_SITTER_ITERATIONS,
-// and TREE_SITTER_EDITS explore further locally.
-testCommand('reparses the corpus consistently after random edits', ['bun', 'run', 'tree-sitter', 'fuzz'], 900_000, {
+// and TREE_SITTER_EDITS explore further locally. The CLI is in place before this test, since `beforeAll` below runs
+// before every test of this file.
+testCommand('reparses the corpus consistently after random edits', ['script/fuzz-corpus'], 900_000, {
   env: {
     TREE_SITTER_SEED: process.env.TREE_SITTER_SEED ?? '1',
     TREE_SITTER_ITERATIONS: process.env.TREE_SITTER_ITERATIONS ?? '1000',
@@ -42,6 +43,21 @@ const edits = [
   }),
 ];
 
+const parserDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tree-sitter-bash-parser-'));
+const parserPath = path.join(parserDir, 'bash.parser');
+let cli = '';
+
+// The timeout leaves room for building the CLI when its download fails or its release has no binary that runs here,
+// which takes over 10 minutes on GitHub's Intel macOS runner.
+beforeAll(() => {
+  cli = execFileSync('script/fork-cli', { cwd: repositoryRoot, encoding: 'utf8', env: cliEnv }).trim();
+  execFileSync('bun', ['run', 'tree-sitter', 'build', '-o', parserPath], { cwd: repositoryRoot, env: cliEnv });
+}, 1_800_000);
+
+afterAll(() => {
+  fs.rmSync(parserDir, { force: true, recursive: true });
+});
+
 for (const { name, before, position, text } of edits) {
   test(`reparses as a fresh parse after an edit: ${name}`, () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tree-sitter-bash-'));
@@ -60,9 +76,10 @@ for (const { name, before, position, text } of edits) {
 }
 
 function parseWithCli(args: string[]): string {
-  const result = spawnSync('bun', ['run', 'tree-sitter', 'parse', ...args], {
-    cwd: path.join(import.meta.dirname, '../..'),
+  const result = spawnSync(cli, ['parse', '--lib-path', parserPath, '--lang-name', 'bash', ...args], {
+    cwd: repositoryRoot,
     encoding: 'utf8',
+    env: cliEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   expect(result.status, result.stderr).toBe(0);
