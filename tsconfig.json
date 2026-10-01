@@ -11,7 +11,7 @@
     },
     "resolveJsonModule": true,
     "rootDir": ".",
-    "types": ["bun"]
+    "types": ["bun", "vitest/globals"]
   },
   "exclude": ["test/fixtures"],
   "extends": "@tsconfig/bun/tsconfig.json",

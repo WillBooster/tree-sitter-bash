@@ -38,6 +38,9 @@ clone() {
 }
 
 cd "$(dirname "$0")/.."
+# The CLI caches compiled parsers by language name in a directory shared by every checkout and reuses one that is newer
+# than the sources, so this checkout's parser is compiled into a cache of its own.
+export TREE_SITTER_LIBDIR=$PWD/.tmp/tree-sitter-lib
 
 clone bash-it https://github.com/Bash-it/bash-it 4725d29db8c0ac8c21df47664b28539f3b8fce94
 clone bash https://git.savannah.gnu.org/git/bash.git 9c465866b7d849378369ef700cbe2965aa9691e3

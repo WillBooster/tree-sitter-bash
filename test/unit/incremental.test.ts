@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { testCommand } from './run.js';
+import { cliEnv, repositoryRoot, testCommand } from './run.js';
 
 // Edits each corpus case at random and reparses it incrementally, then undoes the edits and reparses
 // again: the changed ranges must cover every change and the final tree must match the corpus. The CLI
@@ -61,8 +61,9 @@ for (const { name, before, position, text } of edits) {
 
 function parseWithCli(args: string[]): string {
   const result = spawnSync('bun', ['run', 'tree-sitter', 'parse', ...args], {
-    cwd: path.join(import.meta.dirname, '../..'),
+    cwd: repositoryRoot,
     encoding: 'utf8',
+    env: cliEnv,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   expect(result.status, result.stderr).toBe(0);
