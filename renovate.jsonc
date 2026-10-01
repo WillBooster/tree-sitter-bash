@@ -3,6 +3,12 @@
   "extends": ["github>WillBooster/willbooster-configs:renovate.jsonc"],
   "packageRules": [
     {
+      // tree-sitter-cli provides only the DSL types that type-check grammar.js. The CLI of WillBooster/tree-sitter 1.x,
+      // which generates the parser, takes tree-sitter 0.27's DSL.
+      "matchPackageNames": ["tree-sitter-cli"],
+      "allowedVersions": "0.27.x",
+    },
+    {
       // script/tree-sitter generates, builds, and tests the parser with the CLI of the runtime version pinned as
       // @willbooster/web-tree-sitter, so a runtime update also regenerates the parser.
       "matchPackageNames": ["@willbooster/web-tree-sitter"],

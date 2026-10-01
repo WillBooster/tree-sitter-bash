@@ -34,8 +34,8 @@ if [[ ! -x $cli/bin/tree-sitter ]]; then
     tar -xzf "$staging/cli.tar.gz" -C "$staging" && "$staging/tree-sitter" --version > /dev/null; then
     mv "$staging/tree-sitter" "$cli/bin/tree-sitter"
   else
-    # `tree-sitter test --wasm` needs the `wasm` feature, which the released binaries are built with as well and whose
-    # build needs CMake.
+    # `tree-sitter test --wasm` needs the `wasm` feature, which the released binaries are built with as well; its wasmtime
+    # build runs cmake, which mise.toml pins.
     cargo install --quiet --locked --features wasm --root "$staging/root" \
       --git https://github.com/WillBooster/tree-sitter --tag "v$version" tree-sitter-cli >&2
     mv "$staging/root/bin/tree-sitter" "$cli/bin/tree-sitter"
