@@ -102,7 +102,8 @@ script/parse-examples
   the Usage section shows.
 
 The tests and `script/parse-examples` compile the parser into `.tmp/tree-sitter-lib` rather than the CLI's cache shared
-by every checkout; `script/fuzz-corpus` builds a per-run parser in `.tmp/fuzz` and deletes it afterwards.
+by every checkout; `script/fuzz-corpus` and the targeted edits of the incremental check build a parser of their own
+for each run and delete it afterwards.
 
 CI also fuzzes the parser with libFuzzer and sanitizers (`.github/workflows/robustness.yml`).
 
