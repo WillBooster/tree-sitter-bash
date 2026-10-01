@@ -10,9 +10,9 @@ import { cliEnv, repositoryRoot, testCommand } from './run.js';
 // again: the changed ranges must cover every change and the final tree must match the corpus. The CLI
 // exits zero even when a case fails or no corpus is found, so its output decides: it must list the cases
 // it fuzzed and print no failure summary. TREE_SITTER_SEED, TREE_SITTER_ITERATIONS,
-// and TREE_SITTER_EDITS explore further locally. The timeout leaves room for building the CLI when its download fails
-// or its release has no binary that runs here, which would take over 10 minutes on GitHub's Intel macOS runner.
-testCommand('reparses the corpus consistently after random edits', ['script/fuzz-corpus'], 1_800_000, {
+// and TREE_SITTER_EDITS explore further locally. The CLI is in place before this test, since `beforeAll` below runs
+// before every test of this file.
+testCommand('reparses the corpus consistently after random edits', ['script/fuzz-corpus'], 900_000, {
   env: {
     TREE_SITTER_SEED: process.env.TREE_SITTER_SEED ?? '1',
     TREE_SITTER_ITERATIONS: process.env.TREE_SITTER_ITERATIONS ?? '1000',
@@ -47,6 +47,8 @@ const parserDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tree-sitter-bash-parser
 const parserPath = path.join(parserDir, 'bash.parser');
 let cli = '';
 
+// The timeout leaves room for building the CLI when its download fails or its release has no binary that runs here,
+// which takes over 10 minutes on GitHub's Intel macOS runner.
 beforeAll(() => {
   cli = execFileSync('script/fork-cli', { cwd: repositoryRoot, encoding: 'utf8', env: cliEnv }).trim();
   execFileSync('bun', ['run', 'tree-sitter', 'build', '-o', parserPath], { cwd: repositoryRoot, env: cliEnv });
