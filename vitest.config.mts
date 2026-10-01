@@ -12,6 +12,7 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'node',
+          globalSetup: 'test/helpers/installCli.ts',
           include: ['test/unit/**/*.test.ts'],
           exclude: [BrowserTests],
           // Several tests run the tree-sitter CLI, which builds the parser into one cache in this checkout.
