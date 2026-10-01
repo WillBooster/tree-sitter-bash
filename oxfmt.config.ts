@@ -7,6 +7,9 @@ const oxfmtConfig = require('@willbooster/oxfmt-config');
 const oxfmtResolvedConfig: OxfmtConfig = oxfmtConfig.default ?? oxfmtConfig;
 // wbfy:end oxfmt-base
 
+// `tree-sitter generate` writes src/ in its own style.
+oxfmtResolvedConfig.ignorePatterns = [...(oxfmtResolvedConfig.ignorePatterns ?? []), 'src/**'];
+
 // wbfy:start oxfmt-export
 module.exports = oxfmtResolvedConfig;
 // wbfy:end oxfmt-export
