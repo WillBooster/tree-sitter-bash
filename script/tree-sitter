@@ -25,10 +25,11 @@ if [[ ! -x $cli/bin/tree-sitter ]]; then
   staging=$(mktemp -d "$cli/staging.XXXXXX")
   trap 'rm -rf "$staging"' EXIT
   # A binary that does not run here (e.g. on an older glibc than the release's build) is replaced by a build as well.
-  # Without a speed limit, a stalled transfer would hang instead of falling back to the build.
+  # Without a connection timeout below curl's default of 5 minutes and a speed limit, a stalled connection or transfer
+  # would hold up the tests for a long time instead of falling back to the build.
   # The archive is saved before extraction because a retry restarts the transfer, which a pipe into tar cannot undo.
-  if [[ -n $platform ]] && curl --fail --silent --show-error --location --retry 3 --speed-limit 1024 --speed-time 60 \
-    --output "$staging/cli.tar.gz" \
+  if [[ -n $platform ]] && curl --fail --silent --show-error --location --retry 3 --connect-timeout 30 \
+    --speed-limit 1024 --speed-time 60 --output "$staging/cli.tar.gz" \
     "https://github.com/WillBooster/tree-sitter/releases/download/v$version/tree-sitter-cli-$platform.tar.gz" &&
     tar -xzf "$staging/cli.tar.gz" -C "$staging" && "$staging/tree-sitter" --version > /dev/null; then
     mv "$staging/tree-sitter" "$cli/bin/tree-sitter"
