@@ -1,0 +1,88 @@
+#!/usr/bin/env perl
+
+# Writes the input of each corpus case in the given files to its own file in the given directory, splitting the corpus
+# as the WillBooster/tree-sitter CLI does (`parse_test_content` in crates/cli/src/test.rs), and fails when a header has
+# no `---` line, a case that `tree-sitter test` skips without a word. Perl keeps NUL characters, at which some awk
+# implementations (e.g. macOS's) end a line.
+#
+# Usage: script/fuzz-seeds <seed directory> <corpus file>...
+
+use strict;
+use warnings;
+
+my ($dir, @files) = @ARGV;
+my ($headers, $seeds) = (0, 0);
+
+for my $file (@files) {
+    open my $in, '<:raw', $file or die "$file: $!";
+    my @lines = <$in>;
+    close $in;
+
+    my ($first_suffix) = grep { defined && $_ ne '' } map { (delimiter($_, '='))[1] } @lines;
+    my ($line, $body_start) = (0, undef);
+    while ($line < @lines) {
+        my $next_body_start = header(\@lines, $first_suffix, $line);
+        if (!defined $next_body_start) {
+            $line++;
+            next;
+        }
+        write_seed([@lines[$body_start .. $line - 1]], $first_suffix, $file) if defined $body_start;
+        $headers++;
+        ($line, $body_start) = ($next_body_start, $next_body_start);
+    }
+    write_seed([@lines[$body_start .. $#lines]], $first_suffix, $file) if defined $body_start;
+}
+
+print "$headers headers, $seeds seeds\n";
+exit($headers > 0 && $seeds == $headers ? 0 : 1);
+
+# Returns the length of a line's run of at least three `$char`, and the rest of the line without its line break.
+sub delimiter {
+    my ($line, $char) = @_;
+    return unless $line =~ /^(\Q$char\E{3,})([^\r\n]*)/;
+    return (length $1, $2);
+}
+
+sub suffix_matches {
+    my ($first_suffix, $suffix) = @_;
+    return defined $first_suffix ? $suffix eq $first_suffix : $suffix eq '';
+}
+
+# Returns the index of the line after the closing `===` line of the header that opens at `$start`, if any. A blank line
+# before the first attribute line, or no closing line, leaves no header.
+sub header {
+    my ($lines, $first_suffix, $start) = @_;
+    my (undef, $suffix) = delimiter($lines->[$start], '=');
+    return unless defined $suffix && suffix_matches($first_suffix, $suffix);
+    my $seen_attribute = 0;
+    for my $line ($start + 1 .. $#$lines) {
+        my (undef, $closing_suffix) = delimiter($lines->[$line], '=');
+        return $line + 1 if defined $closing_suffix && suffix_matches($first_suffix, $closing_suffix);
+        (my $trimmed = $lines->[$line]) =~ s/^\s+|\s+$//g;
+        return if $trimmed eq '' && !$seen_attribute;
+        $seen_attribute = 1
+          if $trimmed =~ /^:(?:skip|fail-fast|error|cst)(?:\(|$)/ || $trimmed =~ /^:(?:platform|language)\(.*\)$/;
+    }
+    return;
+}
+
+# Writes the input of a case, the lines before its longest (and, of equally long ones, last) `---` line.
+sub write_seed {
+    my ($body, $first_suffix, $file) = @_;
+    my ($divider, $longest) = (undef, 0);
+    for my $line (0 .. $#$body) {
+        my ($length, $suffix) = delimiter($body->[$line], '-');
+        next unless defined $suffix && suffix_matches($first_suffix, $suffix);
+        ($divider, $longest) = ($line, $length + length $suffix) if $length + length $suffix >= $longest;
+    }
+    if (!defined $divider) {
+        warn "$file: a case has no `---` line\n";
+        return;
+    }
+    my $input = join '', @$body[0 .. $divider - 1];
+    $input =~ s/\n\z//;
+    $input =~ s/\r\z//;
+    open my $out, '>:raw', sprintf('%s/%d', $dir, ++$seeds) or die $!;
+    print $out $input;
+    close $out;
+}

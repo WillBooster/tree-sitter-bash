@@ -42,27 +42,11 @@ jobs:
           persist-credentials: false
       - run: |
           mkdir -p .tmp/fuzz-seeds
-          corpus=$(find test/corpus -name '*.txt' | LC_ALL=C sort)
-          # Perl keeps the NUL characters of test/corpus/null-characters.txt, at which awk implementations may end a
-          # line. The delimiter lines of a corpus file with CRLF line endings end with CR.
-          perl -ne '
-            if ($state != 2 && /^=+\r?$/) { open $seed, ">", sprintf(".tmp/fuzz-seeds/%d", ++$n) or die $! if ++$state == 2; next }
-            if ($state == 2 && /^---+\r?$/) { $state = 0; close $seed; next }
-            print $seed $_ if $state == 2;
-          ' $corpus
-          # libFuzzer runs just as well without seeds, so the split itself must show that each corpus case and every NUL
-          # character reached them. A case without its `---` line would share the next case's seed, so the headers are
-          # counted too, as `===` lines around a title, which an input line of `=` lacks. Each file is counted
-          # separately, since a file may lack a final line break.
-          cases=$({ grep -a -h -c -E $'^---+\r?$' $corpus || true; } | awk '{ n += $1 } END { print n + 0 }')
-          headers=$(perl -0777 -ne '$n += () = /^={3,}\r?\n(?:(?!={3}|[ \t\r]*$).*\n)+={3,}\r?$/mg; END { print $n + 0 }' $corpus)
-          seeds=$(find .tmp/fuzz-seeds -type f | wc -l)
-          corpus_nuls=$(cat $corpus | tr -dc '\000' | wc -c)
+          script/fuzz-seeds .tmp/fuzz-seeds $(find test/corpus -name '*.txt' | LC_ALL=C sort)
+          # libFuzzer runs just as well without seeds, so the seeds must show that every NUL character reached them.
+          corpus_nuls=$(find test/corpus -name '*.txt' -exec cat {} + | tr -dc '\000' | wc -c)
           seed_nuls=$(find .tmp/fuzz-seeds -type f -exec cat {} + | tr -dc '\000' | wc -c)
-          echo "Corpus: $cases cases, $headers headers, $corpus_nuls NULs; seeds: $seeds files, $seed_nuls NULs"
-          test "$cases" -gt 0
-          test "$seeds" -eq "$cases"
-          test "$headers" -eq "$cases"
+          echo "NUL characters: $corpus_nuls in the corpus, $seed_nuls in the seeds"
           test "$seed_nuls" -eq "$corpus_nuls"
       - name: Build the fuzzer
         run: |
