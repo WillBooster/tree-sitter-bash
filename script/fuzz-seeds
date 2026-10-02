@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 
 # Writes the input of each corpus case in the given files to its own file in the given directory, splitting the corpus
-# as the WillBooster/tree-sitter CLI does (`parse_test_content` in crates/cli/src/test.rs), and fails when a header has
+# as the WillBooster/tree-sitter CLI does (`parse_test_content` in crates/cli/src/test.rs, whose functions each sub below
+# ports with the same string operations, so a change there needs the same change here), and fails when a header has
 # no `---` line, a case that `tree-sitter test` skips without a word. Perl keeps NUL characters, at which some awk
 # implementations (e.g. macOS's) end a line.
 #
@@ -36,11 +37,14 @@ for my $file (@files) {
 print "$headers headers, $seeds seeds\n";
 exit($headers > 0 && $seeds == $headers ? 0 : 1);
 
-# Returns the length of a line's run of at least three `$char`, and the rest of the line without its line break.
+# Returns the length of a line's run of at least three `$char`, and the rest of the line without its trailing line
+# break characters (`parse_delimiter_line`).
 sub delimiter {
     my ($line, $char) = @_;
-    return unless $line =~ /^(\Q$char\E{3,})([^\r\n]*)/;
-    return (length $1, $2);
+    return unless $line =~ /^(\Q$char\E{3,})(.*)\z/s;
+    my ($length, $suffix) = (length $1, $2);
+    $suffix =~ s/[\r\n]+\z//;
+    return ($length, $suffix);
 }
 
 sub suffix_matches {
