@@ -42,12 +42,12 @@ jobs:
           persist-credentials: false
       - run: |
           mkdir -p .tmp/fuzz-seeds
-          # Perl keeps the NUL characters of test/corpus/null-characters.txt, at which awk implementations may end a line.
-          perl -ne '
-            if ($state != 2 && /^=+$/) { open $seed, ">", sprintf(".tmp/fuzz-seeds/%d", ++$n) or die $! if ++$state == 2; next }
-            if ($state == 2 && /^---+$/) { $state = 0; close $seed; next }
-            print $seed $_ if $state == 2;
-          ' $(find test/corpus -name '*.txt' | LC_ALL=C sort)
+          script/fuzz-seeds .tmp/fuzz-seeds $(find test/corpus -name '*.txt' | LC_ALL=C sort)
+          # libFuzzer runs just as well without seeds, so the seeds must show that every NUL character reached them.
+          corpus_nuls=$(find test/corpus -name '*.txt' -exec cat {} + | tr -dc '\000' | wc -c)
+          seed_nuls=$(find .tmp/fuzz-seeds -type f -exec cat {} + | tr -dc '\000' | wc -c)
+          echo "NUL characters: $corpus_nuls in the corpus, $seed_nuls in the seeds"
+          test "$seed_nuls" -eq "$corpus_nuls"
       - name: Build the fuzzer
         run: |
           jq '.. | select((.type? == "STRING" or (.type? == "ALIAS" and .named? == false)) and .value? != "") | .value' \
