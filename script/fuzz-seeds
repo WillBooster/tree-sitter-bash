@@ -25,7 +25,9 @@ for my $file (@files) {
         my $next_body_start = header(\@lines, $first_suffix, $line);
         if (!defined $next_body_start) {
             # The CLI ignores what precedes a file's first header, such as a case whose header it does not recognize.
-            if (!defined $body_start && $lines[$line] =~ /\S/) {
+            my $text = $lines[$line];
+            utf8::decode($text);
+            if (!defined $body_start && $text =~ /\S/) {
                 warn "$file:@{[$line + 1]}: no case contains this line\n";
                 $stray_lines++;
             }
