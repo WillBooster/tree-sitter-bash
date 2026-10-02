@@ -54,7 +54,7 @@ jobs:
           # counted too, as `===` lines around a title, which an input line of `=` lacks. Each file is counted
           # separately, since a file may lack a final line break.
           cases=$({ grep -a -h -c -E '^---+$' $corpus || true; } | awk '{ n += $1 } END { print n + 0 }')
-          headers=$(perl -0777 -ne '$n += () = /^=+\r?\n(?:[^=\r\n].*\n)+=+\r?$/mg; END { print $n + 0 }' $corpus)
+          headers=$(perl -0777 -ne '$n += () = /^={3,}\r?\n(?:[^=\r\n].*\n)+={3,}\r?$/mg; END { print $n + 0 }' $corpus)
           seeds=$(find .tmp/fuzz-seeds -type f | wc -l)
           corpus_nuls=$(cat $corpus | tr -dc '\000' | wc -c)
           seed_nuls=$(find .tmp/fuzz-seeds -type f -exec cat {} + | tr -dc '\000' | wc -c)
