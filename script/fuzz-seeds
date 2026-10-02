@@ -2,9 +2,9 @@
 
 # Writes the input of each corpus case in the given files to its own file in the given directory, splitting the corpus
 # as the WillBooster/tree-sitter CLI does (`parse_test_content` in crates/cli/src/test.rs, whose functions each sub below
-# ports with the same string operations, so a change there needs the same change here), and fails when a header has
-# no `---` line, a case that `tree-sitter test` skips without a word. Perl keeps NUL characters, at which some awk
-# implementations (e.g. macOS's) end a line.
+# ports with the same string operations, so a change there needs the same change here). It fails on what the CLI drops
+# without a word: a header without a `---` line, and lines before a file's first header. Perl keeps NUL characters, at
+# which some awk implementations (e.g. macOS's) end a line.
 #
 # Usage: script/fuzz-seeds <seed directory> <corpus file>...
 
@@ -12,7 +12,7 @@ use strict;
 use warnings;
 
 my ($dir, @files) = @ARGV;
-my ($headers, $seeds) = (0, 0);
+my ($headers, $seeds, $stray_lines) = (0, 0, 0);
 
 for my $file (@files) {
     open my $in, '<:raw', $file or die "$file: $!";
@@ -24,6 +24,11 @@ for my $file (@files) {
     while ($line < @lines) {
         my $next_body_start = header(\@lines, $first_suffix, $line);
         if (!defined $next_body_start) {
+            # The CLI ignores what precedes a file's first header, such as a case whose header it does not recognize.
+            if (!defined $body_start && $lines[$line] =~ /\S/) {
+                warn "$file:@{[$line + 1]}: no case contains this line\n";
+                $stray_lines++;
+            }
             $line++;
             next;
         }
@@ -35,7 +40,7 @@ for my $file (@files) {
 }
 
 print "$headers headers, $seeds seeds\n";
-exit($headers > 0 && $seeds == $headers ? 0 : 1);
+exit($headers > 0 && $seeds == $headers && $stray_lines == 0 ? 0 : 1);
 
 # Returns the length of a line's run of at least three `$char`, and the rest of the line without its trailing line
 # break characters (`parse_delimiter_line`).
