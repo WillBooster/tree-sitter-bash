@@ -41,7 +41,7 @@
   "devDependencies": {
     "@tsconfig/bun": "1.0.11",
     "@types/bun": "1.4.2",
-    "@vitest/browser-playwright": "5.0.1",
+    "@vitest/browser-playwright": "5.0.2",
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/wb": "22.13.2",
@@ -57,7 +57,7 @@
     "tree-sitter-cli": "0.27.0",
     "typescript": "7.0.2",
     "vite": "8.3.0",
-    "vitest": "5.0.1",
+    "vitest": "5.0.2",
     "wrangler": "4.136.2"
   },
   "peerDependencies": {
