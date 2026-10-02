@@ -97,6 +97,6 @@ sub write_seed {
     $input =~ s/\n\z//;
     $input =~ s/\r\z//;
     open my $out, '>:raw', sprintf('%s/%d', $dir, ++$seeds) or die $!;
-    print $out $input;
-    close $out;
+    print $out $input or die $!;
+    close $out or die $!;
 }
