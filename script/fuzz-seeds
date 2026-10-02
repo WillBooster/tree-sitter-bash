@@ -58,7 +58,10 @@ sub header {
     for my $line ($start + 1 .. $#$lines) {
         my (undef, $closing_suffix) = delimiter($lines->[$line], '=');
         return $line + 1 if defined $closing_suffix && suffix_matches($first_suffix, $closing_suffix);
-        (my $trimmed = $lines->[$line]) =~ s/^\s+|\s+$//g;
+        # The CLI trims Unicode whitespace, which Perl matches only in decoded text.
+        my $trimmed = $lines->[$line];
+        utf8::decode($trimmed);
+        $trimmed =~ s/^\s+|\s+$//g;
         return if $trimmed eq '' && !$seen_attribute;
         $seen_attribute = 1
           if $trimmed =~ /^:(?:skip|fail-fast|error|cst)(?:\(|$)/ || $trimmed =~ /^:(?:platform|language)\(.*\)$/;
