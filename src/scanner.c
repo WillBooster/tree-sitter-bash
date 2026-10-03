@@ -38,6 +38,7 @@ enum TokenType {
     CLOSER_LINE_ANSI_C_STRING_CONTENT,
     JOINED_COMMENT,
     BACKTICK_COMMENT,
+    BACKTICK_COMMENT_BOUNDARY,
     ERROR_RECOVERY,
 };
 
@@ -1511,7 +1512,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     bool in_word = valid_symbols[BARE_DOLLAR] && !valid_symbols[VARIABLE_NAME];
     if (!error_recovery && scanner->backtick_depth > 0 && valid_symbols[BACKTICK_COMMENT] &&
-        lexer->lookahead == '#' && (is_blank(first) || !in_word)) {
+        (valid_symbols[BACKTICK_COMMENT_BOUNDARY] || valid_symbols[BACKTICK_CLOSE]) && lexer->lookahead == '#' &&
+        (is_blank(first) || !in_word)) {
         return scan_comment(lexer, true);
     }
 

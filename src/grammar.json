@@ -484,23 +484,40 @@
               {
                 "type": "REPEAT",
                 "content": {
-                  "type": "CHOICE",
+                  "type": "SEQ",
                   "members": [
                     {
-                      "type": "FIELD",
-                      "name": "argument",
-                      "content": {
-                        "type": "SYMBOL",
-                        "name": "_argument"
-                      }
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "SYMBOL",
+                          "name": "_backtick_comment_boundary"
+                        },
+                        {
+                          "type": "BLANK"
+                        }
+                      ]
                     },
                     {
-                      "type": "FIELD",
-                      "name": "redirect",
-                      "content": {
-                        "type": "SYMBOL",
-                        "name": "_redirect"
-                      }
+                      "type": "CHOICE",
+                      "members": [
+                        {
+                          "type": "FIELD",
+                          "name": "argument",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "_argument"
+                          }
+                        },
+                        {
+                          "type": "FIELD",
+                          "name": "redirect",
+                          "content": {
+                            "type": "SYMBOL",
+                            "name": "_redirect"
+                          }
+                        }
+                      ]
                     }
                   ]
                 }
@@ -539,8 +556,25 @@
       ]
     },
     "command_name": {
-      "type": "SYMBOL",
-      "name": "_word"
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_backtick_comment_boundary"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_word"
+        }
+      ]
     },
     "declaration_command": {
       "type": "PREC_LEFT",
@@ -592,32 +626,49 @@
           {
             "type": "REPEAT",
             "content": {
-              "type": "CHOICE",
+              "type": "SEQ",
               "members": [
                 {
-                  "type": "FIELD",
-                  "name": "argument",
-                  "content": {
-                    "type": "CHOICE",
-                    "members": [
-                      {
-                        "type": "SYMBOL",
-                        "name": "variable_assignment"
-                      },
-                      {
-                        "type": "SYMBOL",
-                        "name": "_argument"
-                      }
-                    ]
-                  }
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "SYMBOL",
+                      "name": "_backtick_comment_boundary"
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
                 },
                 {
-                  "type": "FIELD",
-                  "name": "redirect",
-                  "content": {
-                    "type": "SYMBOL",
-                    "name": "_redirect"
-                  }
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "FIELD",
+                      "name": "argument",
+                      "content": {
+                        "type": "CHOICE",
+                        "members": [
+                          {
+                            "type": "SYMBOL",
+                            "name": "variable_assignment"
+                          },
+                          {
+                            "type": "SYMBOL",
+                            "name": "_argument"
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "type": "FIELD",
+                      "name": "redirect",
+                      "content": {
+                        "type": "SYMBOL",
+                        "name": "_redirect"
+                      }
+                    }
+                  ]
                 }
               ]
             }
@@ -4990,6 +5041,10 @@
     {
       "type": "SYMBOL",
       "name": "_backtick_comment"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_backtick_comment_boundary"
     },
     {
       "type": "SYMBOL",

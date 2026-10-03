@@ -1036,3 +1036,80 @@ echo next
     name: (command_name
       (word))
     argument: (word)))
+
+================================================================================
+Parameter expansions inside backquotes keep hash operators
+================================================================================
+
+echo `echo $# ${#x} ${x#pat} ${x##pat} ${choice##* }` outside
+echo `echo ${x:- # literal} ${x:+#literal} ${#args[@]}` outside
+echo `local result=${x#pat}; echo $result # comment` outside
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (special_variable_name))
+        argument: (expansion
+          prefix: (operator)
+          parameter: (variable_name))
+        argument: (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word))
+        argument: (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word))
+        argument: (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word))
+        argument: (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word))
+        argument: (expansion
+          prefix: (operator)
+          parameter: (subscript
+            name: (variable_name)
+            index: (word)))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (declaration_command
+        name: (command_name)
+        argument: (variable_assignment
+          name: (variable_name)
+          value: (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (word))))
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name)))
+      (comment))
+    argument: (word)))

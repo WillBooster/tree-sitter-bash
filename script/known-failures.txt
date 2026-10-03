@@ -9,7 +9,6 @@ examples/bash/tests/posixexp.tests
 examples/bash/tests/posixexp2.tests
 examples/bash/tests/quote.tests
 examples/bash/tests/quotearray.tests
-examples/wild-corpus/cloud/sandstorm/install.sh
 examples/wild-corpus/esoteric/CmdlineGL/share/examples/FlightSim.sh
 examples/wild-corpus/esoteric/CmdlineGL/share/examples/Robot.sh
 examples/wild-corpus/esoteric/make-a-lisp-bash/core.sh

@@ -141,6 +141,7 @@ module.exports = grammar({
     $._closer_line_ansi_c_string_content,
     $._joined_comment,
     $._backtick_comment,
+    $._backtick_comment_boundary,
     $.__error_recovery,
   ],
 
@@ -229,7 +230,12 @@ module.exports = grammar({
           seq(
             repeat($._command_prefix),
             field('name', $.command_name),
-            repeat(choice(field('argument', $._argument), field('redirect', $._redirect)))
+            repeat(
+              seq(
+                optional($._backtick_comment_boundary),
+                choice(field('argument', $._argument), field('redirect', $._redirect))
+              )
+            )
           ),
           repeat1($._command_prefix)
         )
@@ -237,14 +243,19 @@ module.exports = grammar({
 
     _command_prefix: ($) => choice(field('assignment', $.variable_assignment), field('redirect', $._redirect)),
 
-    command_name: ($) => $._word,
+    command_name: ($) => seq(optional($._backtick_comment_boundary), $._word),
 
     declaration_command: ($) =>
       prec.left(
         seq(
           repeat($._command_prefix),
           field('name', alias(choice('declare', 'typeset', 'export', 'readonly', 'local'), $.command_name)),
-          repeat(choice(field('argument', choice($.variable_assignment, $._argument)), field('redirect', $._redirect)))
+          repeat(
+            seq(
+              optional($._backtick_comment_boundary),
+              choice(field('argument', choice($.variable_assignment, $._argument)), field('redirect', $._redirect))
+            )
+          )
         )
       ),
 
