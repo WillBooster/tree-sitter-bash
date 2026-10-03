@@ -4825,6 +4825,10 @@
         {
           "type": "SYMBOL",
           "name": "_joined_comment"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_backtick_comment"
         }
       ]
     }
@@ -4982,6 +4986,10 @@
     {
       "type": "SYMBOL",
       "name": "_joined_comment"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_backtick_comment"
     },
     {
       "type": "SYMBOL",

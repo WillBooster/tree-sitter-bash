@@ -877,3 +877,162 @@ $x
       (word)
       (simple_expansion
         (variable_name)))))
+
+================================================================================
+Comments end at closing backquotes
+================================================================================
+
+echo `echo hey # comment` there
+printf '%s\n' "`printf inside # comment`outside"
+printf 'hey %s' `# comment` | cat <<< 'there'
+echo next
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (comment))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (raw_string)
+    argument: (string
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (word))
+        (comment))
+      (string_content)))
+  (pipeline
+    (command
+      name: (command_name
+        (word))
+      argument: (raw_string)
+      argument: (command_substitution
+        (comment)))
+    (command
+      name: (command_name
+        (word))
+      redirect: (herestring_redirect
+        value: (raw_string))))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))
+
+================================================================================
+Escapes and line endings inside backquote comments
+================================================================================
+
+echo `echo inside # escaped \` remains` outside
+echo `echo inside # slash\\` outside
+echo `echo one # joined \
+kept` outside
+echo `echo before # comment
+echo after`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (comment))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (comment))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (comment))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (comment)
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))))
+
+================================================================================
+Hash words and comments across substitution contexts
+================================================================================
+
+echo `echo inside#literal` outside
+echo `echo '#quoted' "#double"` outside
+echo $(echo inside # closing backtick ` literal
+) outside
+# outside ` literal
+echo next
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word)))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (string
+          (string_content))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (comment))
+    argument: (word))
+  (comment)
+  (command
+    name: (command_name
+      (word))
+    argument: (word)))

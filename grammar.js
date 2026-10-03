@@ -140,6 +140,7 @@ module.exports = grammar({
     $._closer_line_raw_string_content,
     $._closer_line_ansi_c_string_content,
     $._joined_comment,
+    $._backtick_comment,
     $.__error_recovery,
   ],
 
@@ -156,8 +157,6 @@ module.exports = grammar({
 
   rules: {
     program: ($) => optional($._statements),
-
-    // Statements
 
     _statements: ($) => seq(repeat(seq($._statement, $._terminator)), $._statement, optional($._terminator)),
 
@@ -223,8 +222,6 @@ module.exports = grammar({
       prec.left(
         seq(field('body', choice($._compound_command, $.function_definition)), repeat1(field('redirect', $._redirect)))
       ),
-
-    // Simple commands
 
     command: ($) =>
       prec.left(
@@ -309,8 +306,6 @@ module.exports = grammar({
 
     array: ($) => seq(token.immediate('('), repeat($._argument), ')'),
 
-    // Redirections
-
     _redirect: ($) => choice($.file_redirect, $.heredoc_redirect, $.herestring_redirect),
 
     file_redirect: ($) =>
@@ -345,8 +340,6 @@ module.exports = grammar({
         ),
         $.heredoc_end
       ),
-
-    // Compound commands
 
     compound_statement: ($) => seq('{', optional($._terminated_statements), '}'),
 
@@ -494,8 +487,6 @@ module.exports = grammar({
         choice(seq('function', field('name', $.word), optional(seq('(', ')'))), seq(field('name', $.word), '(', ')')),
         field('body', $._compound_command)
       ),
-
-    // Words
 
     _word: ($) => choice($._word_part, $.concatenation),
 
@@ -806,8 +797,6 @@ module.exports = grammar({
         seq('$[', $._bracket_substitution_start, optional($._arithmetic_expression), $._bracket_substitution_end, ']')
       ),
 
-    // Arithmetic
-
     _arithmetic_expression: ($) =>
       choice(
         $.number,
@@ -895,8 +884,7 @@ module.exports = grammar({
 
     _arithmetic_parenthesized: ($) => seq('(', $._arithmetic_expression, ')'),
 
-    // A comment on such a line also continues past each line continuation.
-    comment: ($) => choice(token(prec(-10, /#.*/)), $._joined_comment),
+    comment: ($) => choice(token(prec(-10, /#.*/)), $._joined_comment, $._backtick_comment),
   },
 });
 
