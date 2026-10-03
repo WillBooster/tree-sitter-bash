@@ -1513,7 +1513,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool in_word = valid_symbols[BARE_DOLLAR] && !valid_symbols[VARIABLE_NAME];
     if (!error_recovery && scanner->backtick_depth > 0 && valid_symbols[BACKTICK_COMMENT] &&
         (valid_symbols[BACKTICK_COMMENT_BOUNDARY] || valid_symbols[BACKTICK_CLOSE]) && lexer->lookahead == '#' &&
-        (is_blank(first) || !in_word)) {
+        (is_blank(first) || !in_word || (after_line_break && lexer->get_column(lexer) == 0))) {
         return scan_comment(lexer, true);
     }
 

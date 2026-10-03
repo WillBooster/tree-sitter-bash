@@ -1268,3 +1268,73 @@ kept
         name: (command_name
           (word))))
     argument: (word)))
+
+================================================================================
+Backquote comments after line continuations
+================================================================================
+
+echo `echo a \
+# c` d
+echo `echo \
+# c` d
+echo `echo a\
+#literal` d
+echo `echo a \
+  # c` d
+echo `echo a \
+b # c` d
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (comment))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word)))
+      (comment))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (concatenation
+          (word)
+          (word))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word))
+      (comment))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (word)
+        argument: (word))
+      (comment))
+    argument: (word)))
