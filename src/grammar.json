@@ -1965,6 +1965,18 @@
       "type": "SEQ",
       "members": [
         {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_backtick_comment_boundary"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
           "type": "STRING",
           "value": "do"
         },
@@ -2031,6 +2043,18 @@
                     {
                       "type": "SYMBOL",
                       "name": "_newline"
+                    },
+                    {
+                      "type": "BLANK"
+                    }
+                  ]
+                },
+                {
+                  "type": "CHOICE",
+                  "members": [
+                    {
+                      "type": "SYMBOL",
+                      "name": "_backtick_comment_boundary"
                     },
                     {
                       "type": "BLANK"
@@ -2246,6 +2270,18 @@
           }
         },
         {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_backtick_comment_boundary"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
           "type": "STRING",
           "value": "in"
         },
@@ -2345,6 +2381,18 @@
     "_case_patterns": {
       "type": "SEQ",
       "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_backtick_comment_boundary"
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
         {
           "type": "CHOICE",
           "members": [
@@ -2455,6 +2503,18 @@
                   "value": ")"
                 }
               ]
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SYMBOL",
+              "name": "_backtick_comment_boundary"
+            },
+            {
+              "type": "BLANK"
             }
           ]
         },

@@ -1163,3 +1163,108 @@ kept
             name: (command_name
               (word))))))
     argument: (word)))
+
+================================================================================
+Continued backquote comments in compound-command headers
+================================================================================
+
+echo `for x # joined \
+kept
+ in a; do echo "$x"; done` outside
+echo `case a # joined \
+kept
+ in a) echo yes;; esac` outside
+echo `case a in # joined \
+kept
+ a) echo yes;; esac` outside
+set -- a
+echo `for x; # joined \
+kept
+ do echo "$x"; done` outside
+echo `f() # joined \
+kept
+ { echo yes; }; f` outside
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (for_statement
+        variable: (variable_name)
+        (comment)
+        value: (word)
+        body: (do_group
+          (command
+            name: (command_name
+              (word))
+            argument: (string
+              (simple_expansion
+                (variable_name)))))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (case_statement
+        value: (word)
+        (comment)
+        (case_item
+          pattern: (word)
+          (command
+            name: (command_name
+              (word))
+            argument: (word)))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (case_statement
+        value: (word)
+        (comment)
+        (case_item
+          pattern: (word)
+          (command
+            name: (command_name
+              (word))
+            argument: (word)))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (word)
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (for_statement
+        variable: (variable_name)
+        (comment)
+        body: (do_group
+          (command
+            name: (command_name
+              (word))
+            argument: (string
+              (simple_expansion
+                (variable_name)))))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (function_definition
+        name: (word)
+        (comment)
+        body: (compound_statement
+          (command
+            name: (command_name
+              (word))
+            argument: (word))))
+      (command
+        name: (command_name
+          (word))))
+    argument: (word)))

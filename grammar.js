@@ -444,7 +444,7 @@ module.exports = grammar({
         field('body', $.do_group)
       ),
 
-    do_group: ($) => seq('do', optional($._terminated_statements), 'done'),
+    do_group: ($) => seq(optional($._backtick_comment_boundary), 'do', optional($._terminated_statements), 'done'),
 
     for_statement: ($) =>
       seq(
@@ -454,6 +454,7 @@ module.exports = grammar({
         choice(
           seq(
             optional($._newline),
+            optional($._backtick_comment_boundary),
             'in',
             repeat(seq(optional($._backtick_comment_boundary), field('value', $._argument))),
             optional($._backtick_comment_boundary),
@@ -484,6 +485,7 @@ module.exports = grammar({
       seq(
         'case',
         field('value', $._argument),
+        optional($._backtick_comment_boundary),
         'in',
         repeat($.case_item),
         optional(alias($._last_case_item, $.case_item)),
@@ -497,11 +499,18 @@ module.exports = grammar({
     _last_case_item: ($) => seq($._case_patterns, optional($._terminated_statements)),
 
     _case_patterns: ($) =>
-      seq(optional('('), field('pattern', $._argument), repeat(seq('|', field('pattern', $._argument))), ')'),
+      seq(
+        optional($._backtick_comment_boundary),
+        optional('('),
+        field('pattern', $._argument),
+        repeat(seq('|', field('pattern', $._argument))),
+        ')'
+      ),
 
     function_definition: ($) =>
       seq(
         choice(seq('function', field('name', $.word), optional(seq('(', ')'))), seq(field('name', $.word), '(', ')')),
+        optional($._backtick_comment_boundary),
         field('body', $._compound_command)
       ),
 
