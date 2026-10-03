@@ -140,6 +140,8 @@ module.exports = grammar({
     $._closer_line_raw_string_content,
     $._closer_line_ansi_c_string_content,
     $._joined_comment,
+    $._backtick_comment,
+    $._backtick_comment_boundary,
     $.__error_recovery,
   ],
 
@@ -156,8 +158,6 @@ module.exports = grammar({
 
   rules: {
     program: ($) => optional($._statements),
-
-    // Statements
 
     _statements: ($) => seq(repeat(seq($._statement, $._terminator)), $._statement, optional($._terminator)),
 
@@ -224,15 +224,18 @@ module.exports = grammar({
         seq(field('body', choice($._compound_command, $.function_definition)), repeat1(field('redirect', $._redirect)))
       ),
 
-    // Simple commands
-
     command: ($) =>
       prec.left(
         choice(
           seq(
             repeat($._command_prefix),
             field('name', $.command_name),
-            repeat(choice(field('argument', $._argument), field('redirect', $._redirect)))
+            repeat(
+              seq(
+                optional($._backtick_comment_boundary),
+                choice(field('argument', $._argument), field('redirect', $._redirect))
+              )
+            )
           ),
           repeat1($._command_prefix)
         )
@@ -240,14 +243,19 @@ module.exports = grammar({
 
     _command_prefix: ($) => choice(field('assignment', $.variable_assignment), field('redirect', $._redirect)),
 
-    command_name: ($) => $._word,
+    command_name: ($) => seq(optional($._backtick_comment_boundary), $._word),
 
     declaration_command: ($) =>
       prec.left(
         seq(
           repeat($._command_prefix),
           field('name', alias(choice('declare', 'typeset', 'export', 'readonly', 'local'), $.command_name)),
-          repeat(choice(field('argument', choice($.variable_assignment, $._argument)), field('redirect', $._redirect)))
+          repeat(
+            seq(
+              optional($._backtick_comment_boundary),
+              choice(field('argument', choice($.variable_assignment, $._argument)), field('redirect', $._redirect))
+            )
+          )
         )
       ),
 
@@ -309,8 +317,6 @@ module.exports = grammar({
 
     array: ($) => seq(token.immediate('('), repeat($._argument), ')'),
 
-    // Redirections
-
     _redirect: ($) => choice($.file_redirect, $.heredoc_redirect, $.herestring_redirect),
 
     file_redirect: ($) =>
@@ -345,8 +351,6 @@ module.exports = grammar({
         ),
         $.heredoc_end
       ),
-
-    // Compound commands
 
     compound_statement: ($) => seq('{', optional($._terminated_statements), '}'),
 
@@ -440,7 +444,7 @@ module.exports = grammar({
         field('body', $.do_group)
       ),
 
-    do_group: ($) => seq('do', optional($._terminated_statements), 'done'),
+    do_group: ($) => seq(optional($._backtick_comment_boundary), 'do', optional($._terminated_statements), 'done'),
 
     for_statement: ($) =>
       seq(
@@ -448,7 +452,14 @@ module.exports = grammar({
         field('variable', alias($.word, $.variable_name)),
         // Without a word list the separator is optional (`for i do …`); a newline may precede `in`.
         choice(
-          seq(optional($._newline), 'in', repeat(field('value', $._argument)), $._terminator),
+          seq(
+            optional($._newline),
+            optional($._backtick_comment_boundary),
+            'in',
+            repeat(seq(optional($._backtick_comment_boundary), field('value', $._argument))),
+            optional($._backtick_comment_boundary),
+            $._terminator
+          ),
           optional($._terminator)
         ),
         field('body', choice($.do_group, $.compound_statement))
@@ -474,6 +485,7 @@ module.exports = grammar({
       seq(
         'case',
         field('value', $._argument),
+        optional($._backtick_comment_boundary),
         'in',
         repeat($.case_item),
         optional(alias($._last_case_item, $.case_item)),
@@ -487,15 +499,20 @@ module.exports = grammar({
     _last_case_item: ($) => seq($._case_patterns, optional($._terminated_statements)),
 
     _case_patterns: ($) =>
-      seq(optional('('), field('pattern', $._argument), repeat(seq('|', field('pattern', $._argument))), ')'),
+      seq(
+        optional($._backtick_comment_boundary),
+        optional('('),
+        field('pattern', $._argument),
+        repeat(seq('|', field('pattern', $._argument))),
+        ')'
+      ),
 
     function_definition: ($) =>
       seq(
         choice(seq('function', field('name', $.word), optional(seq('(', ')'))), seq(field('name', $.word), '(', ')')),
+        optional($._backtick_comment_boundary),
         field('body', $._compound_command)
       ),
-
-    // Words
 
     _word: ($) => choice($._word_part, $.concatenation),
 
@@ -806,8 +823,6 @@ module.exports = grammar({
         seq('$[', $._bracket_substitution_start, optional($._arithmetic_expression), $._bracket_substitution_end, ']')
       ),
 
-    // Arithmetic
-
     _arithmetic_expression: ($) =>
       choice(
         $.number,
@@ -895,8 +910,7 @@ module.exports = grammar({
 
     _arithmetic_parenthesized: ($) => seq('(', $._arithmetic_expression, ')'),
 
-    // A comment on such a line also continues past each line continuation.
-    comment: ($) => choice(token(prec(-10, /#.*/)), $._joined_comment),
+    comment: ($) => choice(token(prec(-10, /#.*/)), $._joined_comment, $._backtick_comment),
   },
 });
 

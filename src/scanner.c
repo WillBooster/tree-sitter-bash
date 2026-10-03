@@ -37,6 +37,8 @@ enum TokenType {
     CLOSER_LINE_RAW_STRING_CONTENT,
     CLOSER_LINE_ANSI_C_STRING_CONTENT,
     JOINED_COMMENT,
+    BACKTICK_COMMENT,
+    BACKTICK_COMMENT_BOUNDARY,
     ERROR_RECOVERY,
 };
 
@@ -331,7 +333,6 @@ static bool deferred_body_ends_at_closer_line(Scanner *scanner, TSLexer *lexer) 
             if (lexer->eof(lexer)) {
                 return false;
             }
-            // The newline that ends the previous line.
             advance(lexer);
             LineEnd end = scan_deferred_body_line(lexer, heredoc);
             if (end == LINE_ENDS_AT_CLOSER) {
@@ -1098,7 +1099,6 @@ static bool finish_word_continuations(Scanner *scanner, TSLexer *lexer, enum Tok
             return true;
         }
         if (lexer->lookahead != '\n') {
-            // An escaped character continues the word.
             lexer->result_symbol = concat;
             return true;
         }
@@ -1199,19 +1199,7 @@ static bool scan_closer_line_string_content(Scanner *scanner, TSLexer *lexer, bo
     return did_advance;
 }
 
-// A comment on a joined line, which continues past each line continuation.
-static bool scan_joined_comment(TSLexer *lexer) {
-    while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
-        bool backslash = lexer->lookahead == '\\';
-        advance(lexer);
-        if (backslash && !lexer->eof(lexer)) {
-            advance(lexer);
-        }
-    }
-    lexer->mark_end(lexer);
-    lexer->result_symbol = JOINED_COMMENT;
-    return true;
-}
+static bool scan_comment(TSLexer *lexer, bool backquotes);
 
 static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool error_recovery = valid_symbols[ERROR_RECOVERY];
@@ -1445,7 +1433,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         bool in_word = valid_symbols[BARE_DOLLAR] && !valid_symbols[VARIABLE_NAME];
         if (lexer->lookahead == '#' && (is_blank(first) || !in_word) && scanner->joined_line &&
             valid_symbols[JOINED_COMMENT]) {
-            return scan_joined_comment(lexer);
+            return scan_comment(lexer, false);
         }
         // A regex reads `$` as text unless it begins a part, so it looks for `$'` itself.
         if (lexer->lookahead == '$' && valid_symbols[CLOSER_LINE_ANSI_C_STRING_START] && !valid_symbols[REGEX]) {
@@ -1520,6 +1508,13 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         } else {
             break;
         }
+    }
+
+    bool in_word = valid_symbols[BARE_DOLLAR] && !valid_symbols[VARIABLE_NAME];
+    if (!error_recovery && scanner->backtick_depth > 0 && valid_symbols[BACKTICK_COMMENT] &&
+        (valid_symbols[BACKTICK_COMMENT_BOUNDARY] || valid_symbols[BACKTICK_CLOSE]) && lexer->lookahead == '#' &&
+        (is_blank(first) || !in_word || (after_line_break && lexer->get_column(lexer) == 0))) {
+        return scan_comment(lexer, true);
     }
 
     // Each closer has its own marker, so a `]` or `}` argument inside `$( )` does not end it.
@@ -1781,4 +1776,17 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
         }
         array_push(&scanner->heredocs, heredoc);
     }
+}
+
+static bool scan_comment(TSLexer *lexer, bool backquotes) {
+    while (!lexer->eof(lexer) && lexer->lookahead != '\n' && (!backquotes || lexer->lookahead != '`')) {
+        bool backslash = lexer->lookahead == '\\';
+        advance(lexer);
+        if (backslash && !lexer->eof(lexer)) {
+            advance(lexer);
+        }
+    }
+    lexer->mark_end(lexer);
+    lexer->result_symbol = backquotes ? BACKTICK_COMMENT : JOINED_COMMENT;
+    return true;
 }
