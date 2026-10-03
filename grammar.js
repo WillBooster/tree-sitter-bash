@@ -452,7 +452,13 @@ module.exports = grammar({
         field('variable', alias($.word, $.variable_name)),
         // Without a word list the separator is optional (`for i do …`); a newline may precede `in`.
         choice(
-          seq(optional($._newline), 'in', repeat(field('value', $._argument)), $._terminator),
+          seq(
+            optional($._newline),
+            'in',
+            repeat(seq(optional($._backtick_comment_boundary), field('value', $._argument))),
+            optional($._backtick_comment_boundary),
+            $._terminator
+          ),
           optional($._terminator)
         ),
         field('body', choice($.do_group, $.compound_statement))

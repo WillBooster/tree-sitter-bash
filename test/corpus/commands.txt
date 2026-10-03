@@ -1113,3 +1113,53 @@ echo `local result=${x#pat}; echo $result # comment` outside
           (variable_name)))
       (comment))
     argument: (word)))
+
+================================================================================
+Backquote comments in for and select word lists preserve continuations
+================================================================================
+
+echo `for x in a # joined \
+kept
+ do echo "$x"; done` outside
+echo `select x in ${#items} ${items#pat} # joined \
+kept
+ do break; done` outside
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (for_statement
+        variable: (variable_name)
+        value: (word)
+        (comment)
+        body: (do_group
+          (command
+            name: (command_name
+              (word))
+            argument: (string
+              (simple_expansion
+                (variable_name)))))))
+    argument: (word))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (for_statement
+        variable: (variable_name)
+        value: (expansion
+          prefix: (operator)
+          parameter: (variable_name))
+        value: (expansion
+          parameter: (variable_name)
+          operator: (operator)
+          argument: (word))
+        (comment)
+        body: (do_group
+          (command
+            name: (command_name
+              (word))))))
+    argument: (word)))
