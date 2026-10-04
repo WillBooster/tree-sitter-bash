@@ -45,7 +45,7 @@ enum TokenType {
     ARITHMETIC_CACHE_RESET,
 };
 
-enum { ARITHMETIC_DISTANCE = 0x80, ARITHMETIC_DISTANCE_MASK = 0x7f };
+enum { COMMAND_CLOSER_PENDING = 1, ARITHMETIC_DISTANCE = 0x80, ARITHMETIC_DISTANCE_MASK = 0x7f };
 
 typedef Array(int32_t) CodePoints;
 
@@ -108,7 +108,9 @@ static inline uint16_t current_depth(Scanner *scanner) {
     return scanner->backtick_depth + scanner->closers.size;
 }
 
-static inline uint8_t substitution_closer(uint8_t closer) { return closer & ARITHMETIC_DISTANCE ? ')' : closer; }
+static inline uint8_t substitution_closer(uint8_t closer) {
+    return closer == COMMAND_CLOSER_PENDING || (closer & ARITHMETIC_DISTANCE) ? ')' : closer;
+}
 
 static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
 
@@ -386,7 +388,14 @@ static bool awaits_deferred_body(Scanner *scanner) {
     return false;
 }
 
-enum { ANSI_SINGLE_QUOTE = 0x80, AMBIGUOUS_PAREN = 0x100 };
+enum {
+    ANSI_SINGLE_QUOTE = 0x80,
+    AMBIGUOUS_PAREN = 0x100,
+    WORD_PAREN = 0x200,
+    CONDITIONAL_CONTEXT = 0x400,
+    REGEX_OPERAND = 0x800,
+    REGEX_STARTED = 0x1000,
+};
 
 typedef struct {
     uint16_t delimiter;
@@ -422,6 +431,8 @@ static inline void probe_advance(SubstitutionProbeInput *input) {
     input->position++;
 }
 
+static bool probe_word_boundary(SubstitutionProbeInput *input);
+
 static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeInput *input, bool comments) {
     SubstitutionProbeResult result = {.arithmetic = true, .safe_distance = ARITHMETIC_DISTANCE_MASK};
     Array(SubstitutionProbeFrame) delimiters = array_new();
@@ -433,7 +444,8 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         uint8_t delimiter = frame.delimiter & ~AMBIGUOUS_PAREN;
         int32_t c = probe_lookahead(input);
         bool quoted = delimiter == '\'' || delimiter == '"' || delimiter == '`' || delimiter == ANSI_SINGLE_QUOTE;
-        if (comments && !quoted && delimiter == ')' && c == '#' && word_start) {
+        if (comments && !quoted && delimiter == ')' && !(frame.delimiter & (WORD_PAREN | REGEX_OPERAND)) &&
+            c == '#' && word_start) {
             result.comment = true;
             while (!probe_eof(input) && probe_lookahead(input) != '\n') {
                 probe_advance(input);
@@ -444,17 +456,30 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             probe_advance(input);
             if (probe_lookahead(input) != '\n') {
                 word_start = false;
+                if (frame.delimiter & REGEX_OPERAND) {
+                    array_back(&delimiters)->delimiter |= REGEX_STARTED;
+                }
             }
             if (!probe_eof(input)) {
                 probe_advance(input);
             }
             continue;
         }
+        if (frame.delimiter & REGEX_OPERAND) {
+            if (is_blank(c) || c == '\n') {
+                if (frame.delimiter & REGEX_STARTED) {
+                    array_back(&delimiters)->delimiter &= ~(REGEX_OPERAND | REGEX_STARTED);
+                    frame = *array_back(&delimiters);
+                }
+            } else {
+                array_back(&delimiters)->delimiter |= REGEX_STARTED;
+            }
+        }
         if ((delimiter != ANSI_SINGLE_QUOTE && c == delimiter) ||
             (delimiter == ANSI_SINGLE_QUOTE && c == '\'')) {
             probe_advance(input);
             array_pop(&delimiters);
-            word_start = false;
+            word_start = delimiter == ')' && !frame.substitution && !(frame.delimiter & (AMBIGUOUS_PAREN | WORD_PAREN));
             bool unjoined_escape = false;
             if (delimiters.size == 0 || (frame.delimiter & AMBIGUOUS_PAREN)) {
                 while (probe_lookahead(input) == '\\') {
@@ -511,10 +536,55 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             }
             continue;
         }
+        if (!quoted && word_start && c == '[') {
+            probe_advance(input);
+            if (probe_lookahead(input) == '[') {
+                probe_advance(input);
+                word_start = probe_word_boundary(input);
+                if (word_start) {
+                    array_back(&delimiters)->delimiter |= CONDITIONAL_CONTEXT;
+                }
+            } else {
+                word_start = false;
+            }
+            continue;
+        }
+        if (!quoted && (frame.delimiter & CONDITIONAL_CONTEXT) && word_start && c == '=') {
+            probe_advance(input);
+            if (probe_lookahead(input) == '~') {
+                probe_advance(input);
+                if (probe_word_boundary(input)) {
+                    array_back(&delimiters)->delimiter |= REGEX_OPERAND;
+                }
+            }
+            word_start = false;
+            continue;
+        }
+        if (!quoted && (frame.delimiter & CONDITIONAL_CONTEXT) && word_start && c == ']') {
+            probe_advance(input);
+            if (probe_lookahead(input) == ']') {
+                probe_advance(input);
+                if (probe_word_boundary(input)) {
+                    array_back(&delimiters)->delimiter &= ~(CONDITIONAL_CONTEXT | REGEX_OPERAND | REGEX_STARTED);
+                }
+            }
+            word_start = false;
+            continue;
+        }
+        if (!quoted && (c == '?' || c == '*' || c == '+' || c == '@' || c == '!')) {
+            probe_advance(input);
+            if (probe_lookahead(input) == '(') {
+                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | WORD_PAREN}));
+                probe_advance(input);
+            }
+            word_start = false;
+            continue;
+        }
         if (c == '`' || (!quoted && (c == '\'' || c == '"'))) {
             array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = c}));
         } else if (!quoted && c == '(' && delimiter == ')') {
-            array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')'}));
+            uint16_t role = frame.delimiter & (WORD_PAREN | REGEX_OPERAND) ? WORD_PAREN : 0;
+            array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | role}));
         }
         word_start = is_blank(c) || c == '\n' || is_metacharacter(c);
         probe_advance(input);
@@ -523,8 +593,23 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
     return result;
 }
 
+static bool probe_word_boundary(SubstitutionProbeInput *input) {
+    uint32_t position = input->position;
+    while (probe_lookahead(input) == '\\') {
+        probe_advance(input);
+        if (probe_lookahead(input) != '\n') {
+            input->position = position;
+            return false;
+        }
+        probe_advance(input);
+    }
+    bool boundary = probe_eof(input) || is_separator(probe_lookahead(input)) || is_metacharacter(probe_lookahead(input));
+    input->position = position;
+    return boundary;
+}
+
 static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
-    if (lexer->lookahead != '(') {
+    if (lexer->lookahead != '(' || serialized_size(scanner) + CLOSER_SIZE > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
         return false;
     }
     advance(lexer);
@@ -551,8 +636,7 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
         array_delete(&input.buffered);
     }
     if (arithmetic) {
-        if (!valid_symbols[ARITHMETIC_SUBSTITUTION_START] ||
-            serialized_size(scanner) + CLOSER_SIZE > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
+        if (!valid_symbols[ARITHMETIC_SUBSTITUTION_START]) {
             return false;
         }
         array_push(&scanner->closers, ARITHMETIC_DISTANCE | safe_distance);
@@ -561,6 +645,8 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
         return true;
     }
     if (valid_symbols[COMMAND_SUBSTITUTION_START]) {
+        array_push(&scanner->closers, COMMAND_CLOSER_PENDING);
+        array_push(&scanner->closer_regex_depths, scanner->regex_depth);
         lexer->result_symbol = COMMAND_SUBSTITUTION_START;
         return true;
     }
@@ -1452,6 +1538,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     if (!error_recovery &&
         (valid_symbols[SUBSTITUTION_START] || valid_symbols[BRACE_SUBSTITUTION_START] ||
          valid_symbols[BRACKET_SUBSTITUTION_START])) {
+        if (valid_symbols[SUBSTITUTION_START] && scanner->closers.size > 0 &&
+            *array_back(&scanner->closers) == COMMAND_CLOSER_PENDING) {
+            *array_back(&scanner->closers) = ')';
+            lexer->result_symbol = SUBSTITUTION_START;
+            return true;
+        }
         // Nesting too deep for the serialized state is left to the parse as an error.
         if (serialized_size(scanner) + CLOSER_SIZE > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
             return false;
@@ -1863,6 +1955,9 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     }
 
     if ((valid_symbols[BARE_DOLLAR] || (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START])) && lexer->lookahead == '$') {
+        if ((is_blank(first) || first == '\n') && valid_symbols[BARE_DOLLAR] && !valid_symbols[EXTGLOB_PREFIX]) {
+            return false;
+        }
         return scan_dollar_or_substitution_start(scanner, lexer, valid_symbols);
     }
 
