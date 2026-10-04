@@ -56,7 +56,7 @@ jobs:
           # Like tree-sitter/fuzz-action, only the grammar is instrumented, not the runtime.
           clang -std=c11 -Og -g -c -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -I.tmp/tree-sitter/lib/include \
             -I.tmp/tree-sitter/lib/src .tmp/tree-sitter/lib/src/lib.c -o .tmp/tree-sitter.o
-          clang -std=c11 -Og -g -fsanitize=fuzzer,address,undefined \
+          clang -std=c11 -Og -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined \
             -I.tmp/tree-sitter/lib/include -Isrc \
             -DTS_LANG="tree_sitter_$(jq -r .name src/grammar.json)" .tmp/fuzz-action/fuzzer.c src/parser.c \
             $(ls src/scanner.c 2> /dev/null) .tmp/tree-sitter.o -o .tmp/fuzzer
