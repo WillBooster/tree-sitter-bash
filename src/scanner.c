@@ -583,7 +583,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         if (c == '`' || (!quoted && (c == '\'' || c == '"'))) {
             array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = c}));
         } else if (!quoted && c == '(' && delimiter == ')') {
-            uint16_t role = frame.delimiter & (WORD_PAREN | REGEX_OPERAND) ? WORD_PAREN : 0;
+            uint16_t role = frame.delimiter & (WORD_PAREN | REGEX_OPERAND) ? WORD_PAREN : frame.delimiter & CONDITIONAL_CONTEXT;
             array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | role}));
         }
         word_start = is_blank(c) || c == '\n' || is_metacharacter(c);
@@ -635,10 +635,7 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
         }
         array_delete(&input.buffered);
     }
-    if (arithmetic) {
-        if (!valid_symbols[ARITHMETIC_SUBSTITUTION_START]) {
-            return false;
-        }
+    if (arithmetic && valid_symbols[ARITHMETIC_SUBSTITUTION_START]) {
         array_push(&scanner->closers, ARITHMETIC_DISTANCE | safe_distance);
         array_push(&scanner->closer_regex_depths, scanner->regex_depth);
         lexer->result_symbol = ARITHMETIC_SUBSTITUTION_START;
@@ -1956,7 +1953,9 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     if ((valid_symbols[BARE_DOLLAR] || (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START])) && lexer->lookahead == '$') {
         if ((is_blank(first) || first == '\n') && valid_symbols[BARE_DOLLAR] && !valid_symbols[EXTGLOB_PREFIX]) {
-            return false;
+            lexer->mark_end(lexer);
+            advance(lexer);
+            return lexer->lookahead != '(' && finish_bare_dollar(lexer);
         }
         return scan_dollar_or_substitution_start(scanner, lexer, valid_symbols);
     }

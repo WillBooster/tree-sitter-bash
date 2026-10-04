@@ -1360,6 +1360,8 @@ calculate() {
   ) + 1 ))"
   printf "%s\n" "$(( $(printf "%s" @(x)#suffix >/dev/null; printf 2) + 1 ))"
   printf "%s\n" "$(( $( [[ 2 =~ (2)#suffix ]]; printf 2) + 1 ))"
+  printf "%s\n" "$(( $( [[ ( 2 =~ (2)#suffix ) ]]; printf 2
+  ) + 1 ))"
 }
 calculate
 case x in x) printf "%s\n" ok;; *) printf "%s\n" no;; esac
@@ -1425,6 +1427,25 @@ case x in x) printf "%s\n" ok;; *) printf "%s\n" no;; esac
                   name: (command_name
                     (word))
                   argument: (word)))
+              right: (number)))))
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (arithmetic_expansion
+            (binary_expression
+              left: (command_substitution
+                (test_command
+                  (parenthesized_test
+                    (regex_test
+                      left: (word)
+                      right: (regex))))
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (word)))
               right: (number)))))))
   (command
     name: (command_name
@@ -1456,12 +1477,106 @@ render_defaults() {
   local x= y=Y
   printf '%s\n' "${x:-$y $(printf a)}" "${x:-${y} $((1+2))}"
   printf '%s\n' "${x:-$(printf b) $(printf a)}" "${x/${y} $(printf a)/b}"
+  printf '%s\n' "${x:- $}" "${x:-
+$}" "${x/ $/b}"
 }
 render_defaults
 
 ---
 
-(program (function_definition name: (word) body: (compound_statement (declaration_command name: (command_name) argument: (variable_assignment name: (variable_name)) argument: (variable_assignment name: (variable_name) value: (word))) (command name: (command_name (word)) argument: (raw_string) argument: (string (expansion parameter: (variable_name) operator: (operator) argument: (simple_expansion (variable_name)) argument: (word) argument: (command_substitution (command name: (command_name (word)) argument: (word))))) argument: (string (expansion parameter: (variable_name) operator: (operator) argument: (expansion parameter: (variable_name)) argument: (word) argument: (arithmetic_expansion (binary_expression left: (number) right: (number)))))) (command name: (command_name (word)) argument: (raw_string) argument: (string (expansion parameter: (variable_name) operator: (operator) argument: (command_substitution (command name: (command_name (word)) argument: (word))) argument: (word) argument: (command_substitution (command name: (command_name (word)) argument: (word))))) argument: (string (expansion parameter: (variable_name) operator: (operator) argument: (expansion parameter: (variable_name)) argument: (word) argument: (command_substitution (command name: (command_name (word)) argument: (word))) argument: (word)))))) (command name: (command_name (word))))
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (declaration_command
+        name: (command_name)
+        argument: (variable_assignment
+          name: (variable_name))
+        argument: (variable_assignment
+          name: (variable_name)
+          value: (word)))
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (simple_expansion
+              (variable_name))
+            argument: (word)
+            argument: (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)))))
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (expansion
+              parameter: (variable_name))
+            argument: (word)
+            argument: (arithmetic_expansion
+              (binary_expression
+                left: (number)
+                right: (number))))))
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)))
+            argument: (word)
+            argument: (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)))))
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (expansion
+              parameter: (variable_name))
+            argument: (word)
+            argument: (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)))
+            argument: (word))))
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (word)))
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (word)))
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (word)
+            argument: (word))))))
+  (command
+    name: (command_name
+      (word))))
 
 ============================
 Recovery around a concatenated arithmetic operand
@@ -1473,3 +1588,42 @@ printf '%s\n' complete
 ---
 
 (program (command name: (command_name (word)) argument: (arithmetic_expansion (ERROR) (command_substitution (command name: (command_name (word)) argument: (word))))) (command name: (command_name (word)) argument: (raw_string) argument: (word)))
+
+============================
+Parameterless expansion syntax retains command substitutions
+============================
+
+inspect_syntax() {
+  printf '%s\n' ${=$((1))} ${=$(printf a)}
+}
+printf '%s\n' parsed
+
+---
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (expansion
+          argument: (word)
+          argument: (command_substitution
+            (subshell
+              (command
+                name: (command_name
+                  (word))))))
+        argument: (expansion
+          argument: (word)
+          argument: (command_substitution
+            (command
+              name: (command_name
+                (word))
+              argument: (word)))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (raw_string)
+    argument: (word)))
