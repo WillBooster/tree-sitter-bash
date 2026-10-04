@@ -68,7 +68,6 @@ typedef struct {
     // Inside backquotes an unescaped backquote always closes the substitution, so the depth decides
     // whether a backquote opens or closes one.
     uint8_t backtick_depth;
-    // The closer (`)`, `}`, or `]`) of each open substitution, innermost last.
     Array(uint8_t) closers;
     // The regex group depth when each open substitution started, restored when it ends.
     Array(uint16_t) closer_regex_depths;
