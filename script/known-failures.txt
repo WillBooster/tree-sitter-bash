@@ -1,7 +1,6 @@
 examples/bash/examples/shellmath/shellmath.sh
 examples/bash/tests/arith.tests
 examples/bash/tests/array.tests
-examples/bash/tests/comsub-posix.tests
 examples/bash/tests/comsub2.tests
 examples/bash/tests/errors.tests
 examples/bash/tests/parser.tests
@@ -13,7 +12,6 @@ examples/wild-corpus/esoteric/CmdlineGL/share/examples/FlightSim.sh
 examples/wild-corpus/esoteric/CmdlineGL/share/examples/Robot.sh
 examples/wild-corpus/esoteric/make-a-lisp-bash/core.sh
 examples/wild-corpus/esoteric/shasm/shasm.sh
-examples/wild-corpus/exp/shootout/timing.sh
 examples/wild-corpus/freebsd-11.1/crypto/openssl/util/bat.sh
 examples/wild-corpus/freebsd-11.1/tools/tools/shlib-compat/test/regress.sh
 examples/wild-corpus/freebsd-11.1/usr.bin/apply/tests/regress.sh
@@ -80,7 +78,6 @@ examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/io.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/nameref.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/options.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/pointtype.sh
-examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/quoting.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/quoting2.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/recttype.sh
 examples/wild-corpus/illumos-gate/usr/src/lib/libshell/common/tests/signal.sh
@@ -121,7 +118,6 @@ examples/wild-corpus/illumos-gate/usr/src/tools/scripts/bldenv.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/scripts/nightly.sh
 examples/wild-corpus/liballocs/tools/debug-funcs.sh
 examples/wild-corpus/linux-4.8.7/scripts/ld-version.sh
-examples/wild-corpus/linux-4.8.7/tools/perf/perf-with-kcore.sh
 examples/wild-corpus/minix/commands/scripts/DESCRIBE.sh
 examples/wild-corpus/minix/commands/scripts/mkdist.sh
 examples/wild-corpus/oil/test/gold.sh
@@ -151,7 +147,6 @@ examples/wild-corpus/shell/ast/src/cmd/ksh93/tests/math.sh
 examples/wild-corpus/shell/ast/src/cmd/ksh93/tests/nameref.sh
 examples/wild-corpus/shell/ast/src/cmd/ksh93/tests/options.sh
 examples/wild-corpus/shell/ast/src/cmd/ksh93/tests/pointtype.sh
-examples/wild-corpus/shell/ast/src/cmd/ksh93/tests/quoting.sh
 examples/wild-corpus/shell/ast/src/cmd/ksh93/tests/quoting2.sh
 examples/wild-corpus/shell/ast/src/cmd/ksh93/tests/recttype.sh
 examples/wild-corpus/shell/ast/src/cmd/ksh93/tests/signal.sh

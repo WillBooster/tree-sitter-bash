@@ -1310,3 +1310,70 @@ printf '%s\n' done
     (raw_string)
     (word)))
 
+
+=============================
+Special parameters retain arithmetic before a case pattern
+=============================
+
+count_args() {
+  local remaining=$(( $# - 1 ))
+  case $1 in
+    a) printf '%s\n' "$remaining";;
+  esac
+}
+count_args a b c
+printf '%s\n' "$(( $# + 1 ))"
+case x in x) printf '%s\n' ok;; esac
+
+---
+
+(program
+  (function_definition
+    (word)
+    (compound_statement
+      (declaration_command
+        (command_name)
+        (variable_assignment
+          (variable_name)
+          (arithmetic_expansion
+            (binary_expression
+              (simple_expansion
+                (special_variable_name))
+              (number)))))
+      (case_statement
+        (simple_expansion
+          (special_variable_name))
+        (case_item
+          (word)
+          (command
+            (command_name
+              (word))
+            (raw_string)
+            (string
+              (simple_expansion
+                (variable_name))))))))
+  (command
+    (command_name
+      (word))
+    (word)
+    (word)
+    (word))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (arithmetic_expansion
+        (binary_expression
+          (simple_expansion
+            (special_variable_name))
+          (number)))))
+  (case_statement
+    (word)
+    (case_item
+      (word)
+      (command
+        (command_name
+          (word))
+        (raw_string)
+        (word)))))

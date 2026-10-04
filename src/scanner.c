@@ -485,9 +485,10 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             continue;
         }
         if (c == '$') {
-            word_start = true;
+            word_start = false;
             probe_advance(input);
             if (probe_lookahead(input) == '(') {
+                word_start = true;
                 depth++;
                 array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')', .substitution = true}));
                 probe_advance(input);
