@@ -32,8 +32,8 @@ jobs:
           ref: ${{ steps.runtime.outputs.ref }}
           path: .tmp/tree-sitter
           persist-credentials: false
-      # tree-sitter/fuzz-action can only build upstream's runtime, so only its harness is used, and its build is
-      # reproduced below.
+      # tree-sitter/fuzz-action can only build upstream's runtime, so only its harness is used. Its nonnull ignorelist
+      # masks empty scanner-array copies; omit it and make UBSan fatal so those regressions fail this job.
       - uses: actions/checkout@v7.0.1
         with:
           repository: tree-sitter/fuzz-action
