@@ -32,8 +32,8 @@ jobs:
           ref: ${{ steps.runtime.outputs.ref }}
           path: .tmp/tree-sitter
           persist-credentials: false
-      # tree-sitter/fuzz-action can only build upstream's runtime, so only its harness and sanitizer ignore list are
-      # used, and its build is reproduced below.
+      # tree-sitter/fuzz-action can only build upstream's runtime, so only its harness is used. Its nonnull ignorelist
+      # masks empty scanner-array copies; omit it and make UBSan fatal so those regressions fail this job.
       - uses: actions/checkout@v7.0.1
         with:
           repository: tree-sitter/fuzz-action
@@ -56,8 +56,8 @@ jobs:
           # Like tree-sitter/fuzz-action, only the grammar is instrumented, not the runtime.
           clang -std=c11 -Og -g -c -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -I.tmp/tree-sitter/lib/include \
             -I.tmp/tree-sitter/lib/src .tmp/tree-sitter/lib/src/lib.c -o .tmp/tree-sitter.o
-          clang -std=c11 -Og -g -fsanitize=fuzzer,address,undefined \
-            -fsanitize-ignorelist=.tmp/fuzz-action/ignorelist.ini -I.tmp/tree-sitter/lib/include -Isrc \
+          clang -std=c11 -Og -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined \
+            -I.tmp/tree-sitter/lib/include -Isrc \
             -DTS_LANG="tree_sitter_$(jq -r .name src/grammar.json)" .tmp/fuzz-action/fuzzer.c src/parser.c \
             $(ls src/scanner.c 2> /dev/null) .tmp/tree-sitter.o -o .tmp/fuzzer
       - name: Fuzz

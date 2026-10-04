@@ -1744,14 +1744,16 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
     if (size + CLOSER_SIZE * closer_count >= length) {
         return;
     }
-    array_reserve(&scanner->closers, closer_count);
-    memcpy(scanner->closers.contents, &buffer[size], closer_count);
-    scanner->closers.size = closer_count;
-    size += closer_count;
-    array_reserve(&scanner->closer_regex_depths, closer_count);
-    memcpy(scanner->closer_regex_depths.contents, &buffer[size], closer_count * sizeof(uint16_t));
-    scanner->closer_regex_depths.size = closer_count;
-    size += closer_count * sizeof(uint16_t);
+    if (closer_count > 0) {
+        array_reserve(&scanner->closers, closer_count);
+        memcpy(scanner->closers.contents, &buffer[size], closer_count);
+        scanner->closers.size = closer_count;
+        size += closer_count;
+        array_reserve(&scanner->closer_regex_depths, closer_count);
+        memcpy(scanner->closer_regex_depths.contents, &buffer[size], closer_count * sizeof(uint16_t));
+        scanner->closer_regex_depths.size = closer_count;
+        size += closer_count * sizeof(uint16_t);
+    }
     uint8_t count = (uint8_t)buffer[size++];
     for (uint8_t i = 0; i < count && size + HEREDOC_HEADER_SIZE <= length; i++) {
         Heredoc heredoc = {.delimiter = array_new()};
