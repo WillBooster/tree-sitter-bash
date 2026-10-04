@@ -395,6 +395,7 @@ enum {
     CONDITIONAL_CONTEXT = 0x400,
     REGEX_OPERAND = 0x800,
     REGEX_STARTED = 0x1000,
+    WORD_END_PAREN = 0x2000,
 };
 
 typedef struct {
@@ -479,7 +480,8 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             (delimiter == ANSI_SINGLE_QUOTE && c == '\'')) {
             probe_advance(input);
             array_pop(&delimiters);
-            word_start = delimiter == ')' && !frame.substitution && !(frame.delimiter & (AMBIGUOUS_PAREN | WORD_PAREN));
+            word_start = delimiter == ')' && !frame.substitution &&
+                         !(frame.delimiter & (AMBIGUOUS_PAREN | WORD_PAREN | WORD_END_PAREN));
             bool unjoined_escape = false;
             if (delimiters.size == 0 || (frame.delimiter & AMBIGUOUS_PAREN)) {
                 while (probe_lookahead(input) == '\\') {
@@ -578,6 +580,16 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 probe_advance(input);
             }
             word_start = false;
+            continue;
+        }
+        if (!quoted && delimiter == ')' && !(frame.delimiter & (WORD_PAREN | REGEX_OPERAND)) &&
+            (c == '<' || c == '>')) {
+            probe_advance(input);
+            if (probe_lookahead(input) == '(') {
+                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | WORD_END_PAREN}));
+                probe_advance(input);
+            }
+            word_start = true;
             continue;
         }
         if (c == '`' || (!quoted && (c == '\'' || c == '"'))) {
