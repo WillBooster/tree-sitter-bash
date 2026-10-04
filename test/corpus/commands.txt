@@ -1338,3 +1338,375 @@ b # c` d
         argument: (word))
       (comment))
     argument: (word)))
+
+================================================================================
+Recovery after an invalid arithmetic operand preserves following compact commands
+================================================================================
+
+echo $(($))
+echo $((printf x) && printf y)
+echo "$((printf x) && printf y)"
+
+--------------------------------------------------------------------------------
+
+(program (command name: (command_name (word))) (ERROR) (command name: (command_name (word)) argument: (command_substitution (list left: (subshell (command name: (command_name (word)) argument: (word))) right: (command name: (command_name (word)) argument: (word))))) (command name: (command_name (word)) argument: (string (command_substitution (list left: (subshell (command name: (command_name (word)) argument: (word))) right: (command name: (command_name (word)) argument: (word)))))))
+
+================================================================================
+Comments after shell groups retain arithmetic and word suffixes
+================================================================================
+
+calculate() {
+  printf "%s\n" "$(( $( (printf 2)# comment )
+  ) + 1 ))"
+  printf "%s\n" "$(( $(printf "%s" @(x)#suffix >/dev/null; printf 2) + 1 ))"
+  printf "%s\n" "$(( $( [[ 2 =~ (2)#suffix ]]; printf 2) + 1 ))"
+  printf "%s\n" "$(( $( [[ ( 2 =~ (2)#suffix ) ]]; printf 2
+  ) + 1 ))"
+  printf "%s\n" "$(( $(printf "%s" <(printf 2 # body )
+  )#suffix >/dev/null; printf 2) + 1 ))"
+  printf "%s\n" "$(( $(printf "%s" >(cat >/dev/null)#suffix >/dev/null; printf 2) + 1 ))"
+  printf "%s\n" "$((1<($((printf 2)&&printf 2))))"
+}
+calculate
+case x in x) printf "%s\n" ok;; *) printf "%s\n" no;; esac
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (arithmetic_expansion
+            (binary_expression
+              left: (command_substitution
+                (subshell
+                  (command
+                    name: (command_name
+                      (word))
+                    argument: (word)))
+                (comment))
+              right: (number)))))
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (arithmetic_expansion
+            (binary_expression
+              left: (command_substitution
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (string
+                    (string_content))
+                  argument: (word)
+                  redirect: (file_redirect
+                    destination: (word)))
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (word)))
+              right: (number)))))
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (arithmetic_expansion
+            (binary_expression
+              left: (command_substitution
+                (test_command
+                  (regex_test
+                    left: (word)
+                    right: (regex)))
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (word)))
+              right: (number)))))
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (arithmetic_expansion
+            (binary_expression
+              left: (command_substitution
+                (test_command
+                  (parenthesized_test
+                    (regex_test
+                      left: (word)
+                      right: (regex))))
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (word)))
+              right: (number)))))
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (arithmetic_expansion
+            (binary_expression
+              left: (command_substitution
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (string
+                    (string_content))
+                  argument: (concatenation
+                    (process_substitution
+                      (command
+                        name: (command_name
+                          (word))
+                        argument: (word))
+                      (comment))
+                    (word))
+                  redirect: (file_redirect
+                    destination: (word)))
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (word)))
+              right: (number)))))
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (arithmetic_expansion
+            (binary_expression
+              left: (command_substitution
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (string
+                    (string_content))
+                  argument: (concatenation
+                    (process_substitution
+                      (command
+                        name: (command_name
+                          (word))
+                        redirect: (file_redirect
+                          destination: (word))))
+                    (word))
+                  redirect: (file_redirect
+                    destination: (word)))
+                (command
+                  name: (command_name
+                    (word))
+                  argument: (word)))
+              right: (number)))))
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (string
+          (arithmetic_expansion
+            (binary_expression
+              left: (number)
+              right: (parenthesized_expression
+                (command_substitution
+                  (list
+                    left: (subshell
+                      (command
+                        name: (command_name
+                          (word))
+                        argument: (word)))
+                    right: (command
+                      name: (command_name
+                        (word))
+                      argument: (word)))))))))))
+  (command
+    name: (command_name
+      (word)))
+  (case_statement
+    value: (word)
+    (case_item
+      pattern: (word)
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (word)))
+    (case_item
+      pattern: (word)
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (string_content))
+        argument: (word)))))
+
+============================
+Parameter-expansion blanks before substitutions
+============================
+
+render_defaults() {
+  local x= y=Y
+  printf '%s\n' "${x:-$y $(printf a)}" "${x:-${y} $((1+2))}"
+  printf '%s\n' "${x:-$(printf b) $(printf a)}" "${x/${y} $(printf a)/b}"
+  printf '%s\n' "${x:- $}" "${x:-
+$}" "${x/ $/b}"
+}
+render_defaults
+
+---
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (declaration_command
+        name: (command_name)
+        argument: (variable_assignment
+          name: (variable_name))
+        argument: (variable_assignment
+          name: (variable_name)
+          value: (word)))
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (simple_expansion
+              (variable_name))
+            argument: (word)
+            argument: (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)))))
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (expansion
+              parameter: (variable_name))
+            argument: (word)
+            argument: (arithmetic_expansion
+              (binary_expression
+                left: (number)
+                right: (number))))))
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)))
+            argument: (word)
+            argument: (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)))))
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (expansion
+              parameter: (variable_name))
+            argument: (word)
+            argument: (command_substitution
+              (command
+                name: (command_name
+                  (word))
+                argument: (word)))
+            argument: (word))))
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (word)))
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (word)))
+        argument: (string
+          (expansion
+            parameter: (variable_name)
+            operator: (operator)
+            argument: (word)
+            argument: (word))))))
+  (command
+    name: (command_name
+      (word))))
+
+============================
+Recovery around a concatenated arithmetic operand
+============================
+
+echo $(( 1$(echo 2) ))
+printf '%s\n' complete
+
+---
+
+(program (command name: (command_name (word)) argument: (arithmetic_expansion (ERROR) (command_substitution (command name: (command_name (word)) argument: (word))))) (command name: (command_name (word)) argument: (raw_string) argument: (word)))
+
+============================
+Parameterless expansion syntax retains command substitutions
+============================
+
+inspect_syntax() {
+  printf '%s\n' ${=$((1))} ${=$(printf a)}
+}
+printf '%s\n' parsed
+
+---
+
+(program
+  (function_definition
+    name: (word)
+    body: (compound_statement
+      (command
+        name: (command_name
+          (word))
+        argument: (raw_string)
+        argument: (expansion
+          argument: (word)
+          argument: (command_substitution
+            (subshell
+              (command
+                name: (command_name
+                  (word))))))
+        argument: (expansion
+          argument: (word)
+          argument: (command_substitution
+            (command
+              name: (command_name
+                (word))
+              argument: (word)))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (raw_string)
+    argument: (word)))

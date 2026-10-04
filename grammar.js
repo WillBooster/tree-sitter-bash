@@ -143,9 +143,12 @@ module.exports = grammar({
     $._backtick_comment,
     $._backtick_comment_boundary,
     $.__error_recovery,
+    $._command_substitution_start,
+    $._arithmetic_substitution_start,
+    $._arithmetic_cache_reset,
   ],
 
-  extras: ($) => [$.comment, $.heredoc_body, /[ \t\n]/, /\\\n/, $._line_continuation],
+  extras: ($) => [$.comment, $.heredoc_body, /[ \t\n]/, /\\\n/, $._line_continuation, $._arithmetic_cache_reset],
 
   supertypes: ($) => [$._statement, $._arithmetic_expression],
 
@@ -801,7 +804,14 @@ module.exports = grammar({
     // inside a substitution has its body read before the substitution ends.
     command_substitution: ($) =>
       choice(
-        seq('$(', $._substitution_start, optional($._statements), $._substitution_end, ')'),
+        seq(
+          $._command_substitution_start,
+          '$(',
+          $._substitution_start,
+          optional($._statements),
+          $._substitution_end,
+          ')'
+        ),
         // bash 5.3 runs `${ list; }` and `${| list; }` in the current shell.
         seq(
           alias(token(/\$\{[ \t\n|]/), '${'),
@@ -819,7 +829,7 @@ module.exports = grammar({
     // Arithmetic may span lines, and a heredoc body starts only after it, so it counts as nesting.
     arithmetic_expansion: ($) =>
       choice(
-        seq('$((', $._substitution_start, optional($._arithmetic_expression), $._substitution_end, '))'),
+        seq($._arithmetic_substitution_start, '$((', optional($._arithmetic_expression), $._substitution_end, '))'),
         seq('$[', $._bracket_substitution_start, optional($._arithmetic_expression), $._bracket_substitution_end, ']')
       ),
 

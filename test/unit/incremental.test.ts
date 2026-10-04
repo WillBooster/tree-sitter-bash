@@ -24,7 +24,28 @@ testCommand('reparses the corpus consistently after random edits', ['script/fuzz
 });
 
 // Edits that the random ones reach only rarely. Each inserts `text` at `position` of `before`.
+const subshellBefore = 'value="$(printf x) && printf y)"\nprintf \'%s\\n\' "$value"\n';
+const arithmeticBefore = 'value="$((true))"\nprintf \'%s\\n\' "$value"\n';
+const nestedArithmeticBefore = 'value="$((1+$((true))))"\nprintf \'%s\\n\' "$value"\n';
 const edits = [
+  {
+    name: 'an inner command fallback invalidates an enclosing arithmetic decision',
+    before: nestedArithmeticBefore,
+    position: nestedArithmeticBefore.indexOf('))') + 1,
+    text: ' && printf 2',
+  },
+  {
+    name: 'an inserted subshell changes the command substitution boundary',
+    before: subshellBefore,
+    position: subshellBefore.indexOf('$(') + 2,
+    text: '(',
+  },
+  {
+    name: 'a list after the first closing paren changes arithmetic to command substitution',
+    before: arithmeticBefore,
+    position: arithmeticBefore.indexOf('))') + 1,
+    text: ' && printf y',
+  },
   {
     name: 'a newline after a special parameter in a heredoc body makes the next line its delimiter',
     before: 'cat <<EOF\n$1EOF\n$y\nEOF\n',
