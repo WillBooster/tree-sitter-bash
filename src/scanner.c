@@ -40,7 +40,11 @@ enum TokenType {
     BACKTICK_COMMENT,
     BACKTICK_COMMENT_BOUNDARY,
     ERROR_RECOVERY,
+    COMMAND_SUBSTITUTION_START,
+    ARITHMETIC_SUBSTITUTION_START,
 };
+
+enum { ARITHMETIC_DISTANCE = 0x80, ARITHMETIC_DISTANCE_MASK = 0x7f };
 
 typedef Array(int32_t) CodePoints;
 
@@ -103,6 +107,8 @@ typedef struct {
 static inline uint16_t current_depth(Scanner *scanner) {
     return scanner->backtick_depth + scanner->closers.size;
 }
+
+static inline uint8_t substitution_closer(uint8_t closer) { return closer & ARITHMETIC_DISTANCE ? ')' : closer; }
 
 static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
 
@@ -361,7 +367,8 @@ static void end_heredoc_at_closer_line(Scanner *scanner, TSLexer *lexer, uint32_
         }
     }
     // The deferred bodies are read after the `)`, in the enclosing substitution.
-    bool in_parenthesized = scanner->closers.size > 1 && *array_get(&scanner->closers, scanner->closers.size - 2) == ')';
+    bool in_parenthesized = scanner->closers.size > 1 &&
+                            substitution_closer(*array_get(&scanner->closers, scanner->closers.size - 2)) == ')';
     scanner->terminator_owed_closers =
         in_parenthesized && deferred_body_ends_at_closer_line(scanner, lexer) ? (uint16_t)scanner->closers.size : 0;
     remove_heredoc(scanner, index);
@@ -379,10 +386,190 @@ static bool awaits_deferred_body(Scanner *scanner) {
     return false;
 }
 
+enum { ANSI_SINGLE_QUOTE = 0x80, AMBIGUOUS_PAREN = 0x100 };
+
+typedef struct {
+    uint16_t delimiter;
+    bool substitution;
+} SubstitutionProbeFrame;
+
+typedef struct {
+    TSLexer *lexer;
+    CodePoints buffered;
+    uint32_t position;
+} SubstitutionProbeInput;
+
+typedef struct {
+    bool complete;
+    bool arithmetic;
+    bool comment;
+    uint8_t safe_distance;
+} SubstitutionProbeResult;
+
+static inline int32_t probe_lookahead(SubstitutionProbeInput *input) {
+    return input->position < input->buffered.size ? *array_get(&input->buffered, input->position) : input->lexer->lookahead;
+}
+
+static inline bool probe_eof(SubstitutionProbeInput *input) {
+    return input->position == input->buffered.size && input->lexer->eof(input->lexer);
+}
+
+static inline void probe_advance(SubstitutionProbeInput *input) {
+    if (input->position == input->buffered.size) {
+        array_push(&input->buffered, input->lexer->lookahead);
+        advance(input->lexer);
+    }
+    input->position++;
+}
+
+static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeInput *input, bool comments) {
+    SubstitutionProbeResult result = {.arithmetic = true, .safe_distance = ARITHMETIC_DISTANCE_MASK};
+    Array(SubstitutionProbeFrame) delimiters = array_new();
+    array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')'}));
+    uint32_t depth = 0;
+    bool word_start = true;
+    while (!probe_eof(input)) {
+        SubstitutionProbeFrame frame = *array_back(&delimiters);
+        uint8_t delimiter = frame.delimiter & ~AMBIGUOUS_PAREN;
+        int32_t c = probe_lookahead(input);
+        bool quoted = delimiter == '\'' || delimiter == '"' || delimiter == '`' || delimiter == ANSI_SINGLE_QUOTE;
+        if (comments && !quoted && delimiter == ')' && c == '#' && word_start) {
+            result.comment = true;
+            while (!probe_eof(input) && probe_lookahead(input) != '\n') {
+                probe_advance(input);
+            }
+            continue;
+        }
+        if (c == '\\' && delimiter != '\'') {
+            probe_advance(input);
+            if (probe_lookahead(input) != '\n') {
+                word_start = false;
+            }
+            if (!probe_eof(input)) {
+                probe_advance(input);
+            }
+            continue;
+        }
+        if ((delimiter != ANSI_SINGLE_QUOTE && c == delimiter) ||
+            (delimiter == ANSI_SINGLE_QUOTE && c == '\'')) {
+            probe_advance(input);
+            array_pop(&delimiters);
+            word_start = false;
+            bool unjoined_escape = false;
+            if (delimiters.size == 0 || (frame.delimiter & AMBIGUOUS_PAREN)) {
+                while (probe_lookahead(input) == '\\') {
+                    probe_advance(input);
+                    if (probe_lookahead(input) != '\n') {
+                        unjoined_escape = true;
+                        break;
+                    }
+                    probe_advance(input);
+                }
+            }
+            bool double_close = !unjoined_escape && probe_lookahead(input) == ')';
+            if (delimiters.size == 0) {
+                result.arithmetic = double_close;
+                result.complete = true;
+                break;
+            }
+            if ((frame.delimiter & AMBIGUOUS_PAREN) && !double_close && depth <= result.safe_distance) {
+                result.safe_distance = depth - 1;
+            }
+            if (frame.substitution) {
+                depth--;
+            }
+            continue;
+        }
+        if (delimiter == '\'' || delimiter == ANSI_SINGLE_QUOTE || delimiter == '`') {
+            probe_advance(input);
+            continue;
+        }
+        if (c == '$') {
+            word_start = true;
+            probe_advance(input);
+            if (probe_lookahead(input) == '(') {
+                depth++;
+                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')', .substitution = true}));
+                probe_advance(input);
+                if (probe_lookahead(input) == '(') {
+                    array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | AMBIGUOUS_PAREN}));
+                    probe_advance(input);
+                }
+            } else if (probe_lookahead(input) == '{' || probe_lookahead(input) == '[') {
+                uint8_t next = probe_lookahead(input) == '{' ? '}' : ']';
+                probe_advance(input);
+                bool substitution = next == ']' || is_blank(probe_lookahead(input)) ||
+                                    probe_lookahead(input) == '\n' || probe_lookahead(input) == '|';
+                if (substitution) {
+                    depth++;
+                }
+                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = next, .substitution = substitution}));
+            } else if (!quoted && probe_lookahead(input) == '\'') {
+                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ANSI_SINGLE_QUOTE}));
+                probe_advance(input);
+            }
+            continue;
+        }
+        if (c == '`' || (!quoted && (c == '\'' || c == '"'))) {
+            array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = c}));
+        } else if (!quoted && c == '(' && delimiter == ')') {
+            array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')'}));
+        }
+        word_start = is_blank(c) || c == '\n' || is_metacharacter(c);
+        probe_advance(input);
+    }
+    array_delete(&delimiters);
+    return result;
+}
+
+static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
+    if (lexer->lookahead != '(') {
+        return false;
+    }
+    advance(lexer);
+    bool arithmetic = lexer->lookahead == '(';
+    uint8_t parent = scanner->closers.size > 0 ? *array_back(&scanner->closers) : 0;
+    bool inside_parent = scanner->backtick_depth == 0 || scanner->closers.size > scanner->backtick_closers;
+    bool inherited = arithmetic && inside_parent && (parent & ARITHMETIC_DISTANCE) &&
+                     (parent & ARITHMETIC_DISTANCE_MASK) > 0;
+    uint8_t safe_distance = inherited ? (parent & ARITHMETIC_DISTANCE_MASK) - 1 : ARITHMETIC_DISTANCE_MASK;
+    if (arithmetic && !inherited) {
+        SubstitutionProbeInput input = {.lexer = lexer, .buffered = array_new()};
+        probe_advance(&input);
+        SubstitutionProbeResult result = probe_substitution_parenthesis(&input, true);
+        arithmetic = result.arithmetic;
+        safe_distance = result.safe_distance;
+        if (!arithmetic && result.comment) {
+            input.position = 1;
+            SubstitutionProbeResult raw = probe_substitution_parenthesis(&input, false);
+            if (!raw.complete) {
+                arithmetic = true;
+                safe_distance = 0;
+            }
+        }
+        array_delete(&input.buffered);
+    }
+    if (arithmetic) {
+        if (!valid_symbols[ARITHMETIC_SUBSTITUTION_START] ||
+            serialized_size(scanner) + CLOSER_SIZE > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
+            return false;
+        }
+        array_push(&scanner->closers, ARITHMETIC_DISTANCE | safe_distance);
+        array_push(&scanner->closer_regex_depths, scanner->regex_depth);
+        lexer->result_symbol = ARITHMETIC_SUBSTITUTION_START;
+        return true;
+    }
+    if (valid_symbols[COMMAND_SUBSTITUTION_START]) {
+        lexer->result_symbol = COMMAND_SUBSTITUTION_START;
+        return true;
+    }
+    return false;
+}
+
 // Heredoc bodies: the body starts at the newline ending the header line and ends with the delimiter
 // line (or at the end of input, as bash does with a warning). An unquoted body stops before each
 // expansion so that the parser can read it.
-static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t index, bool at_line_start) {
+static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t index, bool at_line_start, const bool *valid_symbols) {
     Heredoc *heredoc = array_get(&scanner->heredocs, index);
     // Bash reads a deferred body from the input after its line, never from the text of backquotes that the
     // line opened, so a backquote in it is literal.
@@ -405,7 +592,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             // the rule is off.
             uint16_t outside_backquotes = in_backquotes ? scanner->backtick_closers : 0;
             bool in_parenthesized =
-                scanner->closers.size > outside_backquotes && *array_back(&scanner->closers) == ')';
+                scanner->closers.size > outside_backquotes && substitution_closer(*array_back(&scanner->closers)) == ')';
             bool prefix_marked = false;
             int32_t escaped_after_prefix = 0;
             // At the end of input the lookahead is 0, which a delimiter holding NUL would otherwise match.
@@ -450,7 +637,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             // Inside a substitution, bash also ends the body at a delimiter directly followed by the
             // innermost substitution's closer (`)` or `}`) or a closing backquote.
             bool ends_line = lexer->lookahead == '\n' || lexer->eof(lexer) ||
-                             (scanner->closers.size > 0 && lexer->lookahead == *array_back(&scanner->closers)) ||
+                             (scanner->closers.size > 0 && lexer->lookahead == substitution_closer(*array_back(&scanner->closers))) ||
                              (lexer->lookahead == '`' && in_backquotes);
             if (!escaped && matched == heredoc->delimiter.size && ends_line) {
                 if (did_advance) {
@@ -547,6 +734,11 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                     advance(lexer);
                     if (starts_quoted_expansion(lexer->lookahead)) {
                         if (!did_advance) {
+                            if (lexer->lookahead == '(' &&
+                                (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START]) &&
+                                scan_substitution_start_after_dollar(scanner, lexer, valid_symbols)) {
+                                return true;
+                            }
                             return false;
                         }
                         lexer->result_symbol = HEREDOC_CONTENT;
@@ -776,7 +968,7 @@ static bool scan_heredoc_arrow(Scanner *scanner, TSLexer *lexer, const bool *val
 // The literal text of the right side of `=~`, which, like bash, reads `(` and `|` as regex characters
 // and a parenthesized group, blanks and metacharacters included, as part of the word up to its matching
 // `)`. Quotes and expansions are separate parts, so the group depth is kept for the text after them.
-static bool scan_regex(Scanner *scanner, TSLexer *lexer) {
+static bool scan_regex(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     uint32_t depth = scanner->regex_depth;
     if (depth == 0) {
         while (is_blank(lexer->lookahead)) {
@@ -807,6 +999,11 @@ static bool scan_regex(Scanner *scanner, TSLexer *lexer) {
             int32_t next = lexer->lookahead;
             bool starts_part = c == '$' ? starts_quoted_expansion(next) || next == '\'' || next == '"' : next == '(';
             if (starts_part || (c != '$' && depth == 0)) {
+                if (!did_advance && c == '$' && lexer->lookahead == '(' &&
+                    (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START]) &&
+                    scan_substitution_start_after_dollar(scanner, lexer, valid_symbols)) {
+                    return true;
+                }
                 break;
             }
         } else if (c == '\\') {
@@ -830,7 +1027,7 @@ static bool scan_regex(Scanner *scanner, TSLexer *lexer) {
     return true;
 }
 
-static bool scan_string_content(Scanner *scanner, TSLexer *lexer) {
+static bool scan_string_content(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool line_breaks = !scanner->joined_line && awaits_deferred_body(scanner);
     bool did_advance = false;
     for (;;) {
@@ -851,6 +1048,10 @@ static bool scan_string_content(Scanner *scanner, TSLexer *lexer) {
         }
         advance(lexer);
         if (c == '$' && starts_quoted_expansion(lexer->lookahead)) {
+            if (!did_advance && lexer->lookahead == '(' && (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START]) &&
+                scan_substitution_start_after_dollar(scanner, lexer, valid_symbols)) {
+                return true;
+            }
             break;
         }
         if (c == '\\' && !lexer->eof(lexer) && !(line_breaks && lexer->lookahead == '\n')) {
@@ -1201,6 +1402,16 @@ static bool scan_closer_line_string_content(Scanner *scanner, TSLexer *lexer, bo
 
 static bool scan_comment(TSLexer *lexer, bool backquotes);
 
+static bool scan_dollar_or_substitution_start(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
+    lexer->mark_end(lexer);
+    advance(lexer);
+    if (lexer->lookahead == '(' &&
+        (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START])) {
+        return scan_substitution_start_after_dollar(scanner, lexer, valid_symbols);
+    }
+    return valid_symbols[BARE_DOLLAR] && finish_bare_dollar(lexer);
+}
+
 static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool error_recovery = valid_symbols[ERROR_RECOVERY];
     // Tokens that must touch the previous one (concatenation, an empty assignment value) are decided
@@ -1261,7 +1472,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
               valid_symbols[HEREDOC_BODY_START]) &&
             !(lexer->lookahead == '`' && !array_get(&scanner->heredocs, active)->is_raw &&
               scanner->backtick_depth == 0)) {
-            return scan_heredoc_content(scanner, lexer, (uint32_t)active, heredoc_line_start);
+            return scan_heredoc_content(scanner, lexer, (uint32_t)active, heredoc_line_start, valid_symbols);
         }
         // A newline inside a string is part of it, so bodies start only outside strings, except for a
         // deferred body, which bash reads right after its line wherever that line ends.
@@ -1314,7 +1525,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     }
 
     if (valid_symbols[STRING_CONTENT] && lexer->lookahead != '`') {
-        return scan_string_content(scanner, lexer);
+        return scan_string_content(scanner, lexer, valid_symbols);
     }
 
     if (valid_symbols[CLOSER_LINE_RAW_STRING_CONTENT] || valid_symbols[CLOSER_LINE_ANSI_C_STRING_CONTENT]) {
@@ -1437,7 +1648,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         }
         // A regex reads `$` as text unless it begins a part, so it looks for `$'` itself.
         if (lexer->lookahead == '$' && valid_symbols[CLOSER_LINE_ANSI_C_STRING_START] && !valid_symbols[REGEX]) {
+            lexer->mark_end(lexer);
             advance(lexer);
+            if (lexer->lookahead == '(' &&
+                (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START])) {
+                return scan_substitution_start_after_dollar(scanner, lexer, valid_symbols);
+            }
             if (lexer->lookahead == '\'') {
                 advance(lexer);
                 lexer->mark_end(lexer);
@@ -1450,7 +1666,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     }
 
     if (valid_symbols[REGEX]) {
-        if (scan_regex(scanner, lexer)) {
+        if (scan_regex(scanner, lexer, valid_symbols)) {
             return true;
         }
         // Having found no text, the scan stopped before a quote, or after the `$` of `$'`.
@@ -1630,9 +1846,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return scan_name_or_extglob_prefix(lexer, valid_symbols);
     }
 
-    if (valid_symbols[BARE_DOLLAR] && lexer->lookahead == '$') {
-        advance(lexer);
-        return finish_bare_dollar(lexer);
+    if ((valid_symbols[BARE_DOLLAR] || (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START])) && lexer->lookahead == '$') {
+        return scan_dollar_or_substitution_start(scanner, lexer, valid_symbols);
     }
 
     // Bash reads a reserved word right after a compound command without a separator (`if (x) then`,

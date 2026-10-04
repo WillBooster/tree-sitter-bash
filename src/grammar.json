@@ -3863,6 +3863,10 @@
           "type": "SEQ",
           "members": [
             {
+              "type": "SYMBOL",
+              "name": "_command_substitution_start"
+            },
+            {
               "type": "STRING",
               "value": "$("
             },
@@ -4019,12 +4023,12 @@
           "type": "SEQ",
           "members": [
             {
-              "type": "STRING",
-              "value": "$(("
+              "type": "SYMBOL",
+              "name": "_arithmetic_substitution_start"
             },
             {
-              "type": "SYMBOL",
-              "name": "_substitution_start"
+              "type": "STRING",
+              "value": "$(("
             },
             {
               "type": "CHOICE",
@@ -5138,6 +5142,14 @@
     {
       "type": "SYMBOL",
       "name": "__error_recovery"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_command_substitution_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_arithmetic_substitution_start"
     }
   ],
   "inline": [

@@ -8,14 +8,21 @@ test('uses a Wasm build of the current parser', () => {
   expect(isWasmStale(), 'grammar.js or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
 });
 
-// Consumers parse untrusted scripts, so a long line must not make parsing superlinear: ten times the words take about
-// ten times as long, against a hundred times for a quadratic scanner. The ratio, unlike an absolute limit, holds on
+// These concatenation, line-continuation and plain nested-arithmetic shapes should grow proportionally: ten times the
+// input takes about ten times as long, against a hundred times for a quadratic scanner. The ratio holds on
 // slow CI runners. The parses are timed in the CPU time of the thread that runs them: wall-clock time is inflated
 // unevenly by other processes, and the process's CPU time also counts the engine's background threads, which compile
-// the Wasm build and collect garbage during the parses. 4,000 and 40,000 words are measured after warm-up parses and
+// the Wasm build and collect garbage during the parses. The small and large scripts are measured after warm-up parses and
 // in alternation, each keeping its fastest run; their ratio is 10 to 12 locally, and 18 leaves a margin over that
 // while failing for growth faster than about n^1.25.
 test.each([
+  [
+    'nested arithmetic substitutions',
+    (words: number) => {
+      const depth = words / 125;
+      return `printf "%s\\n" "${'$((1+'.repeat(depth)}1${'))'.repeat(depth)}"\n`.repeat(30);
+    },
+  ],
   ['words that concatenate with strings', (words: number) => `echo ${'a"b"; '.repeat(words)}\n`],
   ['a line after a line continuation', (words: number) => `x \\\n${'a"b" '.repeat(words)}\n`],
 ])('parses a long line of %s in linear time', { timeout: 60_000 }, (_, script) => {

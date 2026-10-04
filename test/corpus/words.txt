@@ -1125,3 +1125,188 @@ echo x@(a|@(b|@(c|@(d|e)))) x@(a|@(b|@(c|d)))
         alternative: (word)
         alternative: (word)))
     argument: (word)))
+
+================================================================================
+Compact subshell command substitutions retain arithmetic preference
+================================================================================
+
+render() {
+  local result="$((printf x) && printf y)" fallback
+  printf '%s\n' "$result" "$(((1) + 2))" "$((printf ')') && printf y)" \
+    "$((1+${fallback:-$((printf 2) && printf 3)}))" "$((printf x # ))
+) && printf y)" "$((16#ff))"
+}
+render
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    (word)
+    (compound_statement
+      (declaration_command
+        (command_name)
+        (variable_assignment
+          (variable_name)
+          (string
+            (command_substitution
+              (list
+                (subshell
+                  (command
+                    (command_name
+                      (word))
+                    (word)))
+                (command
+                  (command_name
+                    (word))
+                  (word))))))
+        (word))
+      (command
+        (command_name
+          (word))
+        (raw_string)
+        (string
+          (simple_expansion
+            (variable_name)))
+        (string
+          (arithmetic_expansion
+            (binary_expression
+              (parenthesized_expression
+                (number))
+              (number))))
+        (string
+          (command_substitution
+            (list
+              (subshell
+                (command
+                  (command_name
+                    (word))
+                  (raw_string)))
+              (command
+                (command_name
+                  (word))
+                (word)))))
+        (string
+          (arithmetic_expansion
+            (binary_expression
+              (number)
+              (expansion
+                (variable_name)
+                (operator)
+                (command_substitution
+                  (list
+                    (subshell
+                      (command
+                        (command_name
+                          (word))
+                        (word)))
+                    (command
+                      (command_name
+                        (word))
+                      (word))))))))
+        (string
+          (command_substitution
+            (list
+              (subshell
+                (command
+                  (command_name
+                    (word))
+                  (word))
+                (comment))
+              (command
+                (command_name
+                  (word))
+                (word)))))
+        (string
+          (arithmetic_expansion
+            (number))))))
+  (command
+    (command_name
+      (word))))
+
+================================================================================
+Compact subshell substitutions in heredoc and regex words
+================================================================================
+
+read -r result <<EOF
+$((printf x) && printf y)
+EOF
+[[ $result =~ $((printf x) && printf y) ]]
+printf '%s\n' "$result"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    (command_name
+      (word))
+    (word)
+    (word)
+    (heredoc_redirect
+      (heredoc_start)))
+  (heredoc_body
+    (heredoc_content)
+    (command_substitution
+      (list
+        (subshell
+          (command
+            (command_name
+              (word))
+            (word)))
+        (command
+          (command_name
+            (word))
+          (word))))
+    (heredoc_content)
+    (heredoc_end))
+  (test_command
+    (regex_test
+      (simple_expansion
+        (variable_name))
+      (command_substitution
+        (list
+          (subshell
+            (command
+              (command_name
+                (word))
+              (word)))
+          (command
+            (command_name
+              (word))
+            (word))))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))))
+
+==================
+Missing raw delimiter completion in a compact command substitution
+==================
+
+printf '%s\n' "$((printf x # ((
+) && printf y)"
+printf '%s\n' done
+
+---
+
+(program
+  (ERROR
+    (command
+      (command_name
+        (word))
+      (raw_string)
+      (ERROR
+        (variable_name))
+      (word))
+    (comment)
+    (word)
+    (word))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (word)))
+
