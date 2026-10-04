@@ -1338,3 +1338,15 @@ b # c` d
         argument: (word))
       (comment))
     argument: (word)))
+
+================================================================================
+Recovery after an invalid arithmetic operand preserves following compact commands
+================================================================================
+
+echo $(($))
+echo $((printf x) && printf y)
+echo "$((printf x) && printf y)"
+
+--------------------------------------------------------------------------------
+
+(program (command name: (command_name (word))) (ERROR) (command name: (command_name (word)) argument: (command_substitution (list left: (subshell (command name: (command_name (word)) argument: (word))) right: (command name: (command_name (word)) argument: (word))))) (command name: (command_name (word)) argument: (string (command_substitution (list left: (subshell (command name: (command_name (word)) argument: (word))) right: (command name: (command_name (word)) argument: (word)))))))

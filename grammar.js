@@ -145,9 +145,10 @@ module.exports = grammar({
     $.__error_recovery,
     $._command_substitution_start,
     $._arithmetic_substitution_start,
+    $._arithmetic_cache_reset,
   ],
 
-  extras: ($) => [$.comment, $.heredoc_body, /[ \t\n]/, /\\\n/, $._line_continuation],
+  extras: ($) => [$.comment, $.heredoc_body, /[ \t\n]/, /\\\n/, $._line_continuation, $._arithmetic_cache_reset],
 
   supertypes: ($) => [$._statement, $._arithmetic_expression],
 

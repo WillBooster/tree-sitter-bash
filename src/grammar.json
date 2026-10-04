@@ -4997,6 +4997,10 @@
     {
       "type": "SYMBOL",
       "name": "_line_continuation"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_arithmetic_cache_reset"
     }
   ],
   "conflicts": [
@@ -5150,6 +5154,10 @@
     {
       "type": "SYMBOL",
       "name": "_arithmetic_substitution_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_arithmetic_cache_reset"
     }
   ],
   "inline": [

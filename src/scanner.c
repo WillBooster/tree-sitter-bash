@@ -42,6 +42,7 @@ enum TokenType {
     ERROR_RECOVERY,
     COMMAND_SUBSTITUTION_START,
     ARITHMETIC_SUBSTITUTION_START,
+    ARITHMETIC_CACHE_RESET,
 };
 
 enum { ARITHMETIC_DISTANCE = 0x80, ARITHMETIC_DISTANCE_MASK = 0x7f };
@@ -1414,6 +1415,21 @@ static bool scan_dollar_or_substitution_start(Scanner *scanner, TSLexer *lexer, 
 
 static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool error_recovery = valid_symbols[ERROR_RECOVERY];
+    if (error_recovery) {
+        bool invalidated = false;
+        for (uint32_t i = 0; i < scanner->closers.size; i++) {
+            uint8_t *closer = array_get(&scanner->closers, i);
+            if ((*closer & ARITHMETIC_DISTANCE) && (*closer & ARITHMETIC_DISTANCE_MASK)) {
+                *closer = ARITHMETIC_DISTANCE;
+                invalidated = true;
+            }
+        }
+        if (invalidated) {
+            lexer->mark_end(lexer);
+            lexer->result_symbol = ARITHMETIC_CACHE_RESET;
+            return true;
+        }
+    }
     // Tokens that must touch the previous one (concatenation, an empty assignment value) are decided
     // by the character right after it, even when blanks are skipped below to find a newline.
     int32_t first = lexer->lookahead;
