@@ -626,3 +626,74 @@ done
           name: (command_name
             (word))
           argument: (word))))))
+
+================================================================================
+Recover a complete test after a malformed binary test
+================================================================================
+
+[["" =''4') ;
+	]]
+
+[='|';o ""} $$ ]]
+[[ a == - ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (test_command
+    (binary_test
+      left: (string)
+      operator: (test_operator)
+      right: (concatenation
+        (raw_string)
+        (word)
+        (ERROR (word))
+        (string)
+        (ERROR (word))
+        (simple_expansion (special_variable_name)))))
+  (test_command
+    (binary_test
+      left: (word)
+      operator: (test_operator)
+      right: (word))))
+
+================================================================================
+Recover a command with a redirect before a malformed subshell
+================================================================================
+
+y ->B(-
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name (word))
+    argument: (word)
+    redirect: (file_redirect destination: (word)))
+  (ERROR))
+
+================================================================================
+Recover complete leading commands before malformed quoting
+================================================================================
+
+echo "a" "b"
+ec"o "a ${b} c" "d` $e"
+echo "(())"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name (word))
+    argument: (string (string_content))
+    argument: (string (string_content)))
+  (command
+    name: (command_name
+      (concatenation (word) (string (string_content)) (word)))
+    argument: (expansion parameter: (variable_name))
+    argument: (concatenation (word) (string (string_content)) (word)))
+  (ERROR
+    (ERROR
+      (concatenation (simple_expansion (variable_name)) (string (string_content)))
+      (arithmetic_command))
+    (string_content)))
