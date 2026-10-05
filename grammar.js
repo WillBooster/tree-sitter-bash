@@ -152,7 +152,7 @@ module.exports = grammar({
 
   supertypes: ($) => [$._statement, $._arithmetic_expression],
 
-  inline: ($) => [$._terminator, $._command_statement],
+  inline: ($) => [$._terminator, $._command_statement, $._redirect, $._word, $._compound_command],
 
   // Until `;;` or `esac`, a case item's statements may belong to a middle item or to the last one.
   conflicts: ($) => [[$._statements, $._last_case_item]],

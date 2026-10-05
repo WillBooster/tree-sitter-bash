@@ -5162,7 +5162,10 @@
   ],
   "inline": [
     "_terminator",
-    "_command_statement"
+    "_command_statement",
+    "_redirect",
+    "_word",
+    "_compound_command"
   ],
   "supertypes": [
     "_statement",
