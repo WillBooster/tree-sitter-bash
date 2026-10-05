@@ -5163,7 +5163,6 @@
   "inline": [
     "_terminator",
     "_command_statement",
-    "_redirect",
     "_compound_command"
   ],
   "supertypes": [
