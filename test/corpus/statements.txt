@@ -626,3 +626,33 @@ done
           name: (command_name
             (word))
           argument: (word))))))
+
+================================================================================
+Recover a complete test after a malformed binary test
+================================================================================
+
+[["" =''4')
+	]]
+
+[='|';o ""} $$ ]]
+[[ a == - ]]
+
+--------------------------------------------------------------------------------
+
+(program
+  (test_command
+    (binary_test
+      left: (string)
+      operator: (test_operator)
+      right: (concatenation
+        (raw_string)
+        (word)
+        (ERROR (word))
+        (string)
+        (ERROR (word))
+        (simple_expansion (special_variable_name)))))
+  (test_command
+    (binary_test
+      left: (word)
+      operator: (test_operator)
+      right: (word))))

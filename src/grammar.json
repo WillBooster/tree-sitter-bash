@@ -5164,7 +5164,6 @@
     "_terminator",
     "_command_statement",
     "_redirect",
-    "_word",
     "_compound_command"
   ],
   "supertypes": [
