@@ -1278,7 +1278,45 @@ escaped="$(( $(cat >/dev/null <<'E'
 E
 printf 1 # )
 ) + 1 ))"
-printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped"
+backticked="$(( $(cat >/dev/null <<'E'
+a # `
+E
+printf 1
+) + 1 ))"
+braced="$(( $(cat >/dev/null <<'E'
+a # ${
+E
+printf 1
+) + 1 ))"
+bracketed="$(( $(cat >/dev/null <<'E'
+a # $[
+E
+printf 1
+) + 1 ))"
+looped=$(( $(printf 2; for((i=0;i<1<<0;i++)); do :; done
+# )
+) + 1 ))
+commented=$(( $(cat >/dev/null <<E
+( # )
+E
+printf 1 # `
+) + 1 ))
+nested_body="$(( $( : <<E $( : <<F
+a # )
+F
+printf ''
+)
+a # ( )
+E
+printf emit_number # `
+) + 2 ))"
+bodyframes=$(( 1 + $(
+(cat >/dev/null <<"E")
+a # ) (
+E
+printf 7 # )
+) ))
+printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes"
 
 --------------------------------------------------------------------------------
 
@@ -1551,9 +1589,205 @@ printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$pre
               (comment))
             (number))))))
   (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word)))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word)))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word)))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (c_style_for_statement
+              (binary_expression
+                (variable_name)
+                (number))
+              (binary_expression
+                (variable_name)
+                (binary_expression
+                  (number)
+                  (number)))
+              (postfix_expression
+                (variable_name))
+              (do_group
+                (command
+                  (command_name
+                    (word)))))
+            (comment))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (command_substitution
+          (subshell
+            (command
+              (command_name
+                (command_substitution
+                  (command
+                    (command_name
+                      (word))
+                    (heredoc_redirect
+                      (heredoc_start))
+                    (command_substitution
+                      (command
+                        (command_name
+                          (word))
+                        (heredoc_redirect
+                          (heredoc_start)))
+                      (heredoc_body
+                        (heredoc_content)
+                        (heredoc_end))
+                      (command
+                        (command_name
+                          (word))
+                        (raw_string))))
+                  (heredoc_body
+                    (heredoc_content)
+                    (heredoc_end))
+                  (command
+                    (command_name
+                      (word))
+                    (word))
+                  (comment)))
+              (word)
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (number)
+          (command_substitution
+            (subshell
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start))))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))))))
+  (command
     (command_name
       (word))
     (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
     (string
       (simple_expansion
         (variable_name)))
