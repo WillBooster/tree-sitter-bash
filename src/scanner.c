@@ -487,6 +487,7 @@ static bool probe_word_is(SubstitutionProbeInput *input, uint32_t start, uint32_
 static bool probe_word_boundary(SubstitutionProbeInput *input);
 static SubstitutionProbeHeredoc probe_heredoc_delimiter(SubstitutionProbeInput *input, uint32_t depth);
 static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHeredoc *heredoc);
+static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool retain_negative_hex);
 static void probe_ansi_c_escape(SubstitutionProbeInput *input, CodePoints *out);
 
 static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeInput *input, bool comments) {
@@ -816,7 +817,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 }
                 array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = next, .substitution = substitution}));
             } else if (!quoted && probe_lookahead(input) == '\'') {
-                uint8_t quote = !comments && (body || !(frame.delimiter & COMMAND_CONTEXT)) ? '\'' : ANSI_SINGLE_QUOTE;
+                uint8_t quote = !comments && body ? '\'' : ANSI_SINGLE_QUOTE;
                 array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = quote}));
                 probe_advance(input);
             }
@@ -1093,67 +1094,30 @@ static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHe
     return end;
 }
 
+typedef struct {
+    TSLexer lexer;
+    SubstitutionProbeInput *input;
+} SubstitutionProbeLexer;
+
+static void advance_probe_escape(TSLexer *lexer, bool skip);
+static bool probe_escape_eof(const TSLexer *lexer);
+
 static void probe_ansi_c_escape(SubstitutionProbeInput *input, CodePoints *out) {
-    int32_t c = probe_lookahead(input);
-    int32_t value = -1;
-    switch (c) {
-        case 'a': value = 7; break;
-        case 'b': value = 8; break;
-        case 'e':
-        case 'E': value = 27; break;
-        case 'f': value = 12; break;
-        case 'n': value = '\n'; break;
-        case 'r': value = '\r'; break;
-        case 't': value = '\t'; break;
-        case 'v': value = 11; break;
-        case '\\':
-        case '\'':
-        case '"':
-        case '?': value = c; break;
-        default: break;
-    }
-    if (value >= 0) {
-        probe_advance(input);
-        array_push(out, value);
-        return;
-    }
-    bool octal = c >= '0' && c <= '7';
-    int max_digits = octal ? 3 : c == 'x' ? 2 : c == 'u' ? 4 : c == 'U' ? 8 : 0;
-    if (max_digits > 0) {
-        if (!octal) {
-            probe_advance(input);
-        }
-        int digits = 0;
-        uint32_t number = 0;
-        while (digits < max_digits) {
-            int32_t next = probe_lookahead(input);
-            int32_t digit = next >= '0' && next <= '9' ? next - '0' :
-                            next >= 'a' && next <= 'f' ? next - 'a' + 10 :
-                            next >= 'A' && next <= 'F' ? next - 'A' + 10 : -1;
-            if (digit < 0 || digit >= (octal ? 8 : 16)) {
-                break;
-            }
-            number = number * (octal ? 8 : 16) + (uint32_t)digit;
-            probe_advance(input);
-            digits++;
-        }
-        if (digits > 0) {
-            array_push(out, (int32_t)number);
-        } else {
-            array_push(out, '\\');
-            array_push(out, c);
-        }
-        return;
-    }
-    if (c == 'c') {
-        probe_advance(input);
-        if (!probe_eof(input)) {
-            array_push(out, probe_lookahead(input) & 0x1F);
-            probe_advance(input);
-        }
-        return;
-    }
-    array_push(out, '\\');
+    SubstitutionProbeLexer cursor = {
+        .lexer = {.lookahead = probe_lookahead(input), .advance = advance_probe_escape, .eof = probe_escape_eof},
+        .input = input,
+    };
+    push_ansi_c_escape(&cursor.lexer, out, true);
+}
+
+static void advance_probe_escape(TSLexer *lexer, bool skip) {
+    SubstitutionProbeInput *input = ((SubstitutionProbeLexer *)lexer)->input;
+    probe_advance(input);
+    lexer->lookahead = probe_lookahead(input);
+}
+
+static bool probe_escape_eof(const TSLexer *lexer) {
+    return probe_eof(((const SubstitutionProbeLexer *)lexer)->input);
 }
 
 static bool probe_word_is(SubstitutionProbeInput *input, uint32_t start, uint32_t end, const char *word) {
@@ -1430,14 +1394,12 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
     }
 }
 
-// The delimiter word undergoes quote removal; any quoting makes the body literal.
 static inline int32_t hex_value(int32_t c) {
     return iswdigit(c) ? c - '0' : (c >= 'a' && c <= 'f') ? c - 'a' + 10 : (c >= 'A' && c <= 'F') ? c - 'A' + 10 : -1;
 }
 
-// Reads up to `max_digits` digits in `base` and returns their value, or -1 when there are none.
-static int32_t read_number(TSLexer *lexer, int32_t base, int max_digits) {
-    int32_t value = 0;
+static int32_t read_number(TSLexer *lexer, int32_t base, int max_digits, bool *has_digits) {
+    uint32_t value = 0;
     int digits = 0;
     while (digits < max_digits) {
         int32_t digit = hex_value(lexer->lookahead);
@@ -1448,11 +1410,11 @@ static int32_t read_number(TSLexer *lexer, int32_t base, int max_digits) {
         advance(lexer);
         digits++;
     }
-    return digits == 0 ? -1 : value;
+    *has_digits = digits > 0;
+    return (int32_t)value;
 }
 
-// Decodes the escape after a backslash in `$'...'` as bash does, appending it to `out`.
-static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out) {
+static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool retain_negative_hex) {
     int32_t c = lexer->lookahead;
     int32_t value = -1;
     switch (c) {
@@ -1477,14 +1439,16 @@ static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out) {
         return;
     }
     if (c >= '0' && c <= '7') {
-        array_push(out, read_number(lexer, 8, 3));
+        bool has_digits;
+        array_push(out, read_number(lexer, 8, 3, &has_digits));
         return;
     }
     int max_digits = c == 'x' ? 2 : c == 'u' ? 4 : c == 'U' ? 8 : 0;
     if (max_digits > 0) {
         advance(lexer);
-        value = read_number(lexer, 16, max_digits);
-        if (value < 0) {
+        bool has_digits;
+        value = read_number(lexer, 16, max_digits, &has_digits);
+        if (!has_digits || (!retain_negative_hex && value < 0)) {
             array_push(out, '\\');
             array_push(out, c);
         } else {
@@ -1500,7 +1464,6 @@ static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out) {
         }
         return;
     }
-    // Bash keeps an unknown escape as written.
     array_push(out, '\\');
 }
 
@@ -1535,7 +1498,7 @@ static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
                 advance(lexer);
             } else if (ansi_c && c == '\\') {
                 if (!lexer->eof(lexer)) {
-                    push_ansi_c_escape(lexer, &heredoc->delimiter);
+                    push_ansi_c_escape(lexer, &heredoc->delimiter, false);
                 }
                 continue;
             }

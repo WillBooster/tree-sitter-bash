@@ -1393,7 +1393,21 @@ b ) "
 E
 printf 7
 ) ))
-printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren" "$tail_backtick" "$tail_bracket" "$tail_pair"
+ansi_close=$(( $(printf 1 # $
+) + ${#absent[$'\')']} ))
+ansi_open=$(( $(printf 1 # $
+) + ${#absent[$'\'(']} ))
+ansi_before=$(( ${#absent[$'\')']} + $(printf 1 # $
+) ))
+ansi_balanced=$(( $(printf 1 # $
+) + ${#absent[$'\'']} ))
+U() { :; }
+ansi_negative=$(( $(cat >/dev/null <<$'\U80000000'
+: # )
+\U
+printf 1 # $
+) + 1 ))
+printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren" "$tail_backtick" "$tail_bracket" "$tail_pair" "$ansi_close" "$ansi_open" "$ansi_before" "$ansi_balanced" "$ansi_negative"
 
 --------------------------------------------------------------------------------
 
@@ -2168,9 +2182,116 @@ printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$pre
                 (word))
               (word)))))))
   (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (expansion
+            (operator)
+            (subscript
+              (variable_name)
+              (ansi_c_string)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (expansion
+            (operator)
+            (subscript
+              (variable_name)
+              (ansi_c_string)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (expansion
+            (operator)
+            (subscript
+              (variable_name)
+              (ansi_c_string)))
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (expansion
+            (operator)
+            (subscript
+              (variable_name)
+              (ansi_c_string)))))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (number)))))
+  (command
     (command_name
       (word))
     (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
     (string
       (simple_expansion
         (variable_name)))
