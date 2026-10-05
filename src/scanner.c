@@ -403,6 +403,8 @@ typedef struct {
     uint16_t delimiter;
     bool substitution;
     bool command;
+    uint32_t arithmetic_command;
+    uint32_t compact_position;
 } SubstitutionProbeFrame;
 
 typedef struct {
@@ -410,10 +412,13 @@ typedef struct {
     CodePoints buffered;
     uint32_t position;
     uint32_t limit;
+    Array(uint32_t) arithmetic_commands;
+    uint32_t arithmetic_command_index;
 } SubstitutionProbeInput;
 
 typedef struct {
     bool complete;
+    bool quoted_end;
     bool arithmetic;
     bool comment;
     uint8_t safe_distance;
@@ -439,6 +444,8 @@ static inline void probe_advance(SubstitutionProbeInput *input) {
 typedef struct {
     CodePoints delimiter;
     uint32_t depth;
+    uint32_t compact_depth;
+    uint32_t compact_position;
     bool allows_indent;
     bool started;
     bool has_delimiter;
@@ -490,6 +497,9 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         }
         if (c == '\\' && delimiter != '\'') {
             probe_advance(input);
+            if (body && array_get(&heredocs, active)->is_raw && probe_lookahead(input) == '\n') {
+                line_start = true;
+            }
             if (probe_lookahead(input) != '\n') {
                 word_start = false;
                 if (frame.delimiter & REGEX_OPERAND) {
@@ -529,6 +539,9 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 }
             }
             bool double_close = !unjoined_escape && probe_lookahead(input) == ')';
+            if (frame.arithmetic_command && !double_close) {
+                *array_get(&input->arithmetic_commands, frame.arithmetic_command - 1) = 0;
+            }
             if (delimiters.size == 0) {
                 result.arithmetic = double_close;
                 result.complete = true;
@@ -581,7 +594,8 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 }
                 array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = next, .substitution = substitution}));
             } else if (!quoted && probe_lookahead(input) == '\'') {
-                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ANSI_SINGLE_QUOTE}));
+                uint8_t quote = !comments && (body || !(frame.delimiter & COMMAND_CONTEXT)) ? '\'' : ANSI_SINGLE_QUOTE;
+                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = quote}));
                 probe_advance(input);
             }
             continue;
@@ -641,6 +655,17 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 } else {
                     SubstitutionProbeHeredoc heredoc = probe_heredoc_delimiter(input, command_depth);
                     if (heredoc.has_delimiter) {
+                        for (uint32_t i = delimiters.size; i > 0; i--) {
+                            SubstitutionProbeFrame owner = *array_get(&delimiters, i - 1);
+                            if (owner.compact_position) {
+                                heredoc.compact_depth = i - 1;
+                                heredoc.compact_position = owner.compact_position;
+                                break;
+                            }
+                            if (owner.command) {
+                                break;
+                            }
+                        }
                         array_push(&heredocs, heredoc);
                     } else {
                         array_delete(&heredoc.delimiter);
@@ -662,16 +687,46 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = c}));
         } else if (!quoted && c == '(' && delimiter == ')') {
             uint16_t role = frame.delimiter & (WORD_PAREN | REGEX_OPERAND) ? WORD_PAREN : frame.delimiter & CONDITIONAL_CONTEXT;
-            array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | role | (frame.delimiter & COMMAND_CONTEXT)}));
+            uint16_t context = frame.delimiter & COMMAND_CONTEXT;
+            probe_advance(input);
+            array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | role | context}));
+            if (context && word_start && !(frame.delimiter & (WORD_PAREN | REGEX_OPERAND | CONDITIONAL_CONTEXT)) &&
+                probe_lookahead(input) == '(') {
+                uint32_t command = 0;
+                bool arithmetic = false;
+                if (comments) {
+                    array_push(&input->arithmetic_commands, input->position);
+                    command = input->arithmetic_commands.size;
+                } else {
+                    while (input->arithmetic_command_index < input->arithmetic_commands.size &&
+                           *array_get(&input->arithmetic_commands, input->arithmetic_command_index) < input->position) {
+                        input->arithmetic_command_index++;
+                    }
+                    arithmetic = input->arithmetic_command_index < input->arithmetic_commands.size &&
+                                 *array_get(&input->arithmetic_commands, input->arithmetic_command_index) == input->position;
+                }
+                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | role | (arithmetic ? 0 : context), .arithmetic_command = command, .compact_position = !comments && !arithmetic ? input->position : 0}));
+                probe_advance(input);
+            }
+            word_start = true;
+            continue;
         }
         if (c == '\n') {
             line_start = true;
             if (!quoted && !body) {
-                for (uint32_t i = 0; i < heredocs.size; i++) {
+                for (uint32_t i = 0; i < heredocs.size;) {
                     if (array_get(&heredocs, i)->depth == command_depth) {
-                        array_get(&heredocs, i)->started = true;
+                        SubstitutionProbeHeredoc *heredoc = array_get(&heredocs, i);
+                        if (heredoc->compact_position && heredoc->compact_depth < delimiters.size &&
+                            array_get(&delimiters, heredoc->compact_depth)->compact_position == heredoc->compact_position) {
+                            array_delete(&heredoc->delimiter);
+                            array_erase(&heredocs, i);
+                            continue;
+                        }
+                        heredoc->started = true;
                         break;
                     }
+                    i++;
                 }
             }
         }
@@ -682,6 +737,10 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         array_delete(&array_get(&heredocs, i)->delimiter);
     }
     array_delete(&heredocs);
+    if (!comments && delimiters.size == 2) {
+        uint8_t delimiter = array_back(&delimiters)->delimiter;
+        result.quoted_end = delimiter == '\'' || delimiter == '"';
+    }
     array_delete(&delimiters);
     return result;
 }
@@ -744,14 +803,11 @@ static SubstitutionProbeHeredoc probe_heredoc_delimiter(SubstitutionProbeInput *
 
 static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHeredoc *heredoc) {
     uint32_t position = input->position;
-    if (heredoc->allows_indent) {
-        while (probe_lookahead(input) == '\t') {
-            probe_advance(input);
-        }
-    }
     uint32_t matched = 0;
     while (!probe_eof(input)) {
-        if (!heredoc->is_raw && probe_lookahead(input) == '\\') {
+        if (matched == 0 && heredoc->allows_indent && probe_lookahead(input) == '\t') {
+            probe_advance(input);
+        } else if (!heredoc->is_raw && probe_lookahead(input) == '\\') {
             probe_advance(input);
             if (probe_lookahead(input) != '\n') {
                 break;
@@ -766,6 +822,16 @@ static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHe
         }
     }
     bool end = matched == heredoc->delimiter.size && (probe_eof(input) || probe_lookahead(input) == '\n');
+    if (!end && matched == heredoc->delimiter.size) {
+        while (!probe_eof(input) && probe_lookahead(input) != '\n' && probe_lookahead(input) != ')') {
+            bool backslash = !heredoc->is_raw && probe_lookahead(input) == '\\';
+            probe_advance(input);
+            if (backslash && !probe_eof(input) && probe_lookahead(input) != ')') {
+                probe_advance(input);
+            }
+        }
+        end = probe_lookahead(input) == ')';
+    }
     input->position = position;
     return end;
 }
@@ -860,7 +926,7 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
                      (parent & ARITHMETIC_DISTANCE_MASK) > 0;
     uint8_t safe_distance = inherited ? (parent & ARITHMETIC_DISTANCE_MASK) - 1 : ARITHMETIC_DISTANCE_MASK;
     if (arithmetic && !inherited) {
-        SubstitutionProbeInput input = {.lexer = lexer, .buffered = array_new()};
+        SubstitutionProbeInput input = {.lexer = lexer, .buffered = array_new(), .arithmetic_commands = array_new()};
         probe_advance(&input);
         SubstitutionProbeResult result = probe_substitution_parenthesis(&input, true);
         arithmetic = result.arithmetic;
@@ -873,10 +939,11 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
             if (!result.arithmetic && !raw.complete) {
                 arithmetic = true;
                 safe_distance = 0;
-            } else if (!raw.complete || !raw.arithmetic || (result.arithmetic && input.position < end)) {
+            } else if ((!raw.complete && !raw.quoted_end) || !raw.arithmetic || (result.arithmetic && input.position < end)) {
                 arithmetic = false;
             }
         }
+        array_delete(&input.arithmetic_commands);
         array_delete(&input.buffered);
     }
     if (arithmetic && valid_symbols[ARITHMETIC_SUBSTITUTION_START]) {
