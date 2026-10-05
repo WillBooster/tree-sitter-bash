@@ -582,7 +582,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 continue;
             }
         }
-        if ((comments || (frame.delimiter & COMMAND_CONTEXT)) && !body && !quoted && delimiter == ')' && !(frame.delimiter & (WORD_PAREN | REGEX_OPERAND)) &&
+        if (comments && !body && !quoted && delimiter == ')' && !(frame.delimiter & (WORD_PAREN | REGEX_OPERAND)) &&
             c == '#' && word_start) {
             uint32_t start = input->position;
             while (!probe_eof(input) && probe_lookahead(input) != '\n') {
