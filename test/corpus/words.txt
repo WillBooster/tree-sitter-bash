@@ -1374,7 +1374,26 @@ cat >/dev/null <<K
 a # (
 K
 ) + 2 ))
-printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren"
+tail_backtick=$(( $(cat >/dev/null <<'E'
+a # ) "`
+E
+printf 7
+) + 7 ))
+tail_bracket=$(( $(cat >/dev/null <<'E'
+a # ) "$[
+E
+printf 7
+) + 7 ))
+tail_pair=$(( $(cat >/dev/null <<'E'
+a # ) "`
+E
+printf 7
+) + $(cat >/dev/null <<'E'
+b ) "
+E
+printf 7
+) ))
+printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren" "$tail_backtick" "$tail_bracket" "$tail_pair"
 
 --------------------------------------------------------------------------------
 
@@ -2072,9 +2091,95 @@ printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$pre
               (heredoc_end)))
           (number)))))
   (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))))))
+  (command
     (command_name
       (word))
     (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
     (string
       (simple_expansion
         (variable_name)))

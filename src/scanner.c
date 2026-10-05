@@ -805,7 +805,8 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                     array_back(&delimiters)->delimiter |= COMMAND_CONTEXT;
                     array_back(&delimiters)->command = true;
                 }
-            } else if ((comments || quoted) && (probe_lookahead(input) == '{' || probe_lookahead(input) == '[')) {
+            } else if ((comments && (probe_lookahead(input) == '{' || probe_lookahead(input) == '[')) ||
+                       (quoted && probe_lookahead(input) == '{')) {
                 uint8_t next = probe_lookahead(input) == '{' ? '}' : ']';
                 probe_advance(input);
                 bool substitution = next == ']' || is_blank(probe_lookahead(input)) ||
@@ -990,9 +991,12 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
     }
     array_delete(&heredocs);
     array_delete(&cases);
-    if (!comments && delimiters.size == 2) {
-        uint8_t delimiter = array_back(&delimiters)->delimiter;
+    if (!comments && delimiters.size > 1) {
+        uint8_t delimiter = array_get(&delimiters, 1)->delimiter;
         result.quoted_end = delimiter == '\'' || delimiter == '"';
+        for (uint32_t i = 2; result.quoted_end && i < delimiters.size; i++) {
+            result.quoted_end = array_get(&delimiters, i)->delimiter == '`';
+        }
     }
     array_delete(&delimiters);
     return result;
