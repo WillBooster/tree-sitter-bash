@@ -1790,3 +1790,21 @@ printf '%s\n' "$((a + b + c + d))"
 --------------------------------------------------------------------------------
 
 (program (command (variable_assignment (variable_name) (word))) (if_statement (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word)) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (command (command_name (word)) (raw_string) (string (arithmetic_expansion (binary_expression (binary_expression (binary_expression (variable_name) (variable_name)) (variable_name)) (variable_name))))))
+
+================================================================================
+Standalone timing prefixes before a closing backtick
+================================================================================
+
+a=`t\
+ime`
+b=`time -\
+p`
+c=`time --`
+d=`time -p --`
+e=`t\
+ime -- printf 7`
+printf "<%s><%s><%s><%s><%s>\n" "$a" "$b" "$c" "$d" "$e"
+
+--------------------------------------------------------------------------------
+
+(program (command (variable_assignment (variable_name) (command_substitution (timed_command)))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (word))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (command (command_name (word)) (word)))))) (command (command_name (word)) (string (string_content)) (string (simple_expansion (variable_name))) (string (simple_expansion (variable_name))) (string (simple_expansion (variable_name))) (string (simple_expansion (variable_name))) (string (simple_expansion (variable_name)))))

@@ -1347,7 +1347,7 @@ static bool scan_name_or_extglob_prefix(TSLexer *lexer, const bool *valid_symbol
     return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
 }
 
-static bool scan_timing_word(TSLexer *lexer, const bool *valid_symbols) {
+static bool scan_timing_word(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool keyword = lexer->lookahead == 't';
     const char *word = keyword ? "time" : NULL;
     enum TokenType symbol = TIMING_KEYWORD;
@@ -1401,7 +1401,8 @@ static bool scan_timing_word(TSLexer *lexer, const bool *valid_symbols) {
         joined = true;
     }
     if (!*word && valid_symbols[symbol] &&
-        (lexer->eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
+        (lexer->eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead) ||
+         (lexer->lookahead == '`' && scanner->backtick_depth > 0))) {
         if (lexer->lookahead == '<' || lexer->lookahead == '>') {
             advance(lexer);
             bool escaped = false;
@@ -2034,7 +2035,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     if (!error_recovery &&
         ((valid_symbols[TIMING_KEYWORD] && lexer->lookahead == 't') ||
          ((valid_symbols[TIMING_OPTION] || valid_symbols[TIMING_TERMINATOR]) && lexer->lookahead == '-'))) {
-        return scan_timing_word(lexer, valid_symbols);
+        return scan_timing_word(scanner, lexer, valid_symbols);
     }
 
     if (valid_symbols[EXTGLOB_PREFIX] && !(valid_symbols[VARIABLE_NAME] && is_name_start(lexer->lookahead)) &&
