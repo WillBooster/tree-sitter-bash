@@ -406,6 +406,7 @@ typedef struct {
     bool command;
     bool reserved_word_disabled;
     bool function_name;
+    bool assignment_subscript;
     uint32_t arithmetic_command;
     uint32_t compact_position;
     uint32_t quote_substitution;
@@ -657,7 +658,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             word_start = command_start = true;
             continue;
         }
-        if (comments && delimiter == ']' && (frame.delimiter & ASSIGNMENT_WORD) && (c == '(' || c == ')')) {
+        if (comments && delimiter == ']' && frame.assignment_subscript && (c == '(' || c == ')')) {
             result.reconcile = true;
         }
         if ((delimiter != ANSI_SINGLE_QUOTE && c == delimiter) ||
@@ -757,7 +758,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             uint32_t end = input->position;
             if (!recover_assignment && command_position && probe_lookahead(input) == '[') {
                 probe_advance(input);
-                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ']' | ASSIGNMENT_WORD}));
+                array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ']' | ASSIGNMENT_WORD, .assignment_subscript = true}));
                 array_back(&delimiters)->reserved_word_disabled = true;
                 command_start = word_start = false;
                 continue;
@@ -894,7 +895,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             continue;
         }
         if (comments && !quoted && delimiter == ']' && c == '[') {
-            array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ']'}));
+            array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ']', .assignment_subscript = frame.assignment_subscript}));
             probe_advance(input);
             continue;
         }
@@ -907,7 +908,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                     array_back(&delimiters)->delimiter |= CONDITIONAL_CONTEXT;
                 }
             } else {
-                word_start = false;
+                word_start = command_start = false;
             }
             continue;
         }

@@ -12,6 +12,7 @@ test('keeps arithmetic expansions when command words precede case arguments', as
       "$'a'",
       "$':'",
       'printf x{',
+      '[',
       'printf {',
       '{x',
       'x=1',
@@ -77,6 +78,9 @@ test('counts parentheses in assignment subscripts when selecting outer arithmeti
       for (const [key, type] of [
         ['(', 'command_substitution'],
         [')', 'command_substitution'],
+        ['a[(]', 'command_substitution'],
+        ['a[)]', 'command_substitution'],
+        ['a[(x)]', 'arithmetic_expansion'],
         ['(x)', 'arithmetic_expansion'],
         ['((x))', 'arithmetic_expansion'],
       ]) {
