@@ -1398,6 +1398,7 @@ static bool scan_timing_word(TSLexer *lexer, const bool *valid_symbols) {
             return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
         }
         advance(lexer);
+        joined = true;
     }
     if (!*word && valid_symbols[symbol] &&
         (lexer->eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
