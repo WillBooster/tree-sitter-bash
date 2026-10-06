@@ -490,6 +490,9 @@ static bool probe_word_is(SubstitutionProbeInput *input, uint32_t start, uint32_
 
 static bool probe_word_boundary(SubstitutionProbeInput *input);
 static bool probe_function_header(SubstitutionProbeInput *input);
+static bool probe_header_word(SubstitutionProbeInput *input);
+static bool probe_command_keyword(SubstitutionProbeInput *input, uint32_t start, uint32_t end);
+static bool is_extglob_operator(int32_t c);
 static bool probe_assignment_word(SubstitutionProbeInput *input, uint32_t start, uint32_t end);
 static void probe_function_gap(SubstitutionProbeInput *input);
 static SubstitutionProbeHeredoc probe_heredoc_delimiter(SubstitutionProbeInput *input, uint32_t depth);
@@ -611,6 +614,16 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         if (comments && !quoted && word_start && case_owner && current_case->awaiting_in &&
             !is_name_start(c) && !is_separator(c) && !is_metacharacter(c) && c != '\\') {
             current_case->selector_seen = true;
+        }
+        if (comments && !quoted && !body && word_start && command_start && coproc_name) {
+            uint32_t start = input->position;
+            if (probe_header_word(input) && !probe_command_keyword(input, start, input->position)) {
+                coproc_name = false;
+                command_start = true;
+                word_start = false;
+                continue;
+            }
+            input->position = start;
         }
         if (comments && !quoted && !body && word_start && command_start && !frame.reserved_word_disabled &&
             (frame.delimiter & COMMAND_CONTEXT) && !(frame.delimiter & (WORD_PAREN | REGEX_OPERAND | CONDITIONAL_CONTEXT)) &&
@@ -888,7 +901,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             probe_advance(input);
             continue;
         }
-        if (!quoted && word_start && c == '[') {
+        if (!quoted && word_start && command_start && !frame.reserved_word_disabled && c == '[') {
             probe_advance(input);
             if (probe_lookahead(input) == '[') {
                 probe_advance(input);
@@ -1112,20 +1125,7 @@ static bool probe_function_header(SubstitutionProbeInput *input) {
     bool function_keyword = false;
     for (;;) {
         uint32_t start = input->position;
-        bool word = false;
-        while (!probe_eof(input)) {
-            int32_t c = probe_lookahead(input);
-            if (c == '\\') {
-                probe_advance(input);
-                if (probe_eof(input)) break;
-                word = word || probe_lookahead(input) != '\n';
-                probe_advance(input);
-            } else {
-                if (is_separator(c) || is_metacharacter(c) || c == '\'' || c == '"' || c == '$' || c == '`' || (!word && c == '#')) break;
-                word = true;
-                probe_advance(input);
-            }
-        }
+        bool word = probe_header_word(input);
         uint32_t end = input->position;
         if (!word || (!function_keyword && probe_assignment_word(input, start, end))) break;
         probe_function_gap(input);
@@ -1134,26 +1134,77 @@ static bool probe_function_header(SubstitutionProbeInput *input) {
             function_keyword = true;
             continue;
         }
-        if (!function_keyword) {
-            static const char *keywords[] = {"if", "then", "else", "elif", "fi", "case", "esac", "for", "select", "while", "until", "do", "done", "in", "time", "coproc", "!", "{", "}"};
-            for (unsigned i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
-                if (probe_word_is(input, start, end, keywords[i])) {
-                    input->position = position;
-                    return false;
-                }
-            }
-        }
+        if (!function_keyword && probe_command_keyword(input, start, end)) break;
         if (probe_lookahead(input) != '(') {
             if (function_keyword) return true;
             break;
         }
+        uint32_t opening = input->position;
         probe_advance(input);
         probe_function_gap(input);
-        if (probe_lookahead(input) != ')') break;
+        if (probe_lookahead(input) != ')') {
+            if (function_keyword) {
+                input->position = opening;
+                return true;
+            }
+            break;
+        }
         probe_advance(input);
         return true;
     }
     input->position = position;
+    return false;
+}
+
+static bool probe_header_word(SubstitutionProbeInput *input) {
+    uint32_t start = input->position;
+    bool word = false;
+    while (!probe_eof(input)) {
+        int32_t c = probe_lookahead(input);
+        if (is_extglob_operator(c)) {
+            word = true;
+            probe_advance(input);
+            if (probe_lookahead(input) == '(') {
+                uint32_t depth = 1;
+                probe_advance(input);
+                while (depth && !probe_eof(input)) {
+                    int32_t pattern = probe_lookahead(input);
+                    probe_advance(input);
+                    if (pattern == '\\') {
+                        if (!probe_eof(input)) probe_advance(input);
+                    } else if (pattern == '(') {
+                        depth++;
+                    } else if (pattern == ')') {
+                        depth--;
+                    } else if (pattern == '\'' || pattern == '"' || pattern == '$' || pattern == '`') {
+                        input->position = start;
+                        return false;
+                    }
+                }
+                if (depth) {
+                    input->position = start;
+                    return false;
+                }
+            }
+        } else if (c == '\\') {
+            probe_advance(input);
+            if (probe_eof(input)) break;
+            word = word || probe_lookahead(input) != '\n';
+            probe_advance(input);
+        } else {
+            if (is_separator(c) || is_metacharacter(c) || c == '\'' || c == '"' || c == '$' || c == '`' || (!word && c == '#')) break;
+            word = true;
+            probe_advance(input);
+        }
+    }
+    return word;
+}
+
+static bool probe_command_keyword(SubstitutionProbeInput *input, uint32_t start, uint32_t end) {
+    static const char *keywords[] = {"function", "if", "then", "else", "elif", "fi", "case", "esac", "for", "select", "while", "until", "do", "done", "in", "time", "coproc", "!", "{", "}"};
+    for (unsigned i = 0; i < sizeof(keywords) / sizeof(keywords[0]); i++) {
+        if (probe_word_is(input, start, end, keywords[i])) return true;
+    }
     return false;
 }
 
