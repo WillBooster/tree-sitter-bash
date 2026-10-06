@@ -610,7 +610,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 if (comments && !quoted && word_start && case_owner && current_case->awaiting_in) {
                     current_case->selector_seen = true;
                 }
-                word_start = false;
+                word_start = command_start = false;
                 if (frame.delimiter & REGEX_OPERAND) {
                     array_back(&delimiters)->delimiter |= REGEX_STARTED;
                 }
