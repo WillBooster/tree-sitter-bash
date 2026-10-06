@@ -1356,7 +1356,11 @@ static bool scan_timing_word(TSLexer *lexer, const bool *valid_symbols) {
         advance(lexer);
         while (lexer->lookahead == '\\') {
             advance(lexer);
-            if (lexer->lookahead != '\n') return false;
+            if (lexer->lookahead != '\n') {
+                if (joined || lexer->eof(lexer)) return false;
+                advance(lexer);
+                return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
+            }
             advance(lexer);
             joined = true;
         }
@@ -1366,7 +1370,11 @@ static bool scan_timing_word(TSLexer *lexer, const bool *valid_symbols) {
     while (*word) {
         if (lexer->lookahead == '\\') {
             advance(lexer);
-            if (lexer->lookahead != '\n') return false;
+            if (lexer->lookahead != '\n') {
+                if (joined || lexer->eof(lexer)) return false;
+                advance(lexer);
+                return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
+            }
             advance(lexer);
             joined = true;
         } else if (lexer->lookahead == *word) {
@@ -1384,7 +1392,11 @@ static bool scan_timing_word(TSLexer *lexer, const bool *valid_symbols) {
     lexer->mark_end(lexer);
     while (lexer->lookahead == '\\') {
         advance(lexer);
-        if (lexer->lookahead != '\n') return false;
+        if (lexer->lookahead != '\n') {
+            if (joined || lexer->eof(lexer)) return false;
+            advance(lexer);
+            return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
+        }
         advance(lexer);
     }
     if (!*word && valid_symbols[symbol] &&

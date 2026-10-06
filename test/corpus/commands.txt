@@ -1774,3 +1774,17 @@ printf '%s\n' "$((a + b + c))"
 --------------------------------------------------------------------------------
 
 (program (if_statement (command (command_name (concatenation (word) (word) (process_substitution (command (command_name (word)) (word))))) (word)) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (word) (process_substitution (command (command_name (word)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (process_substitution (command (command_name (word)) (word))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (command (command_name (word)) (raw_string) (string (arithmetic_expansion (binary_expression (binary_expression (variable_name) (variable_name)) (variable_name))))))
+
+================================================================================
+Escaped ordinary extglob prefixes retain subsequent command consumers
+================================================================================
+
+x=not_found
+if t\ime@("$x") marker; then a=1; else a=2; fi
+if time -\p@("$x") marker; then b=3; else b=4; fi
+if time --\x@("$x") marker; then c=5; else c=6; fi
+printf '%s\n' "$((a + b + c))"
+
+--------------------------------------------------------------------------------
+
+(program (command (variable_assignment (variable_name) (word))) (if_statement (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word)) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (command (command_name (word)) (raw_string) (string (arithmetic_expansion (binary_expression (binary_expression (variable_name) (variable_name)) (variable_name))))))
