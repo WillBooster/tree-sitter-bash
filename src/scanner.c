@@ -405,6 +405,7 @@ typedef struct {
     bool substitution;
     bool command;
     bool reserved_word_disabled;
+    bool function_name;
     uint32_t arithmetic_command;
     uint32_t compact_position;
     uint32_t quote_substitution;
@@ -774,7 +775,14 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             }
             bool keyword = probe_word_boundary(input);
             bool keyword_position = command_position && !array_back(&delimiters)->reserved_word_disabled;
-            if (case_owner && current_case->awaiting_in && !current_case->selector_seen) {
+            bool function_name = frame.function_name;
+            if (keyword && keyword_position && function_name) {
+                array_back(&delimiters)->function_name = false;
+                command_start = true;
+            } else if (keyword && keyword_position && probe_word_is(input, start, end, "function")) {
+                array_back(&delimiters)->function_name = true;
+                command_start = true;
+            } else if (case_owner && current_case->awaiting_in && !current_case->selector_seen) {
                 current_case->selector_seen = true;
                 command_start = false;
             } else if (keyword && case_owner && current_case->awaiting_in && probe_word_is(input, start, end, "in")) {
@@ -800,6 +808,20 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                      probe_word_is(input, start, end, "coproc"));
                 timing_option = command_start && probe_word_is(input, start, end, "time") ? 1 : 0;
                 coproc_name = command_start && probe_word_is(input, start, end, "coproc");
+            }
+            if (keyword && keyword_position && (!command_start || function_name)) {
+                uint32_t position = input->position;
+                while (is_blank(probe_lookahead(input))) probe_advance(input);
+                if (probe_lookahead(input) == '(') {
+                    probe_advance(input);
+                    while (is_blank(probe_lookahead(input))) probe_advance(input);
+                    if (probe_lookahead(input) == ')') {
+                        probe_advance(input);
+                        command_start = word_start = true;
+                        continue;
+                    }
+                }
+                input->position = position;
             }
             word_start = false;
             continue;
@@ -1053,12 +1075,14 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             if (is_blank(c) || c == '\n' || is_metacharacter(c)) {
                 array_back(&delimiters)->delimiter &= ~ASSIGNMENT_WORD;
             }
-        } else if (!quoted && (c == '\n' || c == ';' || c == '&' || c == '|' || brace_group)) {
+        }
+        if (!quoted && (c == '\n' || c == ';' || c == '&' || c == '|' || brace_group)) {
             array_back(&delimiters)->reserved_word_disabled = false;
+            array_back(&delimiters)->function_name = false;
             command_start = true;
             timing_option = 0;
             coproc_name = false;
-        } else if (!quoted && !is_blank(c) && c != '(') {
+        } else if (!quoted && !is_blank(c) && c != '(' && !(frame.delimiter & ASSIGNMENT_WORD)) {
             command_start = false;
         }
         word_start = is_blank(c) || c == '\n' || is_metacharacter(c);

@@ -95,3 +95,54 @@ test('counts parentheses in assignment subscripts when selecting outer arithmeti
     parser.delete();
   }
 });
+
+test('tracks case bodies after function headers and assignment separators', async () => {
+  await Parser.init();
+  const parser = new Parser().setLanguage(await Language.load('tree-sitter-bash.wasm'));
+  try {
+    for (const body of [
+      'f() { case x in x) :;; esac; }',
+      'function f { case x in x) :;; esac; }',
+      'function f() { case x in x) :;; esac; }',
+      'f() ( case x in x) :;; esac )',
+      ...['\n', ';', ' ;', '&', '|'].map((separator) => `q=0${separator}case x in x) :;; esac`),
+      '>f\ncase x in x) :;; esac',
+    ]) {
+      const source = `v=$(( $(: <<E\na # (\nE\n${body} # \`\nprintf 1\n) + 1 ))\nprintf "%s\\n" "$v"\n`;
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        const outer = tree.rootNode.descendantsOfType('arithmetic_expansion')[0]!;
+        expect(outer.startIndex).toBe(2);
+        expect(outer.endIndex).toBe(source.indexOf('))\nprintf') + 2);
+        const index = source.indexOf('printf 1') + 7;
+        const prefix = source.slice(0, index).split('\n');
+        const point = { row: prefix.length - 1, column: prefix.at(-1)!.length };
+        tree.edit(
+          new Edit({
+            startIndex: index,
+            oldEndIndex: index + 1,
+            newEndIndex: index + 1,
+            startPosition: point,
+            oldEndPosition: { ...point, column: point.column + 1 },
+            newEndPosition: { ...point, column: point.column + 1 },
+          })
+        );
+        const changed = source.slice(0, index) + '2' + source.slice(index + 1);
+        const incremental = parser.parse(changed, tree)!;
+        const fresh = parser.parse(changed)!;
+        try {
+          expect(incremental.rootNode.toString()).toBe(fresh.rootNode.toString());
+          expect(incremental.rootNode.descendantsOfType('arithmetic_expansion')[0]?.text).toContain('printf 2');
+        } finally {
+          incremental.delete();
+          fresh.delete();
+        }
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});
