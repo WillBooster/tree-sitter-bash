@@ -1,7 +1,7 @@
 import { Edit, Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
-test('keeps arithmetic expansions when escaped command words precede case arguments', async () => {
+test('keeps arithmetic expansions when command words precede case arguments', async () => {
   await Parser.init();
   const parser = new Parser().setLanguage(await Language.load('tree-sitter-bash.wasm'));
   try {
@@ -10,6 +10,10 @@ test('keeps arithmetic expansions when escaped command words precede case argume
       String.raw`\x`,
       String.raw`\;`,
       "$'a'",
+      "$':'",
+      'printf x{',
+      'printf {',
+      '{x',
       'x=1',
       'x+=1',
       'x=',

@@ -1038,12 +1038,19 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 }
             }
         }
+        bool brace_group = false;
+        if (!quoted && c == '{' && word_start && command_start && !frame.reserved_word_disabled) {
+            uint32_t position = input->position;
+            probe_advance(input);
+            brace_group = probe_word_boundary(input);
+            input->position = position;
+        }
         if (comments && delimiter == ')' && (frame.delimiter & ASSIGNMENT_WORD)) {
             command_start = true;
             if (is_blank(c) || c == '\n' || is_metacharacter(c)) {
                 array_back(&delimiters)->delimiter &= ~ASSIGNMENT_WORD;
             }
-        } else if (!quoted && (c == '\n' || c == ';' || c == '&' || c == '|' || c == '{')) {
+        } else if (!quoted && (c == '\n' || c == ';' || c == '&' || c == '|' || brace_group)) {
             array_back(&delimiters)->reserved_word_disabled = false;
             command_start = true;
             timing_option = 0;
