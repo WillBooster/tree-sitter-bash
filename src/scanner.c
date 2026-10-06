@@ -656,6 +656,9 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             word_start = command_start = true;
             continue;
         }
+        if (comments && delimiter == ']' && (frame.delimiter & ASSIGNMENT_WORD) && (c == '(' || c == ')')) {
+            result.reconcile = true;
+        }
         if ((delimiter != ANSI_SINGLE_QUOTE && c == delimiter) ||
             (delimiter == ANSI_SINGLE_QUOTE && c == '\'')) {
             probe_advance(input);

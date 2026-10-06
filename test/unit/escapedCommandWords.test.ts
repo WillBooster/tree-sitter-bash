@@ -68,3 +68,30 @@ test('keeps arithmetic expansions when command words precede case arguments', as
     parser.delete();
   }
 });
+
+test('counts parentheses in assignment subscripts when selecting outer arithmetic', async () => {
+  await Parser.init();
+  const parser = new Parser().setLanguage(await Language.load('tree-sitter-bash.wasm'));
+  try {
+    for (const tail of ['; echo 3', '# c\necho 3']) {
+      for (const [key, type] of [
+        ['(', 'command_substitution'],
+        [')', 'command_substitution'],
+        ['(x)', 'arithmetic_expansion'],
+        ['((x))', 'arithmetic_expansion'],
+      ]) {
+        const source = `declare -A m; x=$(( $(m[${key}]=1 ${tail}) + 1 )); echo "[$x]"`;
+        const tree = parser.parse(source)!;
+        try {
+          const outer = tree.rootNode.descendantForIndex(source.indexOf('$(('), source.lastIndexOf('))') + 2)!;
+          expect(outer.type, source).toBe(type);
+          expect(outer.text).toBe(source.slice(source.indexOf('$(('), source.lastIndexOf('))') + 2));
+        } finally {
+          tree.delete();
+        }
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});
