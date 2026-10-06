@@ -5,7 +5,19 @@ test('keeps arithmetic expansions when escaped command words precede case argume
   await Parser.init();
   const parser = new Parser().setLanguage(await Language.load('tree-sitter-bash.wasm'));
   try {
-    for (const command of [String.raw`\:`, String.raw`\x`, String.raw`\;`]) {
+    for (const command of [
+      String.raw`\:`,
+      String.raw`\x`,
+      String.raw`\;`,
+      "$'a'",
+      'x=1',
+      'x+=1',
+      'x=',
+      'x="1"',
+      'x=$y',
+      '2>f',
+      '2>f x=1',
+    ]) {
       const source = `x=$(( $(${command} case; echo in; echo 1) + 1 ))`;
       const tree = parser.parse(source)!;
       try {

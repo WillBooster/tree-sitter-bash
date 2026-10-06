@@ -404,6 +404,7 @@ typedef struct {
     uint16_t delimiter;
     bool substitution;
     bool command;
+    bool reserved_word_disabled;
     uint32_t arithmetic_command;
     uint32_t compact_position;
     uint32_t quote_substitution;
@@ -469,7 +470,13 @@ typedef struct {
     uint32_t span_index;
     uint32_t body_span_index;
     uint32_t arithmetic_command;
+    uint32_t next;
 } SubstitutionProbeHeredoc;
+
+typedef struct {
+    uint32_t first;
+    uint32_t last;
+} SubstitutionProbeHeredocQueue;
 
 typedef struct {
     uint32_t depth;
@@ -493,6 +500,8 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
     uint32_t depth = 0;
     uint32_t command_depth = 0;
     Array(SubstitutionProbeHeredoc) heredocs = array_new();
+    Array(SubstitutionProbeHeredocQueue) heredoc_queues = array_new();
+    uint32_t active = UINT32_MAX;
     Array(SubstitutionProbeCase) cases = array_new();
     bool command_start = true;
     uint8_t timing_option = 0;
@@ -504,14 +513,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         uint8_t delimiter = frame.delimiter & ~AMBIGUOUS_PAREN;
         int32_t c = probe_lookahead(input);
         bool quoted = delimiter == '\'' || delimiter == '"' || delimiter == '`' || delimiter == ANSI_SINGLE_QUOTE;
-        uint32_t active = heredocs.size;
-        for (uint32_t i = 0; i < heredocs.size; i++) {
-            if (array_get(&heredocs, i)->started) {
-                active = i;
-                break;
-            }
-        }
-        bool body = active < heredocs.size;
+        bool body = active != UINT32_MAX;
         uint32_t body_end = input->position;
         if (comments && line_start && body && probe_heredoc_end(input, array_get(&heredocs, active))) {
             array_get(&input->heredoc_bodies, array_get(&heredocs, active)->body_span_index)->end = body_end;
@@ -520,8 +522,10 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 result.reconcile = result.reconcile || text == '(' || text == ')' || text == '\'' ||
                                      text == '"' || text == '`' || text == '$' || text == '\\';
             }
-            array_delete(&array_get(&heredocs, active)->delimiter);
-            array_erase(&heredocs, active);
+            SubstitutionProbeHeredoc *ended = array_get(&heredocs, active);
+            array_get(&heredoc_queues, ended->depth)->first = ended->next;
+            ended->started = false;
+            active = UINT32_MAX;
             line_start = false;
             continue;
         }
@@ -635,6 +639,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             result.safe_distance = 0;
             probe_advance(input);
             current_case->pattern = false;
+            array_back(&delimiters)->reserved_word_disabled = false;
             word_start = command_start = true;
             continue;
         }
@@ -647,6 +652,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 }
                 current_case->pattern = true;
             }
+            array_back(&delimiters)->reserved_word_disabled = false;
             word_start = command_start = true;
             continue;
         }
@@ -662,6 +668,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 }
                 if (probe_lookahead(input) == '=') {
                     array_back(&delimiters)->delimiter |= ASSIGNMENT_WORD;
+                    array_back(&delimiters)->reserved_word_disabled = true;
                 }
                 input->position = position;
             }
@@ -698,11 +705,8 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 while (cases.size && array_back(&cases)->depth > delimiters.size) {
                     array_pop(&cases);
                 }
-                for (uint32_t i = heredocs.size; i > 0; i--) {
-                    if (array_get(&heredocs, i - 1)->depth >= command_depth) {
-                        array_delete(&array_get(&heredocs, i - 1)->delimiter);
-                        array_erase(&heredocs, i - 1);
-                    }
+                if (command_depth < heredoc_queues.size) {
+                    array_get(&heredoc_queues, command_depth)->first = UINT32_MAX;
                 }
                 command_depth--;
             }
@@ -750,6 +754,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             if (!recover_assignment && command_position && probe_lookahead(input) == '[') {
                 probe_advance(input);
                 array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ']' | ASSIGNMENT_WORD}));
+                array_back(&delimiters)->reserved_word_disabled = true;
                 command_start = word_start = false;
                 continue;
             }
@@ -760,10 +765,12 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 }
                 if (probe_lookahead(input) == '=') {
                     array_back(&delimiters)->delimiter |= ASSIGNMENT_WORD;
+                    array_back(&delimiters)->reserved_word_disabled = true;
                 }
                 input->position = position;
             }
             bool keyword = probe_word_boundary(input);
+            bool keyword_position = command_position && !array_back(&delimiters)->reserved_word_disabled;
             if (case_owner && current_case->awaiting_in && !current_case->selector_seen) {
                 current_case->selector_seen = true;
                 command_start = false;
@@ -771,18 +778,18 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 current_case->awaiting_in = false;
                 current_case->pattern = true;
                 command_start = true;
-            } else if (keyword && command_position && probe_word_is(input, start, end, "case")) {
+            } else if (keyword && keyword_position && probe_word_is(input, start, end, "case")) {
                 array_push(&cases, ((SubstitutionProbeCase){.depth = delimiters.size, .awaiting_in = true}));
                 command_start = coproc_name = false;
                 timing_option = 0;
-            } else if (keyword && case_owner && command_start && probe_word_is(input, start, end, "esac")) {
+            } else if (keyword && case_owner && command_start && !frame.reserved_word_disabled && probe_word_is(input, start, end, "esac")) {
                 array_pop(&cases);
                 command_start = false;
             } else if (keyword && command_position && coproc_name) {
                 coproc_name = false;
                 command_start = true;
             } else {
-                command_start = keyword && command_position &&
+                command_start = keyword && keyword_position &&
                     (probe_word_is(input, start, end, "if") || probe_word_is(input, start, end, "then") ||
                      probe_word_is(input, start, end, "else") || probe_word_is(input, start, end, "elif") ||
                      probe_word_is(input, start, end, "while") || probe_word_is(input, start, end, "until") ||
@@ -809,7 +816,8 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             continue;
         }
         if (c == '$') {
-            word_start = false;
+            word_start = command_start = coproc_name = false;
+            timing_option = 0;
             probe_advance(input);
             if (probe_lookahead(input) == '(') {
                 if (!comments && quoted) {
@@ -942,6 +950,17 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                                 break;
                             }
                         }
+                        while (heredoc_queues.size <= command_depth) {
+                            array_push(&heredoc_queues, ((SubstitutionProbeHeredocQueue){.first = UINT32_MAX, .last = UINT32_MAX}));
+                        }
+                        SubstitutionProbeHeredocQueue *queue = array_get(&heredoc_queues, command_depth);
+                        if (queue->first == UINT32_MAX) {
+                            queue->first = heredocs.size;
+                        } else {
+                            array_get(&heredocs, queue->last)->next = heredocs.size;
+                        }
+                        queue->last = heredocs.size;
+                        heredoc.next = UINT32_MAX;
                         array_push(&heredocs, heredoc);
                     } else {
                         array_delete(&heredoc.delimiter);
@@ -953,6 +972,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             if (comments && command_position && (frame.delimiter & COMMAND_CONTEXT) &&
                 !(frame.delimiter & (AMBIGUOUS_PAREN | CONDITIONAL_CONTEXT))) {
                 array_back(&delimiters)->delimiter |= ASSIGNMENT_WORD;
+                array_back(&delimiters)->reserved_word_disabled = true;
                 command_start = false;
             }
             if (probe_lookahead(input) == '(') {
@@ -997,26 +1017,24 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         }
         if (c == '\n') {
             line_start = true;
-            if (!quoted && !body) {
-                for (uint32_t i = 0; i < heredocs.size;) {
-                    if (array_get(&heredocs, i)->depth == command_depth) {
-                        SubstitutionProbeHeredoc *heredoc = array_get(&heredocs, i);
-                        if ((heredoc->arithmetic_command &&
-                             *array_get(&input->arithmetic_commands, heredoc->arithmetic_command - 1) != 0) ||
-                            (heredoc->compact_position && heredoc->compact_depth < delimiters.size &&
-                             array_get(&delimiters, heredoc->compact_depth)->compact_position == heredoc->compact_position)) {
-                            array_get(&input->normalized_spans, heredoc->span_index)->end =
-                                array_get(&input->normalized_spans, heredoc->span_index)->start;
-                            array_delete(&heredoc->delimiter);
-                            array_erase(&heredocs, i);
-                            continue;
-                        }
-                        heredoc->started = true;
-                        heredoc->body_span_index = input->heredoc_bodies.size;
-                        array_push(&input->heredoc_bodies, ((SubstitutionProbeSpan){.start = input->position + 1}));
-                        break;
+            if (!quoted && !body && command_depth < heredoc_queues.size) {
+                SubstitutionProbeHeredocQueue *queue = array_get(&heredoc_queues, command_depth);
+                while (queue->first != UINT32_MAX) {
+                    SubstitutionProbeHeredoc *heredoc = array_get(&heredocs, queue->first);
+                    if ((heredoc->arithmetic_command &&
+                         *array_get(&input->arithmetic_commands, heredoc->arithmetic_command - 1) != 0) ||
+                        (heredoc->compact_position && heredoc->compact_depth < delimiters.size &&
+                         array_get(&delimiters, heredoc->compact_depth)->compact_position == heredoc->compact_position)) {
+                        array_get(&input->normalized_spans, heredoc->span_index)->end =
+                            array_get(&input->normalized_spans, heredoc->span_index)->start;
+                        queue->first = heredoc->next;
+                        continue;
                     }
-                    i++;
+                    active = queue->first;
+                    heredoc->started = true;
+                    heredoc->body_span_index = input->heredoc_bodies.size;
+                    array_push(&input->heredoc_bodies, ((SubstitutionProbeSpan){.start = input->position + 1}));
+                    break;
                 }
             }
         }
@@ -1026,6 +1044,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 array_back(&delimiters)->delimiter &= ~ASSIGNMENT_WORD;
             }
         } else if (!quoted && (c == '\n' || c == ';' || c == '&' || c == '|' || c == '{')) {
+            array_back(&delimiters)->reserved_word_disabled = false;
             command_start = true;
             timing_option = 0;
             coproc_name = false;
@@ -1043,6 +1062,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         array_delete(&heredoc->delimiter);
     }
     array_delete(&heredocs);
+    array_delete(&heredoc_queues);
     array_delete(&cases);
     if (!comments && delimiters.size > 1) {
         uint8_t delimiter = array_get(&delimiters, 1)->delimiter;
