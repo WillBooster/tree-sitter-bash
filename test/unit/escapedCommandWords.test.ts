@@ -18,6 +18,10 @@ test('keeps arithmetic expansions when command words precede case arguments', as
       'x=1',
       'x+=1',
       'x=',
+      'x=()',
+      'x+=()',
+      'x=(1)',
+      'x[0]=()',
       'x="1"',
       'x=$y',
       '2>f',
@@ -106,9 +110,20 @@ test('tracks case bodies after function headers and assignment separators', asyn
   try {
     for (const body of [
       'f() { case x in x) :;; esac; }',
-      ...['f \\\n ()', 'f(\\\n)', 'foo-bar()', 'foo.bar()', '1()', String.raw`f\ o()`, 'function foo-bar'].map(
-        (header) => `${header} { case x in x) :;; esac; }`
-      ),
+      ...[
+        'f \\\n ()',
+        'f(\\\n)',
+        'foo-bar()',
+        'foo.bar()',
+        '1()',
+        String.raw`f\ o()`,
+        'function foo-bar',
+        'a-b=()',
+        'a[0]()',
+        'a[0]b=()',
+        String.raw`a\=()`,
+        'function a=',
+      ].map((header) => `${header} { case x in x) :;; esac; }`),
       'function f { case x in x) :;; esac; }',
       'function f() { case x in x) :;; esac; }',
       'f() ( case x in x) :;; esac )',

@@ -490,6 +490,7 @@ static bool probe_word_is(SubstitutionProbeInput *input, uint32_t start, uint32_
 
 static bool probe_word_boundary(SubstitutionProbeInput *input);
 static bool probe_function_header(SubstitutionProbeInput *input);
+static bool probe_assignment_word(SubstitutionProbeInput *input, uint32_t start, uint32_t end);
 static void probe_function_gap(SubstitutionProbeInput *input);
 static SubstitutionProbeHeredoc probe_heredoc_delimiter(SubstitutionProbeInput *input, uint32_t depth);
 static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHeredoc *heredoc);
@@ -1126,7 +1127,7 @@ static bool probe_function_header(SubstitutionProbeInput *input) {
             }
         }
         uint32_t end = input->position;
-        if (!word) break;
+        if (!word || (!function_keyword && probe_assignment_word(input, start, end))) break;
         probe_function_gap(input);
         if (!function_keyword && probe_word_is(input, start, end, "function")) {
             if (input->position == end) break;
@@ -1153,6 +1154,41 @@ static bool probe_function_header(SubstitutionProbeInput *input) {
         return true;
     }
     input->position = position;
+    return false;
+}
+
+static bool probe_assignment_word(SubstitutionProbeInput *input, uint32_t start, uint32_t end) {
+    bool name = false;
+    bool key_closed = false;
+    bool append = false;
+    uint32_t brackets = 0;
+    for (uint32_t i = start; i < end; i++) {
+        int32_t c = *array_get(&input->buffered, i);
+        if (c == '\\' && i + 1 < end) {
+            int32_t next = *array_get(&input->buffered, ++i);
+            if (next == '\n' || brackets) continue;
+            return false;
+        }
+        if (brackets) {
+            if (c == '[') brackets++;
+            if (c == ']' && --brackets == 0) key_closed = true;
+        } else if (!name) {
+            if (!is_name_start(c)) return false;
+            name = true;
+        } else if (c == '=') {
+            return true;
+        } else if (append) {
+            return false;
+        } else if (c == '+') {
+            append = true;
+        } else if (key_closed) {
+            return false;
+        } else if (c == '[') {
+            brackets = 1;
+        } else if (!is_name_char(c)) {
+            return false;
+        }
+    }
     return false;
 }
 
