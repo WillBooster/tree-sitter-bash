@@ -5162,7 +5162,8 @@
   ],
   "inline": [
     "_terminator",
-    "_command_statement"
+    "_command_statement",
+    "_compound_command"
   ],
   "supertypes": [
     "_statement",

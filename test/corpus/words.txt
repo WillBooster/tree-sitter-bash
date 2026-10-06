@@ -1407,7 +1407,15 @@ ansi_negative=$(( $(cat >/dev/null <<$'\U80000000'
 \U
 printf 1 # $
 ) + 1 ))
-printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren" "$tail_backtick" "$tail_bracket" "$tail_pair" "$ansi_close" "$ansi_open" "$ansi_before" "$ansi_balanced" "$ansi_negative"
+subscript_command=$((printf '%s' $(slots[1<<2]=3
+printf '%s' "${slots[4]}")) )
+prefix_subscript=$((printf '%s' $(2>/dev/null slots[1<<2]+=3
+printf '%s' "${slots[4]}")) )
+argument_heredoc=$((printf '%s' $(printf 2 a[1<<2]=3
+ignored # )
+2]=3
+)) )
+printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren" "$tail_backtick" "$tail_bracket" "$tail_pair" "$ansi_close" "$ansi_open" "$ansi_before" "$ansi_balanced" "$ansi_negative" "$subscript_command" "$prefix_subscript" "$argument_heredoc"
 
 --------------------------------------------------------------------------------
 
@@ -2274,9 +2282,91 @@ printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$pre
             (comment))
           (number)))))
   (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (word))
+            (raw_string)
+            (command_substitution
+              (command
+                (variable_assignment
+                  (subscript
+                    (variable_name)
+                    (word))
+                  (word)))
+              (command
+                (command_name
+                  (word))
+                (raw_string)
+                (string
+                  (expansion
+                    (subscript
+                      (variable_name)
+                      (word)))))))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (word))
+            (raw_string)
+            (command_substitution
+              (command
+                (file_redirect
+                  (file_descriptor)
+                  (word))
+                (variable_assignment
+                  (subscript
+                    (variable_name)
+                    (word))
+                  (word)))
+              (command
+                (command_name
+                  (word))
+                (raw_string)
+                (string
+                  (expansion
+                    (subscript
+                      (variable_name)
+                      (word)))))))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (word))
+            (raw_string)
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (word)
+                (word)
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))))))))
+  (command
     (command_name
       (word))
     (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
     (string
       (simple_expansion
         (variable_name)))
@@ -2550,3 +2640,15 @@ printf '%s\n' "$value"
       (string
         (simple_expansion
           (variable_name))))))
+
+================================================================================
+An unterminated assignment subscript preserves command names during recovery
+================================================================================
+
+echo $((printf M $(slots[12=3
+printf N)) )
+printf '%s\n' after
+
+--------------------------------------------------------------------------------
+
+(ERROR (command_name (word)) (command_name (word)) (word) (variable_name) (word) (raw_string) (word))
