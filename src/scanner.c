@@ -1389,6 +1389,19 @@ static bool scan_timing_word(TSLexer *lexer, const bool *valid_symbols) {
     }
     if (!*word && valid_symbols[symbol] &&
         (lexer->eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
+        if (lexer->lookahead == '<' || lexer->lookahead == '>') {
+            advance(lexer);
+            bool escaped = false;
+            while (lexer->lookahead == '\\') {
+                advance(lexer);
+                if (lexer->lookahead != '\n') {
+                    escaped = true;
+                    break;
+                }
+                advance(lexer);
+            }
+            if (!escaped && lexer->lookahead == '(') return false;
+        }
         lexer->result_symbol = symbol;
         return true;
     }
