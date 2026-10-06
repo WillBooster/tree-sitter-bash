@@ -512,11 +512,18 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
             }
         }
         bool body = active < heredocs.size;
+        uint32_t body_end = input->position;
         if (comments && line_start && body && probe_heredoc_end(input, array_get(&heredocs, active))) {
-            array_get(&input->heredoc_bodies, array_get(&heredocs, active)->body_span_index)->end = input->position;
+            array_get(&input->heredoc_bodies, array_get(&heredocs, active)->body_span_index)->end = body_end;
+            for (uint32_t i = body_end; i < input->position; i++) {
+                int32_t text = *array_get(&input->buffered, i);
+                result.reconcile = result.reconcile || text == '(' || text == ')' || text == '\'' ||
+                                     text == '"' || text == '`' || text == '$' || text == '\\';
+            }
             array_delete(&array_get(&heredocs, active)->delimiter);
             array_erase(&heredocs, active);
-            body = false;
+            line_start = false;
+            continue;
         }
         line_start = false;
         bool raw_body = body && array_get(&heredocs, active)->is_raw;
@@ -1133,6 +1140,7 @@ static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHe
             break;
         }
     }
+    uint32_t delimiter_end = input->position;
     bool end = matched == heredoc->delimiter.size && (probe_eof(input) || probe_lookahead(input) == '\n');
     if (!end && matched == heredoc->delimiter.size) {
         while (!probe_eof(input) && probe_lookahead(input) != '\n' && probe_lookahead(input) != ')') {
@@ -1144,7 +1152,7 @@ static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHe
         }
         end = probe_lookahead(input) == ')';
     }
-    input->position = position;
+    input->position = end ? delimiter_end : position;
     return end;
 }
 

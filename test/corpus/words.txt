@@ -1415,7 +1415,22 @@ argument_heredoc=$((printf '%s' $(printf 2 a[1<<2]=3
 ignored # )
 2]=3
 )) )
-printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren" "$tail_backtick" "$tail_bracket" "$tail_pair" "$ansi_close" "$ansi_open" "$ansi_before" "$ansi_balanced" "$ansi_negative" "$subscript_command" "$prefix_subscript" "$argument_heredoc"
+delimiter_close=$(( $(cat >/dev/null <<')'
+(
+)
+printf 1
+) + 1 ))
+delimiter_open=$(( $(cat >/dev/null <<'('
+)
+(
+printf 1
+) + 1 ))
+delimiter_command=$(( $(cat >/dev/null <<')'
+plain
+)
+printf emit_number
+) + 1 ))
+printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren" "$tail_backtick" "$tail_bracket" "$tail_pair" "$ansi_close" "$ansi_open" "$ansi_before" "$ansi_balanced" "$ansi_negative" "$subscript_command" "$prefix_subscript" "$argument_heredoc" "$delimiter_close" "$delimiter_open" "$delimiter_command"
 
 --------------------------------------------------------------------------------
 
@@ -2355,9 +2370,84 @@ printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$pre
                 (heredoc_content)
                 (heredoc_end))))))))
   (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (command_substitution
+                (command
+                  (command_name
+                    (word))
+                  (file_redirect
+                    (word))
+                  (heredoc_redirect
+                    (heredoc_start)))
+                (heredoc_body
+                  (heredoc_content)
+                  (heredoc_end))
+                (command
+                  (command_name
+                    (word))
+                  (word))))
+            (word)
+            (word))))))
+  (command
     (command_name
       (word))
     (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
     (string
       (simple_expansion
         (variable_name)))
