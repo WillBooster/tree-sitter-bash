@@ -106,6 +106,9 @@ test('tracks case bodies after function headers and assignment separators', asyn
   try {
     for (const body of [
       'f() { case x in x) :;; esac; }',
+      ...['f \\\n ()', 'f(\\\n)', 'foo-bar()', 'foo.bar()', '1()', String.raw`f\ o()`, 'function foo-bar'].map(
+        (header) => `${header} { case x in x) :;; esac; }`
+      ),
       'function f { case x in x) :;; esac; }',
       'function f() { case x in x) :;; esac; }',
       'f() ( case x in x) :;; esac )',
