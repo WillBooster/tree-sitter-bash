@@ -146,6 +146,9 @@ module.exports = grammar({
     $._command_substitution_start,
     $._arithmetic_substitution_start,
     $._arithmetic_cache_reset,
+    $._timing_keyword,
+    $._timing_option,
+    $._timing_terminator,
   ],
 
   extras: ($) => [$.comment, $.heredoc_body, /[ \t\n]/, /\\\n/, $._line_continuation, $._arithmetic_cache_reset],
@@ -204,9 +207,9 @@ module.exports = grammar({
       prec.right(
         2,
         seq(
-          alias(token(/t(?:\\\n)*i(?:\\\n)*m(?:\\\n)*e/), 'time'),
-          optional(field('option', alias(token(/-(?:\\\n)*p/), $.word))),
-          optional(alias(token(/-(?:\\\n)*-/), $.word)),
+          choice('time', alias($._timing_keyword, 'time')),
+          optional(field('option', alias(choice('-p', $._timing_option), $.word))),
+          optional(alias($._timing_terminator, $.word)),
           optional(choice($._command_statement, $.pipeline, $.negated_command))
         )
       ),

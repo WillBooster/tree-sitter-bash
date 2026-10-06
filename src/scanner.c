@@ -43,6 +43,9 @@ enum TokenType {
     COMMAND_SUBSTITUTION_START,
     ARITHMETIC_SUBSTITUTION_START,
     ARITHMETIC_CACHE_RESET,
+    TIMING_KEYWORD,
+    TIMING_OPTION,
+    TIMING_TERMINATOR,
 };
 
 enum { COMMAND_CLOSER_PENDING = 1, ARITHMETIC_DISTANCE = 0x80, ARITHMETIC_DISTANCE_MASK = 0x7f };
@@ -1344,6 +1347,54 @@ static bool scan_name_or_extglob_prefix(TSLexer *lexer, const bool *valid_symbol
     return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
 }
 
+static bool scan_timing_word(TSLexer *lexer, const bool *valid_symbols) {
+    bool keyword = lexer->lookahead == 't';
+    const char *word = keyword ? "time" : NULL;
+    enum TokenType symbol = TIMING_KEYWORD;
+    bool joined = false;
+    if (word == NULL) {
+        advance(lexer);
+        while (lexer->lookahead == '\\') {
+            advance(lexer);
+            if (lexer->lookahead != '\n') return false;
+            advance(lexer);
+            joined = true;
+        }
+        symbol = lexer->lookahead == 'p' ? TIMING_OPTION : TIMING_TERMINATOR;
+        word = symbol == TIMING_OPTION ? "p" : "-";
+    }
+    while (*word) {
+        if (lexer->lookahead == '\\') {
+            advance(lexer);
+            if (lexer->lookahead != '\n') return false;
+            advance(lexer);
+            joined = true;
+        } else if (lexer->lookahead == *word) {
+            advance(lexer);
+            word++;
+        } else {
+            break;
+        }
+    }
+    if (!joined && symbol != TIMING_TERMINATOR) {
+        return keyword && valid_symbols[VARIABLE_NAME]
+                   ? scan_name_or_extglob_prefix(lexer, valid_symbols)
+                   : valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
+    }
+    lexer->mark_end(lexer);
+    while (lexer->lookahead == '\\') {
+        advance(lexer);
+        if (lexer->lookahead != '\n') return false;
+        advance(lexer);
+    }
+    if (!*word && valid_symbols[symbol] &&
+        (lexer->eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
+        lexer->result_symbol = symbol;
+        return true;
+    }
+    return !joined && valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
+}
+
 // Marks the current position and reports whether a reserved word that ends or continues a compound
 // command (`then`, `do`, `done`, `fi`, `esac`, `else`, `elif`, `}`) starts here.
 static bool at_closing_reserved_word(TSLexer *lexer) {
@@ -1952,6 +2003,12 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             return lexer->lookahead != '(';
         }
         return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(lexer, true);
+    }
+
+    if (!error_recovery &&
+        ((valid_symbols[TIMING_KEYWORD] && lexer->lookahead == 't') ||
+         ((valid_symbols[TIMING_OPTION] || valid_symbols[TIMING_TERMINATOR]) && lexer->lookahead == '-'))) {
+        return scan_timing_word(lexer, valid_symbols);
     }
 
     if (valid_symbols[EXTGLOB_PREFIX] && !(valid_symbols[VARIABLE_NAME] && is_name_start(lexer->lookahead)) &&
