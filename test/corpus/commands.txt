@@ -1710,3 +1710,27 @@ printf '%s\n' parsed
       (word))
     argument: (raw_string)
     argument: (word)))
+
+================================================================================
+Timed substitutions preserve consumers and literal command words
+================================================================================
+
+number(){ printf '%s' 3; }
+a=$(time -- number)
+b=$(time -p -- case x in x) printf '%s' 4;; esac)
+c=$(t\
+i\
+m\
+e -\
+p -\
+- { printf '%s' 5; })
+sum=$((a + b + c))
+printf '%s\n' "$sum"
+time -p -- number | cat
+function time { printf '%s\n' "$*"; }
+"time" -- ordinary
+ti\me -p ordinary
+
+--------------------------------------------------------------------------------
+
+(program (function_definition (word) (compound_statement (command (command_name (word)) (raw_string) (word)))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (command (command_name (word))))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (word) (case_statement (word) (case_item (word) (command (command_name (word)) (raw_string) (word)))))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (word) (compound_statement (command (command_name (word)) (raw_string) (word))))))) (command (variable_assignment (variable_name) (arithmetic_expansion (binary_expression (binary_expression (variable_name) (variable_name)) (variable_name))))) (command (command_name (word)) (raw_string) (string (simple_expansion (variable_name)))) (timed_command (word) (word) (pipeline (command (command_name (word))) (command (command_name (word))))) (function_definition (word) (compound_statement (command (command_name (word)) (raw_string) (string (simple_expansion (special_variable_name)))))) (command (command_name (string (string_content))) (word) (word)) (command (command_name (word)) (word) (word)))

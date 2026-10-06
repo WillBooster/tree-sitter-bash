@@ -310,7 +310,15 @@
         "type": "SEQ",
         "members": [
           {
-            "type": "STRING",
+            "type": "ALIAS",
+            "content": {
+              "type": "TOKEN",
+              "content": {
+                "type": "PATTERN",
+                "value": "t(?:\\\\\\n)*i(?:\\\\\\n)*m(?:\\\\\\n)*e"
+              }
+            },
+            "named": false,
             "value": "time"
           },
           {
@@ -322,12 +330,35 @@
                 "content": {
                   "type": "ALIAS",
                   "content": {
-                    "type": "STRING",
-                    "value": "-p"
+                    "type": "TOKEN",
+                    "content": {
+                      "type": "PATTERN",
+                      "value": "-(?:\\\\\\n)*p"
+                    }
                   },
                   "named": true,
                   "value": "word"
                 }
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "TOKEN",
+                  "content": {
+                    "type": "PATTERN",
+                    "value": "-(?:\\\\\\n)*-"
+                  }
+                },
+                "named": true,
+                "value": "word"
               },
               {
                 "type": "BLANK"

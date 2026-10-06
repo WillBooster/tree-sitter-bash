@@ -204,8 +204,9 @@ module.exports = grammar({
       prec.right(
         2,
         seq(
-          'time',
-          optional(field('option', alias('-p', $.word))),
+          alias(token(/t(?:\\\n)*i(?:\\\n)*m(?:\\\n)*e/), 'time'),
+          optional(field('option', alias(token(/-(?:\\\n)*p/), $.word))),
+          optional(alias(token(/-(?:\\\n)*-/), $.word)),
           optional(choice($._command_statement, $.pipeline, $.negated_command))
         )
       ),

@@ -2882,7 +2882,7 @@
       }
     },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": false,
       "types": [
         {
@@ -2943,6 +2943,10 @@
         },
         {
           "type": "while_statement",
+          "named": true
+        },
+        {
+          "type": "word",
           "named": true
         }
       ]
