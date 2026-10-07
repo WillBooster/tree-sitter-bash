@@ -1216,7 +1216,8 @@ static bool probe_assignment_word(SubstitutionProbeInput *input, uint32_t start,
     for (uint32_t i = start; i < end; i++) {
         int32_t c = *array_get(&input->buffered, i);
         if (c == '\\' && i + 1 < end) {
-            int32_t next = *array_get(&input->buffered, ++i);
+            i++;
+            int32_t next = *array_get(&input->buffered, i);
             if (next == '\n' || brackets) continue;
             return false;
         }
