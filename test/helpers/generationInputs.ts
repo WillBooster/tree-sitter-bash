@@ -24,5 +24,18 @@ export function generationInputMtime(root: string): number {
     ...fs.readdirSync(corpus, { recursive: true, encoding: 'utf8' }).map((file) => path.join(corpus, file)),
     ...examples.map((file) => path.join(root, file)),
   ];
-  return Math.max(...inputs.map((file) => fs.statSync(file).mtimeMs));
+  return Math.max(
+    ...inputs.map((file) => {
+      try {
+        return fs.statSync(file).mtimeMs;
+      } catch (error) {
+        throw Object.assign(
+          new Error(
+            `Cannot read generation input ${path.relative(root, file)}; restore it or stage removed examples, then run \`bun run build/ci\``
+          ),
+          { cause: error }
+        );
+      }
+    })
+  );
 }
