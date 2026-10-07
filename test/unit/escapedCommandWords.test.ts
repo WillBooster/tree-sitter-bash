@@ -225,3 +225,51 @@ test('preserves arithmetic selection around case commands in process substitutio
     parser.delete();
   }
 });
+
+test('keeps command selection for out-of-range ANSI-C heredoc delimiters', async () => {
+  await Parser.init();
+  const parser = new Parser().setLanguage(await Language.load('tree-sitter-bash.wasm'));
+  try {
+    for (const escape of ['80000000', 'ffffffff']) {
+      const source = `emit_number() { printf 3; }\nvalue="$(( $(cat >/dev/null <<$'\\U${escape}'\na (\n\\U\nprintf emit_number\n) + 2 ))"\nprintf 'VALUE=[%s]\\n' "$value"\n`;
+      const tree = parser.parse(source)!;
+      try {
+        const start = source.indexOf('$((');
+        const end = source.indexOf('))"') + 2;
+        expect(tree.rootNode.descendantsOfType('arithmetic_expansion')).toHaveLength(0);
+        expect(tree.rootNode.descendantsOfType('command_substitution').map((node) => node.text)).toContain(
+          source.slice(start, end)
+        );
+        const index = source.indexOf(escape);
+        const changed = source.slice(0, index) + '80000001' + source.slice(index + escape.length);
+        const column = index - source.lastIndexOf('\n', index) - 1;
+        tree.edit(
+          new Edit({
+            startIndex: index,
+            oldEndIndex: index + escape.length,
+            newEndIndex: index + 8,
+            startPosition: { row: 1, column },
+            oldEndPosition: { row: 1, column: column + escape.length },
+            newEndPosition: { row: 1, column: column + 8 },
+          })
+        );
+        const edited = parser.parse(changed, tree)!;
+        const fresh = parser.parse(changed)!;
+        try {
+          expect(edited.rootNode.toString()).toBe(fresh.rootNode.toString());
+          expect(edited.rootNode.descendantsOfType('arithmetic_expansion')).toHaveLength(0);
+          expect(edited.rootNode.descendantsOfType('command_substitution').map((node) => node.text)).toContain(
+            changed.slice(start, end)
+          );
+        } finally {
+          edited.delete();
+          fresh.delete();
+        }
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    parser.delete();
+  }
+});

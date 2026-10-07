@@ -497,7 +497,7 @@ static bool probe_assignment_word(SubstitutionProbeInput *input, uint32_t start,
 static void probe_function_gap(SubstitutionProbeInput *input);
 static SubstitutionProbeHeredoc probe_heredoc_delimiter(SubstitutionProbeInput *input, uint32_t depth);
 static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHeredoc *heredoc);
-static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool retain_negative_hex);
+static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool literal_invalid_unicode);
 static void probe_ansi_c_escape(SubstitutionProbeInput *input, CodePoints *out);
 
 static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeInput *input, bool comments, bool recover_assignment) {
@@ -1368,7 +1368,7 @@ static void probe_ansi_c_escape(SubstitutionProbeInput *input, CodePoints *out) 
         .lexer = {.lookahead = probe_lookahead(input), .advance = advance_probe_escape, .eof = probe_escape_eof},
         .input = input,
     };
-    push_ansi_c_escape(&cursor.lexer, out, true);
+    push_ansi_c_escape(&cursor.lexer, out, false);
 }
 
 static void advance_probe_escape(TSLexer *lexer, bool skip) {
@@ -1684,7 +1684,7 @@ static int32_t read_number(TSLexer *lexer, int32_t base, int max_digits, bool *h
     return (int32_t)value;
 }
 
-static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool retain_negative_hex) {
+static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool literal_invalid_unicode) {
     int32_t c = lexer->lookahead;
     int32_t value = -1;
     switch (c) {
@@ -1718,10 +1718,10 @@ static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool retain_nega
         advance(lexer);
         bool has_digits;
         value = read_number(lexer, 16, max_digits, &has_digits);
-        if (!has_digits || (!retain_negative_hex && value < 0)) {
+        if (!has_digits || (literal_invalid_unicode && value < 0)) {
             array_push(out, '\\');
             array_push(out, c);
-        } else {
+        } else if (value >= 0) {
             array_push(out, value);
         }
         return;
@@ -1768,7 +1768,7 @@ static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
                 advance(lexer);
             } else if (ansi_c && c == '\\') {
                 if (!lexer->eof(lexer)) {
-                    push_ansi_c_escape(lexer, &heredoc->delimiter, false);
+                    push_ansi_c_escape(lexer, &heredoc->delimiter, true);
                 }
                 continue;
             }
