@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root"
+mkdir -p .tmp/generation-profiles
+
+training=(--corpus "$root/test/corpus")
+while IFS= read -r -d '' file; do
+  training+=("$root/$file")
+done < <(git ls-files -z -- examples)
+
+jq -r '.grammars | map(.path // ".") | unique[]' tree-sitter.json | while IFS= read -r grammar; do
+  script/tree-sitter generate "$grammar/grammar.js" --abi 16
+  name=$(jq -r .name "$grammar/src/grammar.json")
+  profile="$root/.tmp/generation-profiles/$name.json"
+  script/tree-sitter profile --grammar-path "$grammar" --output "$profile" "${training[@]}"
+  script/tree-sitter generate "$grammar/grammar.js" --abi 16 --profile "$profile"
+done
