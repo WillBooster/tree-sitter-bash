@@ -10,7 +10,11 @@ export function generationInputMtime(root: string): number {
   })
     .split('\0')
     .filter(Boolean);
-  const recordedExamples = fs.readFileSync(path.join(root, '.tmp/generation-profiles/examples.z'), 'utf8');
+  const recordedPath = path.join(root, '.tmp/generation-profiles/examples.z');
+  if (!fs.existsSync(recordedPath)) {
+    throw new Error('Generation inputs have not been recorded; run `bun run build/ci`');
+  }
+  const recordedExamples = fs.readFileSync(recordedPath, 'utf8');
   if (examples.join('\0') + (examples.length > 0 ? '\0' : '') !== recordedExamples) {
     throw new Error('Git-tracked generation examples changed; run `bun run build/ci`');
   }
