@@ -13,7 +13,7 @@ const WasmPath = path.join(Root, 'tree-sitter-bash.wasm');
 
 // Rebuilding here would race with other test files loading the Wasm build, so a stale one is reported.
 export function isWasmStale(): boolean {
-  const sources = ['grammar.js', 'src/parser.c', 'src/scanner.c'].map(
+  const sources = ['grammar.js', 'src/parser.c', 'src/scanner.c', 'src/tree_sitter/parser.h'].map(
     (name) => fs.statSync(path.join(Root, name)).mtimeMs
   );
   return Math.max(generationInputMtime(Root), ...sources) > fs.statSync(WasmPath).mtimeMs;

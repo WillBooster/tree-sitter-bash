@@ -83,7 +83,7 @@ binary that runs here. Run other CLI commands through it as well (e.g. `script/t
 
 `bun run generate` records a fresh ABI 16 generation profile from the applicable `test/corpus` cases and Git-tracked
 files in `examples/`, then generates compact parser tables. After changing a grammar, corpus case, or tracked example,
-regenerate and commit `src/`. Stage new example files before generation so they are included in the profile.
+regenerate and commit `src/`. Stage added or removed examples with `git add -A examples` before generation so the profile uses the intended file list.
 Profiles in `.tmp/generation-profiles/` are temporary and must not be committed. `bun run build-wasm`, `bun run build/ci`,
 and the release build regenerate the parsers before compiling them.
 
