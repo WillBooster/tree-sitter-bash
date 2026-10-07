@@ -6,7 +6,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 mkdir -p .tmp/generation-profiles
 
-examples="$root/.tmp/generation-profiles/examples.pending.z"
+examples=$(mktemp "$root/.tmp/generation-profiles/examples.pending.XXXXXX")
 git ls-files -z -- examples > "$examples"
 
 training=(--corpus "$root/test/corpus")
