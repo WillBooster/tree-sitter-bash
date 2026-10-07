@@ -495,7 +495,7 @@ static bool probe_header_word(SubstitutionProbeInput *input);
 static bool probe_command_keyword(SubstitutionProbeInput *input, uint32_t start, uint32_t end);
 static bool is_extglob_operator(int32_t c);
 static bool probe_assignment_word(SubstitutionProbeInput *input, uint32_t start, uint32_t end);
-static void probe_function_gap(SubstitutionProbeInput *input);
+static void probe_horizontal_space(SubstitutionProbeInput *input);
 static SubstitutionProbeHeredoc probe_heredoc_delimiter(SubstitutionProbeInput *input, uint32_t depth);
 static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHeredoc *heredoc);
 static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool literal_invalid_unicode);
@@ -1131,7 +1131,7 @@ static bool probe_function_header(SubstitutionProbeInput *input) {
         bool word = probe_header_word(input);
         uint32_t end = input->position;
         if (!word || (!function_keyword && probe_assignment_word(input, start, end))) break;
-        probe_function_gap(input);
+        probe_horizontal_space(input);
         if (!function_keyword && probe_word_is(input, start, end, "function")) {
             if (input->position == end) break;
             function_keyword = true;
@@ -1144,7 +1144,7 @@ static bool probe_function_header(SubstitutionProbeInput *input) {
         }
         uint32_t opening = input->position;
         probe_advance(input);
-        probe_function_gap(input);
+        probe_horizontal_space(input);
         if (probe_lookahead(input) != ')') {
             if (function_keyword) {
                 input->position = opening;
@@ -1247,7 +1247,7 @@ static bool probe_assignment_word(SubstitutionProbeInput *input, uint32_t start,
     return false;
 }
 
-static void probe_function_gap(SubstitutionProbeInput *input) {
+static void probe_horizontal_space(SubstitutionProbeInput *input) {
     for (;;) {
         if (is_blank(probe_lookahead(input))) {
             probe_advance(input);
@@ -1433,8 +1433,10 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
         if (result.case_pattern && result.complete && !result.arithmetic) {
             uint32_t position = input.position;
             for (;;) {
-                while (is_blank(probe_lookahead(&input)) || probe_lookahead(&input) == '\n') {
+                probe_horizontal_space(&input);
+                if (probe_lookahead(&input) == '\n') {
                     probe_advance(&input);
+                    continue;
                 }
                 if (probe_lookahead(&input) != '#') break;
                 while (!probe_eof(&input) && probe_lookahead(&input) != '\n') {

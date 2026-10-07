@@ -319,14 +319,27 @@ test('preserves case substitution recovery while closing an unfinished expansion
       tree.delete();
       tree = edited;
     }
-    const commented = parser.parse('x=$(( $(case a in a) :;; esac )) # trailing comment\n')!;
-    try {
-      expect(commented.rootNode.type).toBe('program');
-      expect(commented.rootNode.descendantsOfType('subshell')).toHaveLength(0);
-      expect(commented.rootNode.descendantsOfType('command_substitution')[0]!.parent!.type).toBe('ERROR');
-      expect(commented.rootNode.descendantsOfType('comment')[0]!.text).toBe('# trailing comment');
-    } finally {
-      commented.delete();
+    for (const suffix of [' \\\n', '\n\\\n', ' \\\n \\\n']) {
+      const continuedSource = 'x=$(( $(case a in a) :;; esac ))' + suffix;
+      const continued = parser.parse(continuedSource)!;
+      try {
+        expect(continued.rootNode.descendantsOfType('subshell')).toHaveLength(0);
+        expect(continued.rootNode.descendantsOfType('command_substitution')[0]!.parent!.type).toBe('ERROR');
+        expect(continued.rootNode.descendantsOfType('ERROR').at(-1)!.endIndex).toBe(continuedSource.length);
+      } finally {
+        continued.delete();
+      }
+    }
+    for (const ending of ['\n', '\n \\\n']) {
+      const commented = parser.parse('x=$(( $(case a in a) :;; esac )) # trailing comment' + ending)!;
+      try {
+        expect(commented.rootNode.type).toBe('program');
+        expect(commented.rootNode.descendantsOfType('subshell')).toHaveLength(0);
+        expect(commented.rootNode.descendantsOfType('command_substitution')[0]!.parent!.type).toBe('ERROR');
+        expect(commented.rootNode.descendantsOfType('comment')[0]!.text).toBe('# trailing comment');
+      } finally {
+        commented.delete();
+      }
     }
   } finally {
     tree.delete();
