@@ -439,6 +439,7 @@ typedef struct {
     bool arithmetic;
     bool reconcile;
     bool unmatched_assignment;
+    bool case_pattern;
     uint8_t safe_distance;
 } SubstitutionProbeResult;
 
@@ -500,7 +501,7 @@ static bool probe_heredoc_end(SubstitutionProbeInput *input, SubstitutionProbeHe
 static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool literal_invalid_unicode);
 static void probe_ansi_c_escape(SubstitutionProbeInput *input, CodePoints *out);
 
-static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeInput *input, bool comments, bool recover_assignment) {
+static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeInput *input, bool comments, bool recover_assignment, bool recover_case) {
     SubstitutionProbeResult result = {.arithmetic = true, .safe_distance = ARITHMETIC_DISTANCE_MASK};
     Array(SubstitutionProbeFrame) delimiters = array_new();
     array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')'}));
@@ -661,6 +662,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         }
         if (comments && !quoted && case_owner && current_case->pattern && c == ')' && delimiter == ')') {
             result.reconcile = true;
+            result.case_pattern = true;
             result.safe_distance = 0;
             probe_advance(input);
             current_case->pattern = false;
@@ -806,7 +808,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 current_case->awaiting_in = false;
                 current_case->pattern = true;
                 command_start = true;
-            } else if (keyword && keyword_position && probe_word_is(input, start, end, "case")) {
+            } else if (!recover_case && keyword && keyword_position && probe_word_is(input, start, end, "case")) {
                 array_push(&cases, ((SubstitutionProbeCase){.depth = delimiters.size, .awaiting_in = true}));
                 command_start = coproc_name = false;
                 timing_option = 0;
@@ -1426,15 +1428,30 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
     if (arithmetic && !inherited) {
         SubstitutionProbeInput input = {.lexer = lexer, .buffered = array_new(), .arithmetic_commands = array_new(), .command_comments = array_new(), .normalized_spans = array_new(), .heredoc_bodies = array_new(), .quote_substitutions = array_new()};
         probe_advance(&input);
-        SubstitutionProbeResult result = probe_substitution_parenthesis(&input, true, false);
-        if (result.unmatched_assignment) {
+        SubstitutionProbeResult result = probe_substitution_parenthesis(&input, true, false, false);
+        bool recover_case = result.case_pattern && !result.complete;
+        if (result.case_pattern && result.complete && !result.arithmetic) {
+            uint32_t position = input.position;
+            for (;;) {
+                while (is_blank(probe_lookahead(&input)) || probe_lookahead(&input) == '\n') {
+                    probe_advance(&input);
+                }
+                if (probe_lookahead(&input) != '#') break;
+                while (!probe_eof(&input) && probe_lookahead(&input) != '\n') {
+                    probe_advance(&input);
+                }
+            }
+            recover_case = probe_eof(&input);
+            input.position = position;
+        }
+        if (result.unmatched_assignment || recover_case) {
             input.position = 1;
             array_clear(&input.arithmetic_commands);
             array_clear(&input.command_comments);
             array_clear(&input.normalized_spans);
             array_clear(&input.heredoc_bodies);
             array_clear(&input.quote_substitutions);
-            result = probe_substitution_parenthesis(&input, true, true);
+            result = probe_substitution_parenthesis(&input, true, result.unmatched_assignment, recover_case);
         }
         arithmetic = result.arithmetic;
         safe_distance = result.safe_distance;
@@ -1442,7 +1459,7 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
             uint32_t end = input.position;
             input.limit = result.arithmetic ? end : 0;
             input.position = 1;
-            SubstitutionProbeResult raw = probe_substitution_parenthesis(&input, false, false);
+            SubstitutionProbeResult raw = probe_substitution_parenthesis(&input, false, false, false);
             if (!result.arithmetic && !raw.complete) {
                 arithmetic = true;
                 safe_distance = 0;

@@ -273,3 +273,63 @@ test('keeps command selection for out-of-range ANSI-C heredoc delimiters', async
     parser.delete();
   }
 });
+
+test('preserves case substitution recovery while closing an unfinished expansion', async () => {
+  await Parser.init();
+  const parser = new Parser().setLanguage(await Language.load('tree-sitter-bash.wasm'));
+  let source = 'x=$(( $(case a in a) :;; esac )\n';
+  let tree = parser.parse(source)!;
+  try {
+    for (let closers = 1; closers <= 3; closers++) {
+      const substitution = tree.rootNode.descendantsOfType('command_substitution')[0]!;
+      expect(tree.rootNode.descendantsOfType('case_statement')).toHaveLength(1);
+      if (closers < 3) expect(tree.rootNode.descendantsOfType('subshell')).toHaveLength(0);
+      if (closers === 1) {
+        const name = substitution.parent!;
+        expect(name.type).toBe('command_name');
+        expect(name.parent!.childForFieldName('name')!.id).toBe(name.id);
+        expect(tree.rootNode.descendantsOfType('ERROR')[0]!.endIndex).toBe(source.length);
+      } else if (closers === 2) {
+        expect(substitution.parent!.type).toBe('ERROR');
+        expect(substitution.parent!.endIndex).toBe(source.length - 1);
+      } else {
+        expect(tree.rootNode.hasError).toBe(false);
+        expect(tree.rootNode.descendantsOfType('subshell')).toHaveLength(1);
+        break;
+      }
+      const index = source.length - 1;
+      tree.edit(
+        new Edit({
+          startIndex: index,
+          oldEndIndex: index,
+          newEndIndex: index + 1,
+          startPosition: { row: 0, column: index },
+          oldEndPosition: { row: 0, column: index },
+          newEndPosition: { row: 0, column: index + 1 },
+        })
+      );
+      source = source.slice(0, index) + ')\n';
+      const edited = parser.parse(source, tree)!;
+      const fresh = parser.parse(source)!;
+      try {
+        expect(edited.rootNode.toString()).toBe(fresh.rootNode.toString());
+      } finally {
+        fresh.delete();
+      }
+      tree.delete();
+      tree = edited;
+    }
+    const commented = parser.parse('x=$(( $(case a in a) :;; esac )) # trailing comment\n')!;
+    try {
+      expect(commented.rootNode.type).toBe('program');
+      expect(commented.rootNode.descendantsOfType('subshell')).toHaveLength(0);
+      expect(commented.rootNode.descendantsOfType('command_substitution')[0]!.parent!.type).toBe('ERROR');
+      expect(commented.rootNode.descendantsOfType('comment')[0]!.text).toBe('# trailing comment');
+    } finally {
+      commented.delete();
+    }
+  } finally {
+    tree.delete();
+    parser.delete();
+  }
+});
