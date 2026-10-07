@@ -6,10 +6,13 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 mkdir -p .tmp/generation-profiles
 
+examples="$root/.tmp/generation-profiles/examples.pending.z"
+git ls-files -z -- examples > "$examples"
+
 training=(--corpus "$root/test/corpus")
 while IFS= read -r -d '' file; do
   training+=("$root/$file")
-done < <(git ls-files -z -- examples)
+done < "$examples"
 
 node -e 'const {grammars} = require("./tree-sitter.json"); console.log([...new Set(grammars.map(({path}) => path ?? "."))].sort().join("\n"));' | while IFS= read -r grammar; do
   script/tree-sitter generate "$grammar/grammar.js" --abi 16
@@ -18,3 +21,5 @@ node -e 'const {grammars} = require("./tree-sitter.json"); console.log([...new S
   script/tree-sitter profile --grammar-path "$grammar" --output "$profile" "${training[@]}"
   script/tree-sitter generate "$grammar/grammar.js" --abi 16 --profile "$profile"
 done
+
+mv "$examples" "$root/.tmp/generation-profiles/examples.z"
