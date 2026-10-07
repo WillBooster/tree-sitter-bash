@@ -1009,6 +1009,7 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
                 }
                 bool command = (frame.delimiter & COMMAND_CONTEXT) != 0;
                 command_depth += command;
+                command_start = command;
                 array_push(&delimiters, ((SubstitutionProbeFrame){.delimiter = ')' | WORD_END_PAREN | (frame.delimiter & COMMAND_CONTEXT), .command = command}));
                 probe_advance(input);
             }

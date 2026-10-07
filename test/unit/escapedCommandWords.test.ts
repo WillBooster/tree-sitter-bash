@@ -181,3 +181,47 @@ test('tracks case bodies after function headers and assignment separators', asyn
     parser.delete();
   }
 });
+
+test('preserves arithmetic selection around case commands in process substitutions', async () => {
+  await Parser.init();
+  const parser = new Parser().setLanguage(await Language.load('tree-sitter-bash.wasm'));
+  try {
+    const source =
+      'v=$(( $(: <<E\na # (\nE\ncat <(case x in x) :;; esac) # `\nprintf 1\n) + 1 )); printf "%s\\n" "$v"\n';
+    const tree = parser.parse(source)!;
+    try {
+      expect(tree.rootNode.hasError).toBe(false);
+      expect(tree.rootNode.descendantsOfType('arithmetic_expansion').map((node) => node.text)).toEqual([
+        source.slice(2, source.indexOf('; printf')),
+      ]);
+      expect(tree.rootNode.descendantsOfType('case_statement')).toHaveLength(1);
+      const index = source.indexOf('case x') + 5;
+      const column = index - source.lastIndexOf('\n', index) - 1;
+      tree.edit(
+        new Edit({
+          startIndex: index,
+          oldEndIndex: index + 1,
+          newEndIndex: index + 1,
+          startPosition: { row: 3, column },
+          oldEndPosition: { row: 3, column: column + 1 },
+          newEndPosition: { row: 3, column: column + 1 },
+        })
+      );
+      const changed = source.slice(0, index) + 'y' + source.slice(index + 1);
+      const incremental = parser.parse(changed, tree)!;
+      const fresh = parser.parse(changed)!;
+      try {
+        expect(incremental.rootNode.toString()).toBe(fresh.rootNode.toString());
+        expect(incremental.rootNode.hasError).toBe(false);
+        expect(incremental.rootNode.descendantsOfType('arithmetic_expansion')).toHaveLength(1);
+      } finally {
+        incremental.delete();
+        fresh.delete();
+      }
+    } finally {
+      tree.delete();
+    }
+  } finally {
+    parser.delete();
+  }
+});
