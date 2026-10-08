@@ -25,7 +25,7 @@ const oracle = new Oracle(bash);
 afterAll(() => oracle.dispose());
 
 test('uses a Wasm build of the current parser', () => {
-  expect(isWasmStale(), 'grammar.js or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
+  expect(isWasmStale(), 'generation inputs or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
 });
 
 test('uses bash 5.2 or later as the oracle', () => {
