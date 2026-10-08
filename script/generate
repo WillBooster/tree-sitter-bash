@@ -6,8 +6,16 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 mkdir -p .tmp/generation-profiles
 
-examples=$(mktemp "$root/.tmp/generation-profiles/examples.pending.XXXXXX")
-trap 'rm -f "$examples"' EXIT
+lock="$root/.tmp/generation-profiles/lock"
+if ! mkdir "$lock" 2> /dev/null; then
+  echo 'Generation or a Wasm build is already running; retry after it finishes.' >&2
+  exit 1
+fi
+trap 'rmdir "$lock"' EXIT
+
+workspace=$(mktemp -d "$root/.tmp/generation-profiles/run.XXXXXX")
+trap 'rm -rf "$workspace"; rmdir "$lock"' EXIT
+examples="$workspace/examples.z"
 git ls-files -z -- examples > "$examples"
 
 training=(--corpus "$root/test/corpus")
@@ -18,9 +26,12 @@ done < "$examples"
 node -e 'const {grammars} = require("./tree-sitter.json"); console.log([...new Set(grammars.map(({path}) => path ?? "."))].sort().join("\n"));' | while IFS= read -r grammar; do
   script/tree-sitter generate "$grammar/grammar.js" --abi 16
   name=$(node -e 'console.log(JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).name)' "$grammar/src/grammar.json")
-  profile="$root/.tmp/generation-profiles/$name.json"
+  profile="$workspace/$name.json"
   script/tree-sitter profile --grammar-path "$grammar" --output "$profile" "${training[@]}"
   script/tree-sitter generate "$grammar/grammar.js" --abi 16 --profile "$profile"
+  if [[ ${1:-} == --build-wasm ]]; then
+    script/tree-sitter build --wasm "$grammar"
+  fi
 done
 
 mv "$examples" "$root/.tmp/generation-profiles/examples.z"
