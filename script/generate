@@ -7,6 +7,7 @@ cd "$root"
 mkdir -p .tmp/generation-profiles
 
 examples=$(mktemp "$root/.tmp/generation-profiles/examples.pending.XXXXXX")
+trap 'rm -f "$examples"' EXIT
 git ls-files -z -- examples > "$examples"
 
 training=(--corpus "$root/test/corpus")
