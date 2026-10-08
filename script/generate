@@ -18,7 +18,7 @@ workspace=$(mktemp -d "$root/.tmp/generation-profiles/run.XXXXXX")
 backup=
 cleanup() {
   status=$?
-  trap '' HUP INT TERM
+  trap '' HUP INT QUIT TERM
   if [[ -n $backup ]]; then
     if [[ ! -d $backup ]] || ! mv "$grammar/src" "$workspace/failed-src" || ! mv "$backup" "$grammar/src"; then
       echo "Source recovery failed; preserve $workspace and $lock." >&2
@@ -34,6 +34,7 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
+trap 'exit 131' QUIT
 trap 'exit 143' TERM
 examples="$workspace/examples.z"
 git ls-files -z -- examples > "$examples"
