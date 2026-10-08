@@ -1710,3 +1710,101 @@ printf '%s\n' parsed
       (word))
     argument: (raw_string)
     argument: (word)))
+
+================================================================================
+Timed substitutions preserve consumers and literal command words
+================================================================================
+
+number(){ printf '%s' 3; }
+a=$(time -- number)
+b=$(time -p -- case x in x) printf '%s' 4;; esac)
+c=$(t\
+i\
+m\
+e -\
+p -\
+- { printf '%s' 5; })
+sum=$((a + b + c))
+printf '%s\n' "$sum"
+time -p -- number | cat
+function time { printf '%s\n' "$*"; }
+"time" -- ordinary
+ti\me -p ordinary
+
+--------------------------------------------------------------------------------
+
+(program (function_definition (word) (compound_statement (command (command_name (word)) (raw_string) (word)))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (command (command_name (word))))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (word) (case_statement (word) (case_item (word) (command (command_name (word)) (raw_string) (word)))))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (word) (compound_statement (command (command_name (word)) (raw_string) (word))))))) (command (variable_assignment (variable_name) (arithmetic_expansion (binary_expression (binary_expression (variable_name) (variable_name)) (variable_name))))) (command (command_name (word)) (raw_string) (string (simple_expansion (variable_name)))) (timed_command (word) (word) (pipeline (command (command_name (word))) (command (command_name (word))))) (function_definition (word) (compound_statement (command (command_name (word)) (raw_string) (string (simple_expansion (special_variable_name)))))) (command (command_name (string (string_content))) (word) (word)) (command (command_name (word)) (word) (word)))
+
+================================================================================
+Joined timing prefixes retain adjoining ordinary command words
+================================================================================
+
+timeX(){ printf '%s' "$1"; }
+function -px { printf '%s' "$1"; }
+function --x { printf '%s' "$1"; }
+suffix=X
+a=$(t\
+imeX 3)
+b=$(time -\
+p'x' 4)
+c=$(time -\
+-'x' 5)
+d=$(ti\
+me"$suffix" 6)
+e=$(tim\
+e\X 7)
+sum=$((a + b + c + d + e))
+printf '%s\n' "$sum"
+
+--------------------------------------------------------------------------------
+
+(program (function_definition (word) (compound_statement (command (command_name (word)) (raw_string) (string (simple_expansion (special_variable_name)))))) (function_definition (word) (compound_statement (command (command_name (word)) (raw_string) (string (simple_expansion (special_variable_name)))))) (function_definition (word) (compound_statement (command (command_name (word)) (raw_string) (string (simple_expansion (special_variable_name)))))) (command (variable_assignment (variable_name) (word))) (command (variable_assignment (variable_name) (command_substitution (command (command_name (concatenation (word) (word))) (word))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (command (command_name (concatenation (word) (word) (raw_string))) (word)))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (command (command_name (concatenation (word) (word) (raw_string))) (word)))))) (command (variable_assignment (variable_name) (command_substitution (command (command_name (concatenation (word) (word) (string (simple_expansion (variable_name))))) (word))))) (command (variable_assignment (variable_name) (command_substitution (command (command_name (concatenation (word) (word))) (word))))) (command (variable_assignment (variable_name) (arithmetic_expansion (binary_expression (binary_expression (binary_expression (binary_expression (variable_name) (variable_name)) (variable_name)) (variable_name)) (variable_name))))) (command (command_name (word)) (raw_string) (string (simple_expansion (variable_name)))))
+
+================================================================================
+Adjoining process substitutions retain ordinary command consumers
+================================================================================
+
+if t\
+ime<(printf X) marker; then a=1; else a=2; fi
+if time -\
+p>(cat) marker; then b=3; else b=4; fi
+if time --<(printf X) marker; then c=5; else c=6; fi
+printf '%s\n' "$((a + b + c))"
+
+--------------------------------------------------------------------------------
+
+(program (if_statement (command (command_name (concatenation (word) (word) (process_substitution (command (command_name (word)) (word))))) (word)) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (word) (process_substitution (command (command_name (word)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (process_substitution (command (command_name (word)) (word))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (command (command_name (word)) (raw_string) (string (arithmetic_expansion (binary_expression (binary_expression (variable_name) (variable_name)) (variable_name))))))
+
+================================================================================
+Escaped ordinary extglob prefixes retain subsequent command consumers
+================================================================================
+
+x=not_found
+if t\ime@("$x") marker; then a=1; else a=2; fi
+if time -\p@("$x") marker; then b=3; else b=4; fi
+if time --\x@("$x") marker; then c=5; else c=6; fi
+if time --\
+\x@("$x") marker; then d=7; else d=8; fi
+printf '%s\n' "$((a + b + c + d))"
+
+--------------------------------------------------------------------------------
+
+(program (command (variable_assignment (variable_name) (word))) (if_statement (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word)) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (if_statement (timed_command (command (command_name (concatenation (word) (word) (extglob_pattern (string (simple_expansion (variable_name)))))) (word))) (command (variable_assignment (variable_name) (word))) (else_clause (command (variable_assignment (variable_name) (word))))) (command (command_name (word)) (raw_string) (string (arithmetic_expansion (binary_expression (binary_expression (binary_expression (variable_name) (variable_name)) (variable_name)) (variable_name))))))
+
+================================================================================
+Standalone timing prefixes before a closing backtick
+================================================================================
+
+a=`t\
+ime`
+b=`time -\
+p`
+c=`time --`
+d=`time -p --`
+e=`t\
+ime -- printf 7`
+printf "<%s><%s><%s><%s><%s>\n" "$a" "$b" "$c" "$d" "$e"
+
+--------------------------------------------------------------------------------
+
+(program (command (variable_assignment (variable_name) (command_substitution (timed_command)))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (word))))) (command (variable_assignment (variable_name) (command_substitution (timed_command (word) (command (command_name (word)) (word)))))) (command (command_name (word)) (string (string_content)) (string (simple_expansion (variable_name))) (string (simple_expansion (variable_name))) (string (simple_expansion (variable_name))) (string (simple_expansion (variable_name))) (string (simple_expansion (variable_name)))))

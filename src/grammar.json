@@ -310,8 +310,22 @@
         "type": "SEQ",
         "members": [
           {
-            "type": "STRING",
-            "value": "time"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "time"
+              },
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_timing_keyword"
+                },
+                "named": false,
+                "value": "time"
+              }
+            ]
           },
           {
             "type": "CHOICE",
@@ -322,12 +336,38 @@
                 "content": {
                   "type": "ALIAS",
                   "content": {
-                    "type": "STRING",
-                    "value": "-p"
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "STRING",
+                        "value": "-p"
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "_timing_option"
+                      }
+                    ]
                   },
                   "named": true,
                   "value": "word"
                 }
+              },
+              {
+                "type": "BLANK"
+              }
+            ]
+          },
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "ALIAS",
+                "content": {
+                  "type": "SYMBOL",
+                  "name": "_timing_terminator"
+                },
+                "named": true,
+                "value": "word"
               },
               {
                 "type": "BLANK"
@@ -5158,6 +5198,18 @@
     {
       "type": "SYMBOL",
       "name": "_arithmetic_cache_reset"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_timing_keyword"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_timing_option"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_timing_terminator"
     }
   ],
   "inline": [
