@@ -21,9 +21,9 @@ cleanup() {
   trap '' HUP INT QUIT TERM
   if [[ -n $backup ]]; then
     if [[ ! -d $backup ]] || ! mv "$grammar/src" "$workspace/failed-src" || ! mv "$backup" "$grammar/src"; then
-      echo "Source recovery failed; preserve $workspace and $lock." >&2
-      echo "Pre-run sources: $backup; generation output: $grammar/src or $workspace/failed-src." >&2
-      echo "Resolve the filesystem error, restore the pre-run sources to $grammar/src, then run: rmdir '$lock'" >&2
+      echo "Source recovery failed; preserve remaining files in $workspace and $grammar/src, and keep $lock." >&2
+      echo "Expected pre-run backup: $backup; failed output: $grammar/src or $workspace/failed-src." >&2
+      echo "If the backup is missing, recover pre-run sources from another copy. Resolve filesystem errors and restore $grammar/src before running: rmdir '$lock'" >&2
       exit 1
     fi
   fi
