@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+root=$(cd "$(dirname "$0")/.." && pwd)
+cd "$root"
+mkdir -p .tmp/generation-profiles
+
+lock="$root/.tmp/generation-profiles/lock"
+if ! mkdir "$lock" 2> /dev/null; then
+  echo "Generation lock exists: $lock" >&2
+  echo "Wait for the active build. If it was killed, stop its remaining processes, then run: rmdir '$lock'" >&2
+  exit 1
+fi
+trap 'rmdir "$lock"' EXIT
+
+workspace=$(mktemp -d "$root/.tmp/generation-profiles/run.XXXXXX")
+backup=
+cleanup() {
+  status=$?
+  trap '' HUP INT QUIT TERM
+  if [[ -n $backup ]]; then
+    if [[ ! -d $backup ]] || ! mv "$grammar/src" "$workspace/failed-src" || ! mv "$backup" "$grammar/src"; then
+      echo "Source recovery failed; preserve remaining files in $workspace and $grammar/src, and keep $lock." >&2
+      echo "Expected pre-run backup: $backup; failed output: $grammar/src or $workspace/failed-src." >&2
+      echo "If the backup is missing, recover pre-run sources from another copy. Resolve filesystem errors and restore $grammar/src before running: rmdir '$lock'" >&2
+      exit 1
+    fi
+  fi
+  rm -rf "$workspace"
+  rmdir "$lock"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 131' QUIT
+trap 'exit 143' TERM
+examples="$workspace/examples.z"
+git ls-files -z -- examples > "$examples"
+
+training=(--corpus "$root/test/corpus")
+while IFS= read -r -d '' file; do
+  training+=("$root/$file")
+done < "$examples"
+
+# Keep this loop in the parent shell: signal traps wait for its foreground CLI before restoring sources.
+grammars=$(node -e 'const {grammars} = require("./tree-sitter.json"); console.log([...new Set(grammars.map(({path}) => path ?? "."))].sort().join("\n"));')
+while IFS= read -r grammar; do
+  cp -Rp "$grammar/src" "$workspace/src"
+  backup="$workspace/src"
+  script/tree-sitter generate "$grammar/grammar.js" --abi 16
+  name=$(node -e 'console.log(JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8")).name)' "$grammar/src/grammar.json")
+  profile="$workspace/$name.json"
+  script/tree-sitter profile --grammar-path "$grammar" --output "$profile" "${training[@]}"
+  script/tree-sitter generate "$grammar/grammar.js" --abi 16 --profile "$profile"
+  if [[ ${1:-} == --build-wasm ]]; then
+    script/tree-sitter build --wasm "$grammar"
+  fi
+  backup=
+  rm -rf "$workspace/src"
+done <<< "$grammars"
+
+mv "$examples" "$root/.tmp/generation-profiles/examples.z"

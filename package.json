@@ -22,10 +22,11 @@
     "*.wasm"
   ],
   "scripts": {
-    "build-wasm": "script/tree-sitter build --wasm",
-    "build/ci": "script/tree-sitter generate && script/tree-sitter build --wasm",
+    "build-wasm": "script/generate --build-wasm",
+    "build/ci": "bun run build-wasm",
     "cleanup": "bun wb lint --fix --format",
     "format": "bun wb lint --format",
+    "generate": "script/generate",
     "lint": "bun wb lint",
     "lint-fix": "bun wb lint --fix",
     "prepare": "(bun lefthook install || true) && (test ! -f .lefthook/normalize-bun-lockfile.sh || bash .lefthook/normalize-bun-lockfile.sh)",
@@ -45,7 +46,7 @@
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
     "@willbooster/wb": "22.18.0",
-    "@willbooster/web-tree-sitter": "1.0.17",
+    "@willbooster/web-tree-sitter": "1.4.2",
     "conventional-changelog-conventionalcommits": "10.4.0",
     "lefthook": "2.1.14",
     "oxfmt": "0.70.0",
@@ -61,7 +62,7 @@
     "wrangler": "4.141.0"
   },
   "peerDependencies": {
-    "@willbooster/web-tree-sitter": "^1.0.0"
+    "@willbooster/web-tree-sitter": "^1.4.2"
   },
   "peerDependenciesMeta": {
     "@willbooster/web-tree-sitter": {

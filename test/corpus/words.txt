@@ -1232,7 +1232,205 @@ read -r result <<EOF
 $((printf x) && printf y)
 EOF
 [[ $result =~ $((printf x) && printf y) ]]
-printf '%s\n' "$result"
+emit_number() { printf 3; }
+value="$(( $(cat >/dev/null <<'END'
+a # )
+END
+printf emit_number
+) + 2 ))"
+consume() { cat "$1"; }
+spaced="$((consume <(printf 2) # comment )
+printf 3))"
+joined="$((consume <(printf 2)
+# comment )
+printf 3))"
+numeric="$(( $(cat >/dev/null <<$'\x45'
+plain
+E
+printf 2 # retained command comment )
+) + 1 ))"
+shifted="$(( $( (( 1 << 2 )); printf 4
+# (
+) + 1 ))"
+prefix="$(( $(cat >/dev/null <<E
+plain
+E # )
+printf 1
+) + 1 ))"
+tabbed="$(( $(cat >/dev/null <<-E
+plain
+\
+	E
+printf 1 # )
+) + 1 ))"
+quoted=$(( $(cat >/dev/null <<E
+a # ) "
+E
+printf 1
+) + 1 ))
+dollarquoted=$(( $(cat >/dev/null <<E
+a # ) $'
+E
+printf 1
+) + 1 ))
+escaped="$(( $(cat >/dev/null <<'E'
+\
+E
+printf 1 # )
+) + 1 ))"
+backticked="$(( $(cat >/dev/null <<'E'
+a # `
+E
+printf 1
+) + 1 ))"
+braced="$(( $(cat >/dev/null <<'E'
+a # ${
+E
+printf 1
+) + 1 ))"
+bracketed="$(( $(cat >/dev/null <<'E'
+a # $[
+E
+printf 1
+) + 1 ))"
+looped=$(( $(printf 2; for((i=0;i<1<<0;i++)); do :; done
+# )
+) + 1 ))
+commented=$(( $(cat >/dev/null <<E
+( # )
+E
+printf 1 # `
+) + 1 ))
+nested_body="$(( $( : <<E $( : <<F
+a # )
+F
+printf ''
+)
+a # ( )
+E
+printf emit_number # `
+) + 2 ))"
+bodyframes=$(( 1 + $(
+(cat >/dev/null <<"E")
+a # ) (
+E
+printf 7 # )
+) ))
+quoted_backtick="$(( $(cat >/dev/null <<'E'
+a # "`echo ")"`"
+E
+printf 1
+) + 1 ))"
+comment_brace=$(( 1 + $((( 1 << 2 ))
+# ${
+printf 7
+) ))
+comment_bracket=$(( 1 + $((( 1 << 2 ))
+# $[
+printf 7
+) ))
+body_quotes=$(( $(cat >/dev/null <<'E'
+a # ) "
+E
+printf 7
+) + $(cat >/dev/null <<'E'
+b ) "
+E
+printf 7
+) ))
+case_body=$(( $(cat >/dev/null <<E
+( # )
+E
+case case in case) cat >/dev/null <<F
+(
+F
+;; esac # '
+) + 2 ))
+emit_void() { :; }
+backtick_comment=$(( $(cat >/dev/null <<E
+it's
+E
+`:
+emit_void # '
+`) + 2 ))
+case_plain="$(( $(case x in x) :;; esac; printf emit_number) + 2 ))"
+case_quote_pair=$(( $(:
+`:
+: # '
+`
+cat >/dev/null <<G
+it's
+G
+case x in *) cat >/dev/null <<K
+a # (
+K
+: ;; esac
+) + 2 ))
+backtick_paren=$(( $(
+`:
+: # )
+`
+cat >/dev/null <<K
+a # (
+K
+) + 2 ))
+tail_backtick=$(( $(cat >/dev/null <<'E'
+a # ) "`
+E
+printf 7
+) + 7 ))
+tail_bracket=$(( $(cat >/dev/null <<'E'
+a # ) "$[
+E
+printf 7
+) + 7 ))
+tail_pair=$(( $(cat >/dev/null <<'E'
+a # ) "`
+E
+printf 7
+) + $(cat >/dev/null <<'E'
+b ) "
+E
+printf 7
+) ))
+ansi_close=$(( $(printf 1 # $
+) + ${#absent[$'\')']} ))
+ansi_open=$(( $(printf 1 # $
+) + ${#absent[$'\'(']} ))
+ansi_before=$(( ${#absent[$'\')']} + $(printf 1 # $
+) ))
+ansi_balanced=$(( $(printf 1 # $
+) + ${#absent[$'\'']} ))
+U() { :; }
+ansi_negative=$(( $(cat >/dev/null <<$'\U80000000'
+: # )
+\U
+printf 1 # $
+) + 1 ))
+subscript_command=$((printf '%s' $(slots[1<<2]=3
+printf '%s' "${slots[4]}")) )
+prefix_subscript=$((printf '%s' $(2>/dev/null slots[1<<2]+=3
+printf '%s' "${slots[4]}")) )
+argument_heredoc=$((printf '%s' $(printf 2 a[1<<2]=3
+ignored # )
+2]=3
+)) )
+delimiter_close=$(( $(cat >/dev/null <<')'
+(
+)
+printf 1
+) + 1 ))
+delimiter_open=$(( $(cat >/dev/null <<'('
+)
+(
+printf 1
+) + 1 ))
+delimiter_command=$(( $(cat >/dev/null <<')'
+plain
+)
+printf emit_number
+) + 1 ))
+printf '%s\n' "$result" "$value" "$spaced" "$joined" "$numeric" "$shifted" "$prefix" "$tabbed" "$quoted" "$dollarquoted" "$escaped" "$backticked" "$braced" "$bracketed" "$looped" "$commented" "$nested_body" "$bodyframes" "$quoted_backtick" "$comment_brace" "$comment_bracket" "$body_quotes" "$case_body" "$backtick_comment" "$case_plain" "$case_quote_pair" "$backtick_paren" "$tail_backtick" "$tail_bracket" "$tail_pair" "$ansi_close" "$ansi_open" "$ansi_before" "$ansi_balanced" "$ansi_negative" "$subscript_command" "$prefix_subscript" "$argument_heredoc" "$delimiter_close" "$delimiter_open" "$delimiter_command"
 
 --------------------------------------------------------------------------------
 
@@ -1274,10 +1472,1093 @@ printf '%s\n' "$result"
             (command_name
               (word))
             (word))))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word))
+        (word))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (command_substitution
+          (subshell
+            (command
+              (command_name
+                (command_substitution
+                  (command
+                    (command_name
+                      (word))
+                    (file_redirect
+                      (word))
+                    (heredoc_redirect
+                      (heredoc_start)))
+                  (heredoc_body
+                    (heredoc_content)
+                    (heredoc_end))
+                  (command
+                    (command_name
+                      (word))
+                    (word))))
+              (word)
+              (word)))))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word))
+        (string
+          (simple_expansion
+            (special_variable_name))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (command_substitution
+          (subshell
+            (command
+              (command_name
+                (word))
+              (process_substitution
+                (command
+                  (command_name
+                    (word))
+                  (word))))
+            (comment)
+            (command
+              (command_name
+                (word))
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (command_substitution
+          (subshell
+            (command
+              (command_name
+                (word))
+              (process_substitution
+                (command
+                  (command_name
+                    (word))
+                  (word))))
+            (comment)
+            (command
+              (command_name
+                (word))
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word))
+              (comment))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (arithmetic_command
+                (binary_expression
+                  (number)
+                  (number)))
+              (command
+                (command_name
+                  (word))
+                (word))
+              (comment))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (comment)
+              (command
+                (command_name
+                  (word))
+                (word)))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word))
+              (comment))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word))
+              (comment))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word)))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word)))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word)))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (c_style_for_statement
+              (binary_expression
+                (variable_name)
+                (number))
+              (binary_expression
+                (variable_name)
+                (binary_expression
+                  (number)
+                  (number)))
+              (postfix_expression
+                (variable_name))
+              (do_group
+                (command
+                  (command_name
+                    (word)))))
+            (comment))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (command_substitution
+          (subshell
+            (command
+              (command_name
+                (command_substitution
+                  (command
+                    (command_name
+                      (word))
+                    (heredoc_redirect
+                      (heredoc_start))
+                    (command_substitution
+                      (command
+                        (command_name
+                          (word))
+                        (heredoc_redirect
+                          (heredoc_start)))
+                      (heredoc_body
+                        (heredoc_content)
+                        (heredoc_end))
+                      (command
+                        (command_name
+                          (word))
+                        (raw_string))))
+                  (heredoc_body
+                    (heredoc_content)
+                    (heredoc_end))
+                  (command
+                    (command_name
+                      (word))
+                    (word))
+                  (comment)))
+              (word)
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (number)
+          (command_substitution
+            (subshell
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start))))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (arithmetic_expansion
+          (binary_expression
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (file_redirect
+                  (word))
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))
+              (command
+                (command_name
+                  (word))
+                (word)))
+            (number))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (number)
+          (command_substitution
+            (arithmetic_command
+              (binary_expression
+                (number)
+                (number)))
+            (comment)
+            (command
+              (command_name
+                (word))
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (number)
+          (command_substitution
+            (arithmetic_command
+              (binary_expression
+                (number)
+                (number)))
+            (comment)
+            (command
+              (command_name
+                (word))
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (case_statement
+              (word)
+              (case_item
+                (word)
+                (command
+                  (command_name
+                    (word))
+                  (file_redirect
+                    (word))
+                  (heredoc_redirect
+                    (heredoc_start)))
+                (heredoc_body
+                  (heredoc_content)
+                  (heredoc_end))))
+            (comment))
+          (number)))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (command_substitution
+                  (command
+                    (command_name
+                      (word)))
+                  (command
+                    (command_name
+                      (word)))
+                  (comment)))))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (string
+        (command_substitution
+          (subshell
+            (command
+              (command_name
+                (command_substitution
+                  (case_statement
+                    (word)
+                    (case_item
+                      (word)
+                      (command
+                        (command_name
+                          (word)))))
+                  (command
+                    (command_name
+                      (word))
+                    (word))))
+              (word)
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word)))
+            (command
+              (command_name
+                (command_substitution
+                  (command
+                    (command_name
+                      (word)))
+                  (command
+                    (command_name
+                      (word)))
+                  (comment))))
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (case_statement
+              (word)
+              (case_item
+                (word)
+                (command
+                  (command_name
+                    (word))
+                  (file_redirect
+                    (word))
+                  (heredoc_redirect
+                    (heredoc_start)))
+                (heredoc_body
+                  (heredoc_content)
+                  (heredoc_end))
+                (command
+                  (command_name
+                    (word))))))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (command_substitution
+                  (command
+                    (command_name
+                      (word)))
+                  (command
+                    (command_name
+                      (word)))
+                  (comment))))
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (expansion
+            (operator)
+            (subscript
+              (variable_name)
+              (ansi_c_string)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (expansion
+            (operator)
+            (subscript
+              (variable_name)
+              (ansi_c_string)))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (expansion
+            (operator)
+            (subscript
+              (variable_name)
+              (ansi_c_string)))
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (expansion
+            (operator)
+            (subscript
+              (variable_name)
+              (ansi_c_string)))))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word))
+            (comment))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (word))
+            (raw_string)
+            (command_substitution
+              (command
+                (variable_assignment
+                  (subscript
+                    (variable_name)
+                    (word))
+                  (word)))
+              (command
+                (command_name
+                  (word))
+                (raw_string)
+                (string
+                  (expansion
+                    (subscript
+                      (variable_name)
+                      (word)))))))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (word))
+            (raw_string)
+            (command_substitution
+              (command
+                (file_redirect
+                  (file_descriptor)
+                  (word))
+                (variable_assignment
+                  (subscript
+                    (variable_name)
+                    (word))
+                  (word)))
+              (command
+                (command_name
+                  (word))
+                (raw_string)
+                (string
+                  (expansion
+                    (subscript
+                      (variable_name)
+                      (word)))))))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (word))
+            (raw_string)
+            (command_substitution
+              (command
+                (command_name
+                  (word))
+                (word)
+                (word)
+                (heredoc_redirect
+                  (heredoc_start)))
+              (heredoc_body
+                (heredoc_content)
+                (heredoc_end))))))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (command_substitution
+                (command
+                  (command_name
+                    (word))
+                  (file_redirect
+                    (word))
+                  (heredoc_redirect
+                    (heredoc_start)))
+                (heredoc_body
+                  (heredoc_content)
+                  (heredoc_end))
+                (command
+                  (command_name
+                    (word))
+                  (word))))
+            (word)
+            (word))))))
   (command
     (command_name
       (word))
     (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
+    (string
+      (simple_expansion
+        (variable_name)))
     (string
       (simple_expansion
         (variable_name)))))
@@ -1377,3 +2658,523 @@ case x in x) printf '%s\n' ok;; esac
           (word))
         (raw_string)
         (word)))))
+
+================================================================================
+Arithmetic recovery through a joined case terminator
+================================================================================
+
+seed=7
+seed() { printf C; }
+value=$(( $(cat >/dev/null <<END
+a # ((
+END
+case x in x) :;; y) :;; es\
+ac # '
+printf seed
+) + 1 ))
+printf '%s\n' "$value"
+
+--------------------------------------------------------------------------------
+
+(program
+  (ERROR
+    (command
+      (variable_assignment
+        (variable_name)
+        (word)))
+    (function_definition
+      (word)
+      (compound_statement
+        (command
+          (command_name
+            (word))
+          (word))))
+    (variable_name)
+    (command
+      (command_name
+        (word))
+      (file_redirect
+        (word))
+      (heredoc_redirect
+        (heredoc_start)))
+    (heredoc_body
+      (heredoc_content)
+      (heredoc_end))
+    (word)
+    (case_item
+      (word)
+      (command
+        (command_name
+          (word))))
+    (case_item
+      (word)
+      (command
+        (command_name
+          (word))))
+    (concatenation
+      (word)
+      (ERROR
+        (word)
+        (comment)
+        (word))
+      (word))
+    (command
+      (command_name
+        (word))
+      (word))
+    (ERROR)
+    (command
+      (command_name
+        (word))
+      (raw_string)
+      (string
+        (simple_expansion
+          (variable_name))))))
+
+================================================================================
+An unterminated assignment subscript preserves command names during recovery
+================================================================================
+
+echo $((printf M $(slots[12=3
+printf N)) )
+printf '%s\n' after
+
+--------------------------------------------------------------------------------
+
+(ERROR (command_name (word)) (command_name (word)) (word) (variable_name) (word) (raw_string) (word))
+
+================================================================================
+Timed and coprocess substitutions consume nested command output
+================================================================================
+
+emit(){ :; }
+seed=7
+seed(){ printf C; }
+value0=$(( $(cat >/dev/null <<E
+a # (
+E
+time case x in x) emit;; esac # '
+printf seed
+) + 1 ))
+printf '%s\n' "$value0"
+value1=$(( $(cat >/dev/null <<E
+a # (
+E
+time -p case x in x) emit;; esac # '
+printf seed
+) + 1 ))
+printf '%s\n' "$value1"
+value2=$(( $(cat >/dev/null <<E
+a # (
+E
+coproc PIPE case x in x) emit;; esac # '
+printf seed
+) + 1 ))
+printf '%s\n' "$value2"
+normal=$(time -p -- printf 3)
+printf '%s\n' "$normal"
+normal=$(coproc PIPE { printf 3; }; cat <&"${PIPE[0]}")
+printf '%s\n' "$normal"
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (word)))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word))
+        (word))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (timed_command
+              (case_statement
+                (word)
+                (case_item
+                  (word)
+                  (command
+                    (command_name
+                      (word))))))
+            (comment)
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (timed_command
+              (word)
+              (case_statement
+                (word)
+                (case_item
+                  (word)
+                  (command
+                    (command_name
+                      (word))))))
+            (comment)
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (arithmetic_expansion
+        (binary_expression
+          (command_substitution
+            (command
+              (command_name
+                (word))
+              (file_redirect
+                (word))
+              (heredoc_redirect
+                (heredoc_start)))
+            (heredoc_body
+              (heredoc_content)
+              (heredoc_end))
+            (coproc_command
+              (word)
+              (case_statement
+                (word)
+                (case_item
+                  (word)
+                  (command
+                    (command_name
+                      (word))))))
+            (comment)
+            (command
+              (command_name
+                (word))
+              (word)))
+          (number)))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (timed_command
+          (word)
+          (word)
+          (command
+            (command_name
+              (word))
+            (word))))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (coproc_command
+          (word)
+          (compound_statement
+            (command
+              (command_name
+                (word))
+              (word))))
+        (command
+          (command_name
+            (word))
+          (file_redirect
+            (string
+              (expansion
+                (subscript
+                  (variable_name)
+                  (word)))))))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))))
+
+================================================================================
+Timed case with option termination retains following command recovery
+================================================================================
+
+emit(){ :; }; casex(){ emit; }; esacx(){ emit; }; seed=7; seed(){ printf C; }
+v=$(( $(time -- case x in x) emit;; esac # '
+printf seed
+) + 1 ))
+printf '%s\n' "$v"
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (word)))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word))
+        (word))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (command_substitution
+                (timed_command
+                  (word)
+                  (case_statement
+                    (word)
+                    (case_item
+                      (word)
+                      (command
+                        (command_name
+                          (word))))))
+                (comment)
+                (command
+                  (command_name
+                    (word))
+                  (word))))
+            (word)
+            (word))))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))))
+
+================================================================================
+Timed case with POSIX option termination retains following command recovery
+================================================================================
+
+emit(){ :; }; casex(){ emit; }; esacx(){ emit; }; seed=7; seed(){ printf C; }
+v=$(( $(time -p -- case x in x) emit;; esac # '
+printf seed
+) + 1 ))
+printf '%s\n' "$v"
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (word)))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word))
+        (word))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (command_substitution
+                (timed_command
+                  (word)
+                  (word)
+                  (case_statement
+                    (word)
+                    (case_item
+                      (word)
+                      (command
+                        (command_name
+                          (word))))))
+                (comment)
+                (command
+                  (command_name
+                    (word))
+                  (word))))
+            (word)
+            (word))))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))))
+
+================================================================================
+Joined timing keyword retains following command recovery
+================================================================================
+
+emit(){ :; }; casex(){ emit; }; esacx(){ emit; }; seed=7; seed(){ printf C; }
+v=$(( $(ti\
+me -p case x in x) emit;; esac # '
+printf seed
+) + 1 ))
+printf '%s\n' "$v"
+
+--------------------------------------------------------------------------------
+
+(program
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word)))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (word)))
+  (function_definition
+    (word)
+    (compound_statement
+      (command
+        (command_name
+          (word))
+        (word))))
+  (command
+    (variable_assignment
+      (variable_name)
+      (command_substitution
+        (subshell
+          (command
+            (command_name
+              (command_substitution
+                (timed_command
+                  (word)
+                  (case_statement
+                    (word)
+                    (case_item
+                      (word)
+                      (command
+                        (command_name
+                          (word))))))
+                (comment)
+                (command
+                  (command_name
+                    (word))
+                  (word))))
+            (word)
+            (word))))))
+  (command
+    (command_name
+      (word))
+    (raw_string)
+    (string
+      (simple_expansion
+        (variable_name)))))

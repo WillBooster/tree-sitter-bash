@@ -5,7 +5,7 @@ import { isWasmStale, parse } from '../helpers/differential/compare.js';
 // Only `bun run build/ci` rebuilds the Wasm build, so a check against a stale one would pass after a source edit that
 // brings the slowdown back.
 test('uses a Wasm build of the current parser', () => {
-  expect(isWasmStale(), 'grammar.js or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
+  expect(isWasmStale(), 'generation inputs or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
 });
 
 // These concatenation, line-continuation and plain nested-arithmetic and unfinished-opener shapes should grow proportionally: ten times the

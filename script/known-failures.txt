@@ -1,4 +1,5 @@
 examples/bash/examples/shellmath/shellmath.sh
+examples/bash/tests/arith-for.tests
 examples/bash/tests/arith.tests
 examples/bash/tests/array.tests
 examples/bash/tests/comsub2.tests

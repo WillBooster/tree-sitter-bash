@@ -17,7 +17,7 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 1.x, a peer dependency:
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 1.4.2 or later, a peer dependency:
 
 ```sh
 npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter
@@ -64,6 +64,10 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
+The ABI 16 major release can change recovery trees for malformed scripts. Valid syntax and completed constructs
+remain supported, and incremental parses must match fresh parses. Review consumers that depend on the exact shape
+of `ERROR` nodes when upgrading.
+
 ## Development
 
 ```sh
@@ -80,6 +84,13 @@ WillBooster/tree-sitter runtime version that `package.json` pins as `@willbooste
 and the runtime of upstream's CLI are not the ones this package ships with. Its first run downloads that CLI from the
 runtime's GitHub Release, or builds it with `cargo` (whose build runs the CMake that `mise.toml` pins) when the download fails or the release has no
 binary that runs here. Run other CLI commands through it as well (e.g. `script/tree-sitter parse script.sh`).
+
+`bun run generate` records a fresh ABI 16 generation profile from the applicable `test/corpus` cases and Git-tracked
+files in `examples/`, then generates compact parser tables. The parser also embeds metadata from `tree-sitter.json`. After changing a grammar,
+`tree-sitter.json`, a corpus case, or a tracked example,
+regenerate and commit `src/`. Stage added or removed examples with `git add -A examples` before generation so the profile uses the intended file list.
+Profiles in `.tmp/generation-profiles/` are temporary and must not be committed. `bun run build-wasm`, `bun run build/ci`,
+and the release build regenerate the parsers before compiling them.
 
 `bun run test` runs:
 

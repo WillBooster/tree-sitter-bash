@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
+import { generationInputMtime } from '../generationInputs.js';
+
 import { Language, type Node, Parser, type Tree } from '@willbooster/web-tree-sitter';
 
 const Root = path.join(import.meta.dirname, '../../..');
@@ -11,11 +13,10 @@ const WasmPath = path.join(Root, 'tree-sitter-bash.wasm');
 
 // Rebuilding here would race with other test files loading the Wasm build, so a stale one is reported.
 export function isWasmStale(): boolean {
-  // src/parser.c is generated from grammar.js, so an edit to the grammar alone also makes the Wasm build stale.
-  const sources = ['grammar.js', 'src/parser.c', 'src/scanner.c'].map(
+  const sources = ['grammar.js', 'src/parser.c', 'src/scanner.c', 'src/tree_sitter/parser.h'].map(
     (name) => fs.statSync(path.join(Root, name)).mtimeMs
   );
-  return Math.max(...sources) > fs.statSync(WasmPath).mtimeMs;
+  return Math.max(generationInputMtime(Root), ...sources) > fs.statSync(WasmPath).mtimeMs;
 }
 
 // Waiting on a cell that nothing notifies is Node.js's synchronous sleep.
