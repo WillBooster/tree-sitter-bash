@@ -17,7 +17,7 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 1.3.0 or later, a peer dependency:
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 1.4.2 or later, a peer dependency:
 
 ```sh
 npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter
