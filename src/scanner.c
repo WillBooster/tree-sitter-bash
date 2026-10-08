@@ -836,6 +836,15 @@ static SubstitutionProbeResult probe_substitution_parenthesis(SubstitutionProbeI
         }
         if (comments && !quoted && command_position && timing_option && word_start && c == '-') {
             probe_advance(input);
+            while (probe_lookahead(input) == '\\') {
+                uint32_t position = input->position;
+                probe_advance(input);
+                if (probe_lookahead(input) != '\n') {
+                    input->position = position;
+                    break;
+                }
+                probe_advance(input);
+            }
             bool posix_option = timing_option == 1 && probe_lookahead(input) == 'p';
             bool end_options = probe_lookahead(input) == '-';
             if (posix_option || end_options) {
