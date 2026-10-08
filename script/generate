@@ -18,10 +18,12 @@ workspace=$(mktemp -d "$root/.tmp/generation-profiles/run.XXXXXX")
 backup=
 cleanup() {
   status=$?
-  trap '' INT TERM
+  trap '' HUP INT TERM
   if [[ -n $backup ]]; then
     if [[ ! -d $backup ]] || ! mv "$grammar/src" "$workspace/failed-src" || ! mv "$backup" "$grammar/src"; then
-      echo "Source recovery failed; preserve $workspace and $lock for manual recovery." >&2
+      echo "Source recovery failed; preserve $workspace and $lock." >&2
+      echo "Pre-run sources: $backup; generation output: $grammar/src or $workspace/failed-src." >&2
+      echo "Resolve the filesystem error, restore the pre-run sources to $grammar/src, then run: rmdir '$lock'" >&2
       exit 1
     fi
   fi
@@ -30,6 +32,7 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
+trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 examples="$workspace/examples.z"

@@ -64,6 +64,10 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
+The ABI 16 major release can change recovery trees for malformed scripts. Valid syntax and completed constructs
+remain supported, and incremental parses must match fresh parses. Review consumers that depend on the exact shape
+of `ERROR` nodes when upgrading.
+
 ## Development
 
 ```sh
