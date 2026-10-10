@@ -11705,8 +11705,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 316:
       ts_lex_state_316:
-      ACCEPT_TOKEN(aux_sym_simple_expansion_token1);
       if (ts_lex_ascii_contains(ts_lex_ascii_set_1, lookahead)) TS_LEX_REPEAT(false, ts_lex_state_316);
+      ACCEPT_TOKEN(aux_sym_simple_expansion_token1);
       END_STATE();
     case 317:
       ACCEPT_TOKEN(aux_sym_simple_expansion_token2);
@@ -11760,8 +11760,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 326:
       ts_lex_state_326:
-      ACCEPT_TOKEN(aux_sym_expansion_token2);
       if (('0' <= lookahead && lookahead <= '9')) TS_LEX_REPEAT(false, ts_lex_state_326);
+      ACCEPT_TOKEN(aux_sym_expansion_token2);
       END_STATE();
     case 327:
       ACCEPT_TOKEN(aux_sym__expansion_operation_token1);
@@ -12064,15 +12064,15 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 362:
       ts_lex_state_362:
-      ACCEPT_TOKEN(aux_sym_number_token1);
       if (('0' <= lookahead && lookahead <= '9') ||
           ('A' <= lookahead && lookahead <= 'F') ||
           ('a' <= lookahead && lookahead <= 'f')) TS_LEX_REPEAT(false, ts_lex_state_362);
+      ACCEPT_TOKEN(aux_sym_number_token1);
       END_STATE();
     case 363:
       ts_lex_state_363:
-      ACCEPT_TOKEN(aux_sym_number_token1);
       if (ts_lex_ascii_contains(ts_lex_ascii_set_3, lookahead)) TS_LEX_REPEAT(false, ts_lex_state_363);
+      ACCEPT_TOKEN(aux_sym_number_token1);
       END_STATE();
     case 364:
       ACCEPT_TOKEN(aux_sym_number_token2);
@@ -12080,8 +12080,8 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 365:
       ts_lex_state_365:
-      ACCEPT_TOKEN(sym__arithmetic_variable);
       if (ts_lex_ascii_contains(ts_lex_ascii_set_1, lookahead)) TS_LEX_REPEAT(false, ts_lex_state_365);
+      ACCEPT_TOKEN(sym__arithmetic_variable);
       END_STATE();
     case 366:
       ACCEPT_TOKEN(anon_sym_PLUS_PLUS);
@@ -12462,9 +12462,9 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
       END_STATE();
     case 427:
       ts_lex_state_427:
-      ACCEPT_TOKEN(aux_sym_comment_token1);
       if (!eof &&
           lookahead != '\n') TS_LEX_REPEAT(false, ts_lex_state_427);
+      ACCEPT_TOKEN(aux_sym_comment_token1);
       END_STATE();
     default:
       return false;
@@ -12473,7 +12473,6 @@ static bool ts_lex(TSLexer *lexer, TSStateId state) {
 
 #define TS_KEYWORD_SKIP 32768u
 #define TS_KEYWORD_STATE_MASK 32767u
-typedef struct { uint32_t index; uint16_t count; TSSymbol accept; } TSKeywordState;
 typedef struct { uint8_t first, last; uint16_t state; } TSKeywordTransition;
 static const TSKeywordTransition ts_keyword_transitions[] = {
   { 9, 10, 32768 },
@@ -12570,103 +12569,105 @@ static const TSKeywordTransition ts_keyword_transitions[] = {
   { 116, 116, 66 },
   { 111, 111, 75 },
 };
+typedef struct { uint16_t index; TSSymbol accept; } TSKeywordState;
 static const TSKeywordState ts_keyword_states[] = {
-  { 0, 14, 0 },
-  { 14, 1, 0 },
-  { 15, 2, 0 },
-  { 17, 2, 0 },
-  { 19, 3, 0 },
-  { 22, 3, 0 },
-  { 25, 2, 0 },
-  { 27, 1, 0 },
-  { 28, 1, 0 },
-  { 29, 3, 0 },
-  { 32, 1, 0 },
-  { 33, 1, 0 },
-  { 34, 1, 0 },
-  { 35, 1, 0 },
-  { 36, 1, 0 },
-  { 37, 1, anon_sym_do },
-  { 38, 2, 0 },
-  { 40, 1, 0 },
-  { 41, 0, anon_sym_fi },
-  { 41, 1, 0 },
-  { 42, 0, anon_sym_if },
-  { 42, 0, anon_sym_in },
-  { 42, 1, 0 },
-  { 43, 1, 0 },
-  { 44, 1, 0 },
-  { 45, 1, 0 },
-  { 46, 1, 0 },
-  { 47, 0, anon_sym_for },
-  { 47, 1, 0 },
-  { 48, 0, anon_sym_case },
-  { 48, 0, anon_sym_done },
-  { 48, 0, anon_sym_elif },
-  { 48, 0, anon_sym_else },
-  { 48, 0, anon_sym_esac },
-  { 48, 0, anon_sym_then },
-  { 48, 0, anon_sym_time },
-  { 48, 0, anon_sym_local },
-  { 48, 0, anon_sym_until },
-  { 48, 0, anon_sym_while },
-  { 48, 0, anon_sym_coproc },
-  { 48, 0, anon_sym_export },
-  { 48, 0, anon_sym_select },
-  { 48, 0, anon_sym_declare },
-  { 48, 1, 0 },
-  { 49, 0, anon_sym_typeset },
-  { 49, 0, anon_sym_function },
-  { 49, 0, anon_sym_readonly },
-  { 49, 1, 0 },
-  { 50, 1, 0 },
-  { 51, 1, 0 },
-  { 52, 1, 0 },
-  { 53, 1, 0 },
-  { 54, 1, 0 },
-  { 55, 1, 0 },
-  { 56, 1, 0 },
-  { 57, 1, 0 },
-  { 58, 1, 0 },
-  { 59, 1, 0 },
-  { 60, 1, 0 },
-  { 61, 1, 0 },
-  { 62, 1, 0 },
-  { 63, 1, 0 },
-  { 64, 1, 0 },
-  { 65, 1, 0 },
-  { 66, 1, 0 },
-  { 67, 1, 0 },
-  { 68, 1, 0 },
-  { 69, 1, 0 },
-  { 70, 1, 0 },
-  { 71, 1, 0 },
-  { 72, 1, 0 },
-  { 73, 1, 0 },
-  { 74, 1, 0 },
-  { 75, 1, 0 },
-  { 76, 1, 0 },
-  { 77, 1, 0 },
-  { 78, 1, 0 },
-  { 79, 1, 0 },
-  { 80, 1, 0 },
-  { 81, 1, 0 },
-  { 82, 1, 0 },
-  { 83, 1, 0 },
-  { 84, 1, 0 },
-  { 85, 1, 0 },
-  { 86, 1, 0 },
-  { 87, 1, 0 },
-  { 88, 1, 0 },
-  { 89, 1, 0 },
-  { 90, 1, 0 },
-  { 91, 1, 0 },
-  { 92, 1, 0 },
+  { 0, 0 },
+  { 14, 0 },
+  { 15, 0 },
+  { 17, 0 },
+  { 19, 0 },
+  { 22, 0 },
+  { 25, 0 },
+  { 27, 0 },
+  { 28, 0 },
+  { 29, 0 },
+  { 32, 0 },
+  { 33, 0 },
+  { 34, 0 },
+  { 35, 0 },
+  { 36, 0 },
+  { 37, anon_sym_do },
+  { 38, 0 },
+  { 40, 0 },
+  { 41, anon_sym_fi },
+  { 41, 0 },
+  { 42, anon_sym_if },
+  { 42, anon_sym_in },
+  { 42, 0 },
+  { 43, 0 },
+  { 44, 0 },
+  { 45, 0 },
+  { 46, 0 },
+  { 47, anon_sym_for },
+  { 47, 0 },
+  { 48, anon_sym_case },
+  { 48, anon_sym_done },
+  { 48, anon_sym_elif },
+  { 48, anon_sym_else },
+  { 48, anon_sym_esac },
+  { 48, anon_sym_then },
+  { 48, anon_sym_time },
+  { 48, anon_sym_local },
+  { 48, anon_sym_until },
+  { 48, anon_sym_while },
+  { 48, anon_sym_coproc },
+  { 48, anon_sym_export },
+  { 48, anon_sym_select },
+  { 48, anon_sym_declare },
+  { 48, 0 },
+  { 49, anon_sym_typeset },
+  { 49, anon_sym_function },
+  { 49, anon_sym_readonly },
+  { 49, 0 },
+  { 50, 0 },
+  { 51, 0 },
+  { 52, 0 },
+  { 53, 0 },
+  { 54, 0 },
+  { 55, 0 },
+  { 56, 0 },
+  { 57, 0 },
+  { 58, 0 },
+  { 59, 0 },
+  { 60, 0 },
+  { 61, 0 },
+  { 62, 0 },
+  { 63, 0 },
+  { 64, 0 },
+  { 65, 0 },
+  { 66, 0 },
+  { 67, 0 },
+  { 68, 0 },
+  { 69, 0 },
+  { 70, 0 },
+  { 71, 0 },
+  { 72, 0 },
+  { 73, 0 },
+  { 74, 0 },
+  { 75, 0 },
+  { 76, 0 },
+  { 77, 0 },
+  { 78, 0 },
+  { 79, 0 },
+  { 80, 0 },
+  { 81, 0 },
+  { 82, 0 },
+  { 83, 0 },
+  { 84, 0 },
+  { 85, 0 },
+  { 86, 0 },
+  { 87, 0 },
+  { 88, 0 },
+  { 89, 0 },
+  { 90, 0 },
+  { 91, 0 },
+  { 92, 0 },
+  { 93, 0 },
 };
 
 static inline uint16_t ts_keyword_next(uint16_t state, uint32_t character) {
   const TSKeywordState *row = &ts_keyword_states[state];
-  uint32_t low = row->index, high = low + row->count;
+  uint32_t low = row->index, high = ts_keyword_states[state + 1].index;
   while (low < high) {
     uint32_t mid = low + (high - low) / 2;
     TSKeywordTransition transition = ts_keyword_transitions[mid];
