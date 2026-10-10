@@ -65,7 +65,7 @@ jobs:
           mkdir -p .tmp/fuzz-out .tmp/fuzz-artifacts
           .tmp/fuzzer .tmp/fuzz-out .tmp/fuzz-seeds -dict=.tmp/fuzz-dict -artifact_prefix=.tmp/fuzz-artifacts/ \
             -timeout=10 -max_total_time=300 -max_len=4096
-      - uses: actions/upload-artifact@v7.0.1
+      - uses: actions/upload-artifact@v7.0.2
         if: failure()
         with:
           name: fuzzer-artifacts
