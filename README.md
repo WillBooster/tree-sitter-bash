@@ -17,7 +17,9 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 1.4.2 or later, a peer dependency:
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 2.0.0 or later, a peer dependency.
+The parser carries the ABI number of WillBooster/tree-sitter (`0x57420001`), so only that runtime loads it; the
+original tree-sitter runtime rejects it, and so does `@willbooster/web-tree-sitter` 1.x:
 
 ```sh
 npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter
@@ -64,9 +66,10 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
-The ABI 16 major release can change recovery trees for malformed scripts. Valid syntax and completed constructs
-remain supported, and incremental parses must match fresh parses. Review consumers that depend on the exact shape
-of `ERROR` nodes when upgrading.
+When upgrading from 3.x, upgrade `@willbooster/web-tree-sitter` to 2.x in the same change: each major of this package
+loads only with the runtime major it was generated for. Scripts that parse without errors get the same syntax trees as
+with 3.x. Recovery trees for malformed scripts can differ from every earlier major, so review consumers that depend on
+the exact shape of `ERROR` nodes.
 
 ## Development
 
@@ -85,7 +88,7 @@ and the runtime of upstream's CLI are not the ones this package ships with. Its 
 runtime's GitHub Release, or builds it with `cargo` (whose build runs the CMake that `mise.toml` pins) when the download fails or the release has no
 binary that runs here. Run other CLI commands through it as well (e.g. `script/tree-sitter parse script.sh`).
 
-`bun run generate` records a fresh ABI 16 generation profile from the applicable `test/corpus` cases and Git-tracked
+`bun run generate` records a fresh generation profile from the applicable `test/corpus` cases and Git-tracked
 files in `examples/`, then generates compact parser tables. The parser also embeds metadata from `tree-sitter.json`. After changing a grammar,
 `tree-sitter.json`, a corpus case, or a tracked example,
 regenerate and commit `src/`. Stage added or removed examples with `git add -A examples` before generation so the profile uses the intended file list.
