@@ -67,9 +67,9 @@ parser.setLanguage(await Language.load(bash));
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
 When upgrading from 3.x, upgrade `@willbooster/web-tree-sitter` to 2.x in the same change: each major of this package
-loads only with the runtime major it was generated for. Syntax trees are the same as with 3.x. When upgrading from 2.x
-or earlier, recovery trees for malformed scripts can differ; valid syntax and completed constructs remain supported,
-so review consumers that depend on the exact shape of `ERROR` nodes.
+loads only with the runtime major it was generated for. Scripts that parse without errors get the same syntax trees as
+with 3.x. Recovery trees for malformed scripts can differ from every earlier major, so review consumers that depend on
+the exact shape of `ERROR` nodes.
 
 ## Development
 
