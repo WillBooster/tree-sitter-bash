@@ -186,7 +186,9 @@ function diffInvocations(executed: Map<string, string[][]>, parsed: Map<string, 
 function literalValue(node: Node): string | undefined {
   switch (node.type) {
     case 'word': {
-      return node.text.replaceAll(/\\([\s\S])/gu, (_, next: string) => (next === '\n' ? '' : next));
+      return backquotedText(node, node.text).replaceAll(/\\([\s\S])/gu, (_, next: string) =>
+        next === '\n' ? '' : next
+      );
     }
     // Split into `string_content` children where bash removes line continuations inside the quotes. A heredoc
     // body inside the quotes is read before the line after it, and is no part of the word.
@@ -196,7 +198,9 @@ function literalValue(node: Node): string | undefined {
     case 'string': {
       const parts = new Set(['string_content', 'heredoc_body']);
       if (node.namedChildren.some((child) => !parts.has(child.type))) return undefined;
-      return quotedText(node).replaceAll(/\\([$`"\\\n])/gu, (_, next: string) => (next === '\n' ? '' : next));
+      return backquotedText(node, quotedText(node)).replaceAll(/\\([$`"\\\n])/gu, (_, next: string) =>
+        next === '\n' ? '' : next
+      );
     }
     case 'ansi_c_string': {
       return decodeAnsiC(node.namedChildCount > 0 ? quotedText(node) : node.text.slice(2, -1));
@@ -210,6 +214,18 @@ function literalValue(node: Node): string | undefined {
       return undefined;
     }
   }
+}
+
+// Bash removes the backslash before `$`, a backquote, and a backslash, and also before `"` where the backquotes are
+// inside double quotes, when it reads the text of backquotes.
+function backquotedText(node: Node, text: string): string {
+  let result = text;
+  for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
+    if (ancestor.type !== 'command_substitution' || !ancestor.text.startsWith('`')) continue;
+    const quoted = ancestor.parent?.type === 'string' || ancestor.parent?.type === 'translated_string';
+    result = result.replaceAll(quoted ? /\\([$`\\"])/gu : /\\([$`\\])/gu, '$1');
+  }
+  return result;
 }
 
 function quotedText(node: Node): string {

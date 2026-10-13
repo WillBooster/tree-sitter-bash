@@ -879,6 +879,70 @@ $x
         (variable_name)))))
 
 ================================================================================
+Backslashes that bash removes inside backquotes
+================================================================================
+
+echo `echo \$HOME \\$HOME \\\$HOME \\\\$HOME a\$b \$(date)`
+echo `echo "\$x" "\\$x" \"a b\"`
+echo "`echo \"a  b\" \"\$x\" "c  d"`"
+
+--------------------------------------------------------------------------------
+
+(program
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (simple_expansion
+          (variable_name))
+        argument: (word)
+        argument: (word)
+        argument: (concatenation
+          (word)
+          (simple_expansion
+            (variable_name)))
+        argument: (concatenation
+          (word)
+          (simple_expansion
+            (variable_name)))
+        argument: (command_substitution
+          (command
+            name: (command_name
+              (word)))))))
+  (command
+    name: (command_name
+      (word))
+    argument: (command_substitution
+      (command
+        name: (command_name
+          (word))
+        argument: (string
+          (simple_expansion
+            (variable_name)))
+        argument: (string
+          (string_content))
+        argument: (word)
+        argument: (word))))
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (command_substitution
+        (command
+          name: (command_name
+            (word))
+          argument: (string
+            (string_content))
+          argument: (string
+            (simple_expansion
+              (variable_name)))
+          argument: (string
+            (string_content)))))))
+
+================================================================================
 Comments end at closing backquotes
 ================================================================================
 
