@@ -149,9 +149,21 @@ module.exports = grammar({
     $._timing_keyword,
     $._timing_option,
     $._timing_terminator,
+    $._backquote_escape,
   ],
 
-  extras: ($) => [$.comment, $.heredoc_body, /[ \t\n]/, /\\\n/, $._line_continuation, $._arithmetic_cache_reset],
+  // Bash removes the backslash before `$` (and before `"` where the backquotes are inside double quotes)
+  // when it reads the text of backquotes, so the scanner returns that backslash on its own and what
+  // follows it is parsed as an expansion or a quote.
+  extras: ($) => [
+    $.comment,
+    $.heredoc_body,
+    /[ \t\n]/,
+    /\\\n/,
+    $._line_continuation,
+    $._arithmetic_cache_reset,
+    $._backquote_escape,
+  ],
 
   supertypes: ($) => [$._statement, $._arithmetic_expression],
 

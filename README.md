@@ -68,8 +68,17 @@ The package also ships the queries in `queries/` and the node types in `src/node
 
 When upgrading from 3.x, upgrade `@willbooster/web-tree-sitter` to 2.x in the same change: each major of this package
 loads only with the runtime major it was generated for. Scripts that parse without errors get the same syntax trees as
-with 3.x. Recovery trees for malformed scripts can differ from every earlier major, so review consumers that depend on
-the exact shape of `ERROR` nodes.
+with 3.x, except where backslashes inside backquotes precede `$` (or `"` when the backquotes are inside double quotes):
+like bash, the parser removes one level of those backslashes before it parses the text, so `` `echo \$x` `` holds an
+expansion and `` `echo \\$x` `` a literal `$x`. Recovery trees for malformed scripts can differ from every earlier
+major, so review consumers that depend on the exact shape of `ERROR` nodes.
+
+Inside backquotes, the text of a node is the source text: consumers that read the value of a word or a string there
+remove a backslash before `$`, a backquote, or a backslash (and before `"` when the backquotes are inside double quotes)
+before they remove quotes and escapes as usual. The parser normalizes runs before `$`, and before `"` when the
+backquotes opened inside double quotes, only in ordinary word and double-quoted string scanning. Runs before other
+characters (including whitespace and metacharacters), heredoc bodies, parameter-expansion text, regexes, nested
+backquotes, and PID expansions split by a removed escape retain their existing parsing limitations.
 
 ## Development
 

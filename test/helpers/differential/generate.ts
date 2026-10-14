@@ -26,6 +26,9 @@ class ScriptGenerator {
   // Inside backquotes, newlines are avoided except before heredoc bodies, whose lines avoid backslashes
   // and backquotes, which would need nested quoting.
   private inBackquotes = false;
+  // Where words inside the backquotes may hold the backslashes that bash removes there, whether the
+  // backquotes are inside double quotes, where bash also removes the one before `"`.
+  private backquoteEscapes: 'none' | 'plain' | 'quoted' = 'none';
   // Words without quotes, expansions, or line continuations, where those would change how bash reads
   // them.
   private plainWords = 0;
@@ -353,6 +356,26 @@ class ScriptGenerator {
 
   // Every argument yields exactly one word for the command, so argument lists line up.
   private argument(depth: number): void {
+    if (this.backquoteEscapes !== 'none' && this.plainWords === 0 && this.random.chance(0.3)) {
+      // Bash removes the backslash before `$` and halves the backslashes before it, so these run a command,
+      // expand, or keep a literal `$`.
+      this.emit(
+        this.random.pick([
+          `"\\$(c ${this.commandId()})"`,
+          String.raw`\"\$(c ${this.commandId()})\"`,
+          String.raw`a\$X`,
+          String.raw`\$((1 + 2))`,
+          String.raw`\\$X`,
+          String.raw`\\\$X`,
+          String.raw`\\\\$X`,
+          String.raw`"\\$X"`,
+          String.raw`"a \$X"`,
+          // One word inside double quotes, where the backslashes are removed, and two elsewhere.
+          this.backquoteEscapes === 'quoted' ? String.raw`\"x  y\"` : String.raw`\"x\"`,
+        ])
+      );
+      return;
+    }
     if (this.inBackquotes || this.plainWords > 0) {
       // Quotes and backslashes inside backquotes follow extra rules; plain words keep the check simple.
       // Other callers need words that bash reads as written.
@@ -437,9 +460,15 @@ class ScriptGenerator {
         break;
       }
       case 8: {
-        this.emit('"');
-        this.backquoted();
-        this.emit('"');
+        if (this.random.chance(0.5)) {
+          this.emit('"');
+          this.backquoted('quoted');
+          this.emit('"');
+        } else {
+          // The substitution prints nothing, so the word part keeps the word.
+          this.emit(this.literalWord());
+          this.backquoted('plain');
+        }
         break;
       }
       default: {
@@ -449,9 +478,10 @@ class ScriptGenerator {
   }
 
   // A simple command in backquotes, whose heredocs end inside them.
-  private backquoted(): void {
+  private backquoted(escapes: 'none' | 'plain' | 'quoted' = 'none'): void {
     this.emit('`');
     this.inBackquotes = true;
+    this.backquoteEscapes = escapes;
     // Bash reads a deferred body right after its line, while the backquotes' end would cut it short
     // for the parser.
     const heredocs = this.deferredHeredocs.length === 0;
@@ -466,6 +496,7 @@ class ScriptGenerator {
     this.pendingHeredocs.pop();
     if (!heredocs) this.heredocsDisabled--;
     this.inBackquotes = false;
+    this.backquoteEscapes = 'none';
     this.emit('`');
   }
 
