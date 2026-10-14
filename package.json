@@ -55,7 +55,6 @@
     "playwright": "1.63.0",
     "semantic-release": "25.0.9",
     "sort-package-json": "4.0.0",
-    "tree-sitter-cli": "0.27.0",
     "typescript": "7.0.2",
     "vite": "8.3.2",
     "vitest": "5.0.3",
