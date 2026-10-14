@@ -3,8 +3,11 @@
  * @license MIT
  */
 
-/// <reference types="tree-sitter-cli/dsl" />
 // @ts-check
+
+// The CLI injects the DSL before loading this CommonJS grammar.
+const { grammar, alias, choice, field, optional, prec, repeat, repeat1, seq, sym, token } =
+  /** @type {typeof globalThis & import('@willbooster/web-tree-sitter/dsl').DSL} */ (globalThis);
 
 // Characters that end an unquoted word part: metacharacters, quotes, and characters that begin an
 // expansion. `#` only starts a comment at the beginning of a word, so it is handled separately. Like
@@ -108,48 +111,48 @@ const TEST_BINARY_OPERATORS = [
 module.exports = grammar({
   name: 'bash',
 
-  externals: ($) => [
-    $.heredoc_start,
-    $._heredoc_body_start,
-    $.heredoc_content,
-    $.heredoc_end,
-    $._heredoc_arrow,
-    $._heredoc_arrow_dash,
-    $._concat,
-    $.file_descriptor,
-    $.variable_name,
-    $._bare_dollar,
-    $._empty_value,
-    $.regex,
-    $.string_content,
-    $._backtick_open,
-    $._backtick_close,
-    $._newline,
-    $._substitution_start,
-    $._substitution_end,
-    $._brace_substitution_end,
-    $._bracket_substitution_end,
-    $._extglob_prefix,
-    $._line_continuation,
-    $._brace_substitution_start,
-    $._bracket_substitution_start,
-    $._regex_start,
-    $._regex_concat,
-    $._closer_line_raw_string_start,
-    $._closer_line_ansi_c_string_start,
-    $._closer_line_raw_string_content,
-    $._closer_line_ansi_c_string_content,
-    $._joined_comment,
-    $._backtick_comment,
-    $._backtick_comment_boundary,
-    $.__error_recovery,
-    $._command_substitution_start,
-    $._arithmetic_substitution_start,
-    $._arithmetic_cache_reset,
-    $._timing_keyword,
-    $._timing_option,
-    $._timing_terminator,
-    $._backquote_escape,
+  externals: () => [
+    sym('heredoc_start'),
+    sym('_heredoc_body_start'),
+    sym('heredoc_content'),
+    sym('heredoc_end'),
+    sym('_heredoc_arrow'),
+    sym('_heredoc_arrow_dash'),
+    sym('_concat'),
+    sym('file_descriptor'),
+    sym('variable_name'),
+    sym('_bare_dollar'),
+    sym('_empty_value'),
+    sym('regex'),
+    sym('string_content'),
+    sym('_backtick_open'),
+    sym('_backtick_close'),
+    sym('_newline'),
+    sym('_substitution_start'),
+    sym('_substitution_end'),
+    sym('_brace_substitution_end'),
+    sym('_bracket_substitution_end'),
+    sym('_extglob_prefix'),
+    sym('_line_continuation'),
+    sym('_brace_substitution_start'),
+    sym('_bracket_substitution_start'),
+    sym('_regex_start'),
+    sym('_regex_concat'),
+    sym('_closer_line_raw_string_start'),
+    sym('_closer_line_ansi_c_string_start'),
+    sym('_closer_line_raw_string_content'),
+    sym('_closer_line_ansi_c_string_content'),
+    sym('_joined_comment'),
+    sym('_backtick_comment'),
+    sym('_backtick_comment_boundary'),
+    sym('__error_recovery'),
+    sym('_command_substitution_start'),
+    sym('_arithmetic_substitution_start'),
+    sym('_arithmetic_cache_reset'),
+    sym('_timing_keyword'),
+    sym('_timing_option'),
+    sym('_timing_terminator'),
+    sym('_backquote_escape'),
   ],
 
   // Bash removes the backslash before `$` (and before `"` where the backquotes are inside double quotes)
@@ -160,9 +163,9 @@ module.exports = grammar({
     $.heredoc_body,
     /[ \t\n]/,
     /\\\n/,
-    $._line_continuation,
-    $._arithmetic_cache_reset,
-    $._backquote_escape,
+    sym('_line_continuation'),
+    sym('_arithmetic_cache_reset'),
+    sym('_backquote_escape'),
   ],
 
   supertypes: ($) => [$._statement, $._arithmetic_expression],
@@ -182,7 +185,7 @@ module.exports = grammar({
     _terminated_statements: ($) => repeat1(seq($._statement, $._terminator)),
 
     // A newline is significant only where it can end a statement; elsewhere it is whitespace.
-    _terminator: ($) => choice(';', '&', $._newline),
+    _terminator: () => choice(';', '&', sym('_newline')),
 
     _statement: ($) =>
       choice($._command_statement, $.pipeline, $.list, $.negated_command, $.timed_command, $.coproc_command),
@@ -219,9 +222,9 @@ module.exports = grammar({
       prec.right(
         2,
         seq(
-          choice('time', alias($._timing_keyword, 'time')),
-          optional(field('option', alias(choice('-p', $._timing_option), $.word))),
-          optional(alias($._timing_terminator, $.word)),
+          choice('time', alias(sym('_timing_keyword'), 'time')),
+          optional(field('option', alias(choice('-p', sym('_timing_option')), $.word))),
+          optional(alias(sym('_timing_terminator'), $.word)),
           optional(choice($._command_statement, $.pipeline, $.negated_command))
         )
       ),
@@ -251,7 +254,7 @@ module.exports = grammar({
             field('name', $.command_name),
             repeat(
               seq(
-                optional($._backtick_comment_boundary),
+                optional(sym('_backtick_comment_boundary')),
                 choice(field('argument', $._argument), field('redirect', $._redirect))
               )
             )
@@ -262,7 +265,7 @@ module.exports = grammar({
 
     _command_prefix: ($) => choice(field('assignment', $.variable_assignment), field('redirect', $._redirect)),
 
-    command_name: ($) => seq(optional($._backtick_comment_boundary), $._word),
+    command_name: ($) => seq(optional(sym('_backtick_comment_boundary')), $._word),
 
     declaration_command: ($) =>
       prec.left(
@@ -271,7 +274,7 @@ module.exports = grammar({
           field('name', alias(choice('declare', 'typeset', 'export', 'readonly', 'local'), $.command_name)),
           repeat(
             seq(
-              optional($._backtick_comment_boundary),
+              optional(sym('_backtick_comment_boundary')),
               choice(field('argument', choice($.variable_assignment, $._argument)), field('redirect', $._redirect))
             )
           )
@@ -280,9 +283,9 @@ module.exports = grammar({
 
     variable_assignment: ($) =>
       seq(
-        field('name', choice($.variable_name, $.subscript)),
+        field('name', choice(sym('variable_name'), $.subscript)),
         field('operator', token.immediate(choice('=', '+='))),
-        field('value', choice($._argument, $._hash_value, $.array, $._empty_value))
+        field('value', choice($._argument, $._hash_value, $.array, sym('_empty_value')))
       ),
 
     // A value is not at the start of a word, so a leading `#` is literal (`color=#fff`).
@@ -294,7 +297,7 @@ module.exports = grammar({
           alias($._hash_word, $.word),
           repeat1(
             seq(
-              $._concat,
+              sym('_concat'),
               choice($._word_part, alias($._hash_word, $.word), alias($._negated_extglob_pattern, $.extglob_pattern))
             )
           )
@@ -302,7 +305,7 @@ module.exports = grammar({
       ),
 
     subscript: ($) =>
-      seq(field('name', $.variable_name), token.immediate('['), field('index', $._subscript_index), ']'),
+      seq(field('name', sym('variable_name')), token.immediate('['), field('index', $._subscript_index), ']'),
 
     // Like bash, the index extends to the matching `]`, so it may hold bracketed groups at any depth
     // (`A[x[1[2]]]`), blanks, and newlines.
@@ -340,7 +343,7 @@ module.exports = grammar({
 
     file_redirect: ($) =>
       seq(
-        optional(field('descriptor', $.file_descriptor)),
+        optional(field('descriptor', sym('file_descriptor'))),
         choice(
           seq(
             field('operator', choice('<', '>', '>>', '>|', '<>', '&>', '&>>', '<&', '>&')),
@@ -351,24 +354,30 @@ module.exports = grammar({
       ),
 
     herestring_redirect: ($) =>
-      seq(optional(field('descriptor', $.file_descriptor)), field('operator', '<<<'), field('value', $._argument)),
+      seq(optional(field('descriptor', sym('file_descriptor'))), field('operator', '<<<'), field('value', $._argument)),
 
-    heredoc_redirect: ($) =>
+    heredoc_redirect: () =>
       seq(
-        optional(field('descriptor', $.file_descriptor)),
-        field('operator', choice(alias($._heredoc_arrow, '<<'), alias($._heredoc_arrow_dash, '<<-'))),
-        field('delimiter', $.heredoc_start)
+        optional(field('descriptor', sym('file_descriptor'))),
+        field('operator', choice(alias(sym('_heredoc_arrow'), '<<'), alias(sym('_heredoc_arrow_dash'), '<<-'))),
+        field('delimiter', sym('heredoc_start'))
       ),
 
     // The scanner opens a body at the newline that ends the line holding its `<<` operator, so bodies
     // appear, in operator order, wherever that newline falls.
     heredoc_body: ($) =>
       seq(
-        $._heredoc_body_start,
+        sym('_heredoc_body_start'),
         repeat(
-          choice($.heredoc_content, $.simple_expansion, $.expansion, $.command_substitution, $.arithmetic_expansion)
+          choice(
+            sym('heredoc_content'),
+            $.simple_expansion,
+            $.expansion,
+            $.command_substitution,
+            $.arithmetic_expansion
+          )
         ),
-        $.heredoc_end
+        sym('heredoc_end')
       ),
 
     compound_statement: ($) => seq('{', optional($._terminated_statements), '}'),
@@ -376,7 +385,7 @@ module.exports = grammar({
     subshell: ($) => seq('(', optional($._statements), ')'),
 
     arithmetic_command: ($) =>
-      seq('((', $._substitution_start, optional($._arithmetic_expression), $._substitution_end, '))'),
+      seq('((', sym('_substitution_start'), optional($._arithmetic_expression), sym('_substitution_end'), '))'),
 
     test_command: ($) => seq('[[', $._test_expression, ']]'),
 
@@ -386,15 +395,18 @@ module.exports = grammar({
         $.unary_test,
         $.binary_test,
         $.regex_test,
-        alias($._test_negation, $.negated_test),
-        alias($._test_logical, $.logical_test),
-        alias($._test_parenthesized, $.parenthesized_test)
+        alias($._test_negation, sym('negated_test')),
+        alias($._test_logical, sym('logical_test')),
+        alias($._test_parenthesized, sym('parenthesized_test'))
       ),
 
     unary_test: ($) =>
       prec(
         PREC.UNARY,
-        seq(field('operator', alias(choice(...TEST_UNARY_OPERATORS), $.test_operator)), field('operand', $._argument))
+        seq(
+          field('operator', alias(choice(...TEST_UNARY_OPERATORS), sym('test_operator'))),
+          field('operand', $._argument)
+        )
       ),
 
     // The right side of `==`/`!=` is a pattern matched as if extglob were enabled.
@@ -403,7 +415,7 @@ module.exports = grammar({
         PREC.COMPARE,
         seq(
           field('left', $._word),
-          field('operator', alias(choice(...TEST_BINARY_OPERATORS), $.test_operator)),
+          field('operator', alias(choice(...TEST_BINARY_OPERATORS), sym('test_operator'))),
           field('right', $._argument)
         )
       ),
@@ -416,14 +428,14 @@ module.exports = grammar({
         seq(
           field('left', $._word),
           field('operator', '=~'),
-          $._regex_start,
+          sym('_regex_start'),
           field('right', choice($._regex_part, alias($._regex_concatenation, $.concatenation)))
         )
       ),
 
-    _regex_concatenation: ($) => prec.right(seq($._regex_part, repeat1(seq($._regex_concat, $._regex_part)))),
+    _regex_concatenation: ($) => prec.right(seq($._regex_part, repeat1(seq(sym('_regex_concat'), $._regex_part)))),
 
-    _regex_part: ($) => choice($.regex, $._quoted_or_expansion),
+    _regex_part: ($) => choice(sym('regex'), $._quoted_or_expansion),
 
     _test_negation: ($) => prec(PREC.UNARY, seq('!', $._test_expression)),
 
@@ -463,20 +475,20 @@ module.exports = grammar({
         field('body', $.do_group)
       ),
 
-    do_group: ($) => seq(optional($._backtick_comment_boundary), 'do', optional($._terminated_statements), 'done'),
+    do_group: ($) => seq(optional(sym('_backtick_comment_boundary')), 'do', optional($._terminated_statements), 'done'),
 
     for_statement: ($) =>
       seq(
         field('keyword', choice('for', 'select')),
-        field('variable', alias($.word, $.variable_name)),
+        field('variable', alias($.word, sym('variable_name'))),
         // Without a word list the separator is optional (`for i do …`); a newline may precede `in`.
         choice(
           seq(
-            optional($._newline),
-            optional($._backtick_comment_boundary),
+            optional(sym('_newline')),
+            optional(sym('_backtick_comment_boundary')),
             'in',
-            repeat(seq(optional($._backtick_comment_boundary), field('value', $._argument))),
-            optional($._backtick_comment_boundary),
+            repeat(seq(optional(sym('_backtick_comment_boundary')), field('value', $._argument))),
+            optional(sym('_backtick_comment_boundary')),
             $._terminator
           ),
           optional($._terminator)
@@ -488,13 +500,13 @@ module.exports = grammar({
       seq(
         'for',
         '((',
-        $._substitution_start,
+        sym('_substitution_start'),
         field('initializer', optional($._arithmetic_expression)),
         ';',
         field('condition', optional($._arithmetic_expression)),
         ';',
         field('update', optional($._arithmetic_expression)),
-        $._substitution_end,
+        sym('_substitution_end'),
         '))',
         optional($._terminator),
         field('body', choice($.do_group, $.compound_statement))
@@ -504,7 +516,7 @@ module.exports = grammar({
       seq(
         'case',
         field('value', $._argument),
-        optional($._backtick_comment_boundary),
+        optional(sym('_backtick_comment_boundary')),
         'in',
         repeat($.case_item),
         optional(alias($._last_case_item, $.case_item)),
@@ -519,7 +531,7 @@ module.exports = grammar({
 
     _case_patterns: ($) =>
       seq(
-        optional($._backtick_comment_boundary),
+        optional(sym('_backtick_comment_boundary')),
         optional('('),
         field('pattern', $._argument),
         repeat(seq('|', field('pattern', $._argument))),
@@ -529,7 +541,7 @@ module.exports = grammar({
     function_definition: ($) =>
       seq(
         choice(seq('function', field('name', $.word), optional(seq('(', ')'))), seq(field('name', $.word), '(', ')')),
-        optional($._backtick_comment_boundary),
+        optional(sym('_backtick_comment_boundary')),
         field('body', $._compound_command)
       ),
 
@@ -552,7 +564,7 @@ module.exports = grammar({
           choice(alias($._negated_extglob_pattern, $.extglob_pattern), alias($._negated_extglob_word, $.word)),
           repeat1(
             seq(
-              $._concat,
+              sym('_concat'),
               choice($._word_part, alias($._hash_word, $.word), alias($._negated_extglob_pattern, $.extglob_pattern))
             )
           )
@@ -573,7 +585,7 @@ module.exports = grammar({
           $._word_part,
           repeat1(
             seq(
-              $._concat,
+              sym('_concat'),
               choice($._word_part, alias($._hash_word, $.word), alias($._negated_extglob_pattern, $.extglob_pattern))
             )
           )
@@ -584,7 +596,7 @@ module.exports = grammar({
       choice(
         $.word,
         // Literal text that the scanner ends before a structured extglob group (`foo@($x)`).
-        alias($._extglob_prefix, $.word),
+        alias(sym('_extglob_prefix'), $.word),
         $.extglob_pattern,
         $.string,
         $.raw_string,
@@ -595,7 +607,7 @@ module.exports = grammar({
         $.command_substitution,
         $.arithmetic_expansion,
         $.process_substitution,
-        alias($._bare_dollar, $.word)
+        alias(sym('_bare_dollar'), $.word)
       ),
 
     // An extglob group (`@(a|b)`) is part of the word; `!(` only inside a word, since a leading `!`
@@ -638,7 +650,7 @@ module.exports = grammar({
       seq(
         '"',
         repeat(
-          choice($.string_content, $.simple_expansion, $.expansion, $.command_substitution, $.arithmetic_expansion)
+          choice(sym('string_content'), $.simple_expansion, $.expansion, $.command_substitution, $.arithmetic_expansion)
         ),
         '"'
       ),
@@ -647,18 +659,22 @@ module.exports = grammar({
     // with its line continuations removed, even inside single quotes, and reads the bodies still queued
     // before that line right after it, even where it ends inside quotes; the scanner then splits the
     // quoted text around the continuations and the bodies.
-    raw_string: ($) =>
+    raw_string: () =>
       choice(
         /'[^']*'/,
-        seq($._closer_line_raw_string_start, repeat(alias($._closer_line_raw_string_content, $.string_content)), "'")
+        seq(
+          sym('_closer_line_raw_string_start'),
+          repeat(alias(sym('_closer_line_raw_string_content'), sym('string_content'))),
+          "'"
+        )
       ),
 
-    ansi_c_string: ($) =>
+    ansi_c_string: () =>
       choice(
         /\$'([^'\\]|\\(.|\n))*'/,
         seq(
-          $._closer_line_ansi_c_string_start,
-          repeat(alias($._closer_line_ansi_c_string_content, $.string_content)),
+          sym('_closer_line_ansi_c_string_start'),
+          repeat(alias(sym('_closer_line_ansi_c_string_content'), sym('string_content'))),
           "'"
         )
       ),
@@ -667,17 +683,17 @@ module.exports = grammar({
       seq(
         '$"',
         repeat(
-          choice($.string_content, $.simple_expansion, $.expansion, $.command_substitution, $.arithmetic_expansion)
+          choice(sym('string_content'), $.simple_expansion, $.expansion, $.command_substitution, $.arithmetic_expansion)
         ),
         '"'
       ),
 
-    simple_expansion: ($) =>
+    simple_expansion: () =>
       seq(
         '$',
         choice(
-          alias(token.immediate(/[A-Za-z_][A-Za-z0-9_]*/), $.variable_name),
-          alias(token.immediate(/[0-9*@#?$!_-]/), $.special_variable_name)
+          alias(token.immediate(/[A-Za-z_][A-Za-z0-9_]*/), sym('variable_name')),
+          alias(token.immediate(/[0-9*@#?$!_-]/), sym('special_variable_name'))
         )
       ),
 
@@ -688,19 +704,19 @@ module.exports = grammar({
         '${',
         choice(
           seq(
-            optional(field('prefix', alias(token.immediate(choice('#', '!')), $.operator))),
+            optional(field('prefix', alias(token.immediate(choice('#', '!')), sym('operator')))),
             field(
               'parameter',
               choice(
-                alias(token.immediate(/[A-Za-z_][A-Za-z0-9_]*/), $.variable_name),
-                alias(token.immediate(/[0-9]+|[*@?$_-]/), $.special_variable_name),
-                alias(token.immediate(choice('#', '!')), $.special_variable_name),
+                alias(token.immediate(/[A-Za-z_][A-Za-z0-9_]*/), sym('variable_name')),
+                alias(token.immediate(/[0-9]+|[*@?$_-]/), sym('special_variable_name')),
+                alias(token.immediate(choice('#', '!')), sym('special_variable_name')),
                 alias($._expansion_subscript, $.subscript)
               )
             ),
             optional($._expansion_operation)
           ),
-          field('parameter', alias(token.immediate(choice('#', '!')), $.special_variable_name)),
+          field('parameter', alias(token.immediate(choice('#', '!')), sym('special_variable_name'))),
           // Bash rejects `${}` and a body without a parameter (`${=1}`, `${"x"}`) only when expanding. A
           // `$name` expansion is left out, since its `$` would tie with the special parameter in `${$}`.
           repeat(
@@ -724,7 +740,7 @@ module.exports = grammar({
 
     _expansion_subscript: ($) =>
       seq(
-        field('name', alias(token.immediate(/[A-Za-z_][A-Za-z0-9_]*/), $.variable_name)),
+        field('name', alias(token.immediate(/[A-Za-z_][A-Za-z0-9_]*/), sym('variable_name'))),
         repeat1(seq(token.immediate('['), field('index', $._subscript_index), ']'))
       ),
 
@@ -762,7 +778,7 @@ module.exports = grammar({
                   '@'
                 )
               ),
-              $.operator
+              sym('operator')
             )
           ),
           repeat(
@@ -773,12 +789,12 @@ module.exports = grammar({
                 alias($._blank_expansion_text, $.word),
                 alias($._angle_text, $.word),
                 $._quoted_or_expansion,
-                alias($._bare_dollar, $.word)
+                alias(sym('_bare_dollar'), $.word)
               )
             )
           )
         ),
-        field('operator', alias(token.immediate(choice('*', '@')), $.operator)),
+        field('operator', alias(token.immediate(choice('*', '@')), sym('operator'))),
         // Text without an operator (`${x y}`) is rejected by bash only when expanding.
         repeat1(
           field(
@@ -821,49 +837,61 @@ module.exports = grammar({
     command_substitution: ($) =>
       choice(
         seq(
-          $._command_substitution_start,
+          sym('_command_substitution_start'),
           '$(',
-          $._substitution_start,
+          sym('_substitution_start'),
           optional($._statements),
-          $._substitution_end,
+          sym('_substitution_end'),
           ')'
         ),
         // bash 5.3 runs `${ list; }` and `${| list; }` in the current shell.
         seq(
           alias(token(/\$\{[ \t\n|]/), '${'),
-          $._brace_substitution_start,
+          sym('_brace_substitution_start'),
           optional($._terminated_statements),
-          $._brace_substitution_end,
+          sym('_brace_substitution_end'),
           '}'
         ),
-        seq(alias($._backtick_open, '`'), optional($._statements), alias($._backtick_close, '`'))
+        seq(alias(sym('_backtick_open'), '`'), optional($._statements), alias(sym('_backtick_close'), '`'))
       ),
 
     process_substitution: ($) =>
-      seq(choice('<(', '>('), $._substitution_start, optional($._statements), $._substitution_end, ')'),
+      seq(choice('<(', '>('), sym('_substitution_start'), optional($._statements), sym('_substitution_end'), ')'),
 
     // Arithmetic may span lines, and a heredoc body starts only after it, so it counts as nesting.
     arithmetic_expansion: ($) =>
       choice(
-        seq($._arithmetic_substitution_start, '$((', optional($._arithmetic_expression), $._substitution_end, '))'),
-        seq('$[', $._bracket_substitution_start, optional($._arithmetic_expression), $._bracket_substitution_end, ']')
+        seq(
+          sym('_arithmetic_substitution_start'),
+          '$((',
+          optional($._arithmetic_expression),
+          sym('_substitution_end'),
+          '))'
+        ),
+        seq(
+          '$[',
+          sym('_bracket_substitution_start'),
+          optional($._arithmetic_expression),
+          sym('_bracket_substitution_end'),
+          ']'
+        )
       ),
 
     _arithmetic_expression: ($) =>
       choice(
         $.number,
-        alias($._arithmetic_variable, $.variable_name),
+        alias($._arithmetic_variable, sym('variable_name')),
         alias($._arithmetic_subscript, $.subscript),
         $.simple_expansion,
         $.expansion,
         $.command_substitution,
         $.arithmetic_expansion,
         $.string,
-        alias($._arithmetic_unary, $.unary_expression),
-        alias($._arithmetic_postfix, $.postfix_expression),
-        alias($._arithmetic_binary, $.binary_expression),
-        alias($._arithmetic_ternary, $.ternary_expression),
-        alias($._arithmetic_parenthesized, $.parenthesized_expression)
+        alias($._arithmetic_unary, sym('unary_expression')),
+        alias($._arithmetic_postfix, sym('postfix_expression')),
+        alias($._arithmetic_binary, sym('binary_expression')),
+        alias($._arithmetic_ternary, sym('ternary_expression')),
+        alias($._arithmetic_parenthesized, sym('parenthesized_expression'))
       ),
 
     number: ($) =>
@@ -877,7 +905,7 @@ module.exports = grammar({
 
     _arithmetic_subscript: ($) =>
       seq(
-        field('name', alias($._arithmetic_variable, $.variable_name)),
+        field('name', alias($._arithmetic_variable, sym('variable_name'))),
         token.immediate('['),
         field('index', $._arithmetic_expression),
         ']'
@@ -893,6 +921,7 @@ module.exports = grammar({
       prec(PREC.POSTFIX, seq($._arithmetic_expression, field('operator', choice('++', '--')))),
 
     _arithmetic_binary: ($) => {
+      /** @type {[number, import('@willbooster/web-tree-sitter/dsl').RuleOrLiteral][]} */
       const table = [
         [PREC.COMMA, ','],
         [PREC.ASSIGN, choice('=', '+=', '-=', '*=', '/=', '%=', '**=', '<<=', '>>=', '&=', '^=', '|=')],
@@ -912,12 +941,12 @@ module.exports = grammar({
         ...table.map(([precedence, operator]) => {
           const rule = seq(
             field('left', $._arithmetic_expression),
-            field('operator', /** @type {RuleOrLiteral} */ (operator)),
+            field('operator', operator),
             field('right', $._arithmetic_expression)
           );
           return precedence === PREC.ASSIGN || precedence === PREC.EXPONENT
-            ? prec.right(/** @type {number} */ (precedence), rule)
-            : prec.left(/** @type {number} */ (precedence), rule);
+            ? prec.right(precedence, rule)
+            : prec.left(precedence, rule);
         })
       );
     },
@@ -936,7 +965,7 @@ module.exports = grammar({
 
     _arithmetic_parenthesized: ($) => seq('(', $._arithmetic_expression, ')'),
 
-    comment: ($) => choice(token(prec(-10, /#.*/)), $._joined_comment, $._backtick_comment),
+    comment: () => choice(token(prec(-10, /#.*/)), sym('_joined_comment'), sym('_backtick_comment')),
   },
 });
 
