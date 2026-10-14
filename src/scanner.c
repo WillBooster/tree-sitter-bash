@@ -75,9 +75,9 @@ typedef struct {
     uint8_t backtick_depth;
     // The backquotes opened inside double quotes, where bash also removes the backslash before `"`.
     bool backtick_in_string;
-    // The last token of this scanner was a backslash that bash removes inside backquotes, after a blank or a
-    // newline; what follows it starts a word rather than continuing the previous one.
-    bool after_separate_escape;
+    // Internal tokens do not persist scanner state, so suppress concatenation only at the column immediately
+    // after a removed escape that follows whitespace, not after the expansion it introduces.
+    uint32_t separate_escape_column;
     Array(uint8_t) closers;
     // The regex group depth when each open substitution started, restored when it ends.
     Array(uint16_t) closer_regex_depths;
@@ -253,13 +253,13 @@ static unsigned decode_varint(const char *in, unsigned available, int32_t *c) {
     return 0;
 }
 
-// Serialized layout: backtick depth (with the separate-escape and in-string flags in its two high bits), the closer
+// Serialized layout: backtick depth (with the in-string flag in its high bit), the separate-escape column (uint32), the closer
 // count when the backquotes opened (uint16), the owed-terminator, line-break, joined-line, split-continuation,
 // string-opened, and heredoc-line-start flags, the closer count owing a terminator after its `)`, the regex depth,
 // and the one saved when the backquotes opened (uint16 each), the closers of the open substitutions (uint16 count,
 // then one byte each, then their saved regex depths as uint16), and heredoc count, then per heredoc its flags,
 // depth (uint16), delimiter length (uint16), and the delimiter as varints.
-#define SCANNER_HEADER_SIZE (2 + 5 * sizeof(uint16_t))
+#define SCANNER_HEADER_SIZE (2 + sizeof(uint32_t) + 5 * sizeof(uint16_t))
 #define CLOSER_SIZE (1 + sizeof(uint16_t))
 #define HEREDOC_HEADER_SIZE (3 + 2 * sizeof(uint16_t))
 
@@ -284,7 +284,7 @@ static void scanner_reset(Scanner *scanner) {
     array_clear(&scanner->heredocs);
     scanner->backtick_depth = 0;
     scanner->backtick_in_string = false;
-    scanner->after_separate_escape = false;
+    scanner->separate_escape_column = 0;
     array_clear(&scanner->closers);
     array_clear(&scanner->closer_regex_depths);
     scanner->backtick_closers = 0;
@@ -2565,8 +2565,9 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     scanner->after_line_break = false;
     bool heredoc_line_start = scanner->heredoc_line_start;
     scanner->heredoc_line_start = false;
-    bool after_separate_escape = scanner->after_separate_escape;
-    scanner->after_separate_escape = false;
+    bool after_separate_escape = scanner->separate_escape_column != 0 &&
+                                 scanner->separate_escape_column == lexer->get_column(lexer);
+    scanner->separate_escape_column = 0;
 
     if (scanner->terminator_owed) {
         scanner->terminator_owed = false;
@@ -2871,7 +2872,9 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
                 if (!scan_backquoted_backslashes(scanner, lexer, valid_symbols)) {
                     return false;
                 }
-                scanner->after_separate_escape = lexer->result_symbol == BACKQUOTE_ESCAPE && first != '\\';
+                scanner->separate_escape_column = lexer->result_symbol == BACKQUOTE_ESCAPE && first != '\\'
+                                                      ? lexer->get_column(lexer)
+                                                      : 0;
                 return true;
             }
             if (valid_symbols[EXTGLOB_PREFIX]) {
@@ -3061,8 +3064,9 @@ bool tree_sitter_bash_external_scanner_scan(void *payload, TSLexer *lexer, const
 unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer) {
     Scanner *scanner = (Scanner *)payload;
     unsigned size = 0;
-    buffer[size++] =
-        (char)(scanner->backtick_depth | scanner->after_separate_escape << 6 | scanner->backtick_in_string << 7);
+    buffer[size++] = (char)(scanner->backtick_depth | scanner->backtick_in_string << 7);
+    memcpy(&buffer[size], &scanner->separate_escape_column, sizeof(scanner->separate_escape_column));
+    size += sizeof(scanner->separate_escape_column);
     memcpy(&buffer[size], &scanner->backtick_closers, sizeof(scanner->backtick_closers));
     size += sizeof(scanner->backtick_closers);
     buffer[size++] = (char)(scanner->terminator_owed | scanner->after_line_break << 1 | scanner->joined_line << 2 |
@@ -3109,9 +3113,10 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
         return;
     }
     unsigned size = 0;
-    scanner->backtick_depth = (uint8_t)buffer[size] & 0x3f;
-    scanner->after_separate_escape = ((uint8_t)buffer[size] & 0x40) != 0;
+    scanner->backtick_depth = (uint8_t)buffer[size] & 0x7f;
     scanner->backtick_in_string = ((uint8_t)buffer[size++] & 0x80) != 0;
+    memcpy(&scanner->separate_escape_column, &buffer[size], sizeof(scanner->separate_escape_column));
+    size += sizeof(scanner->separate_escape_column);
     memcpy(&scanner->backtick_closers, &buffer[size], sizeof(scanner->backtick_closers));
     size += sizeof(scanner->backtick_closers);
     scanner->terminator_owed = buffer[size] & 1;

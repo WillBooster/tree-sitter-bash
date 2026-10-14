@@ -75,7 +75,9 @@ major, so review consumers that depend on the exact shape of `ERROR` nodes.
 
 Inside backquotes, the text of a node is the source text: consumers that read the value of a word or a string there
 remove a backslash before `$`, a backquote, or a backslash (and before `"` when the backquotes are inside double quotes)
-before they remove quotes and escapes as usual.
+before they remove quotes and escapes as usual. This normalization is currently limited to ordinary word and
+double-quoted string scanning: heredoc bodies, parameter-expansion text, regexes, nested backquotes, and PID
+expansions split by a removed escape retain their existing parsing limitations.
 
 ## Development
 
