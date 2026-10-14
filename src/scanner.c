@@ -2848,6 +2848,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             }
             skip(lexer);
         } else if (lexer->lookahead == '\\') {
+            bool separate_escape = first != '\\' || (after_line_break && lexer->get_column(lexer) == 0);
             // A continuation is returned as a token, since tree-sitter's lexer cannot always resume
             // after one; a backslash escaping a word's first character can only start an extglob prefix
             // (`\foo@($x)`), and the word token handles it otherwise.
@@ -2872,7 +2873,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
                 if (!scan_backquoted_backslashes(scanner, lexer, valid_symbols)) {
                     return false;
                 }
-                scanner->separate_escape_column = lexer->result_symbol == BACKQUOTE_ESCAPE && first != '\\'
+                scanner->separate_escape_column = lexer->result_symbol == BACKQUOTE_ESCAPE && separate_escape
                                                       ? lexer->get_column(lexer)
                                                       : 0;
                 return true;

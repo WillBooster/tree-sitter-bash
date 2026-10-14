@@ -1906,3 +1906,29 @@ echo `echo \$x$y`
     (command_substitution
       (command (command_name (word))
         (concatenation (simple_expansion (variable_name)) (simple_expansion (variable_name)))))))
+
+================================================================================
+Backquote escapes after a separate line continuation keep words apart
+================================================================================
+
+echo `echo a \
+\$x`
+echo `echo "a" \
+\$x/bin`
+echo `echo a\
+\$x`
+
+--------------------------------------------------------------------------------
+
+(program
+  (command (command_name (word))
+    (command_substitution
+      (command (command_name (word)) (word) (simple_expansion (variable_name)))))
+  (command (command_name (word))
+    (command_substitution
+      (command (command_name (word)) (string (string_content))
+        (concatenation (simple_expansion (variable_name)) (word)))))
+  (command (command_name (word))
+    (command_substitution
+      (command (command_name (word))
+        (concatenation (word) (simple_expansion (variable_name)))))))
