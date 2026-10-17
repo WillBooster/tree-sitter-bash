@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "alwaysStrict": true,
     "esModuleInterop": true,
@@ -11,10 +12,9 @@
     },
     "resolveJsonModule": true,
     "rootDir": ".",
-    "types": ["bun", "vitest/globals"],
-    "allowJs": true
+    "types": ["bun", "vitest/globals"]
   },
   "exclude": ["test/fixtures"],
   "extends": "@tsconfig/bun/tsconfig.json",
-  "include": ["*.config.mts", "*.config.ts", "scripts/**/*", "src/**/*", "test/**/*", "grammar.js"]
+  "include": ["*.config.mts", "*.config.ts", "grammar.js", "scripts/**/*", "src/**/*", "test/**/*"]
 }
