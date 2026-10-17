@@ -45,20 +45,20 @@
     "@vitest/browser-playwright": "5.0.3",
     "@willbooster/oxfmt-config": "1.2.2",
     "@willbooster/oxlint-config": "1.4.8",
-    "@willbooster/wb": "22.24.0",
-    "@willbooster/web-tree-sitter": "2.0.1",
+    "@willbooster/wb": "22.26.1",
+    "@willbooster/web-tree-sitter": "2.0.24",
     "conventional-changelog-conventionalcommits": "10.4.1",
-    "lefthook": "2.1.16",
+    "lefthook": "2.2.1",
     "oxfmt": "0.72.0",
     "oxlint": "1.87.0",
     "oxlint-tsgolint": "7.0.2003",
-    "playwright": "1.63.0",
+    "playwright": "1.64.0",
     "semantic-release": "25.0.9",
     "sort-package-json": "4.0.0",
     "typescript": "7.0.2",
     "vite": "8.3.4",
     "vitest": "5.0.3",
-    "wrangler": "4.147.0"
+    "wrangler": "4.149.0"
   },
   "peerDependencies": {
     "@willbooster/web-tree-sitter": "^2.0.0"
