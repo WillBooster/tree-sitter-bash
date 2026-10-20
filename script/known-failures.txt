@@ -7,7 +7,6 @@ examples/bash/tests/errors.tests
 examples/bash/tests/parser.tests
 examples/bash/tests/posixexp.tests
 examples/bash/tests/posixexp2.tests
-examples/bash/tests/quote.tests
 examples/bash/tests/quotearray.tests
 examples/wild-corpus/esoteric/CmdlineGL/share/examples/FlightSim.sh
 examples/wild-corpus/esoteric/CmdlineGL/share/examples/Robot.sh
@@ -119,8 +118,6 @@ examples/wild-corpus/illumos-gate/usr/src/tools/scripts/bldenv.sh
 examples/wild-corpus/illumos-gate/usr/src/tools/scripts/nightly.sh
 examples/wild-corpus/liballocs/tools/debug-funcs.sh
 examples/wild-corpus/linux-4.8.7/scripts/ld-version.sh
-examples/wild-corpus/minix/commands/scripts/DESCRIBE.sh
-examples/wild-corpus/minix/commands/scripts/mkdist.sh
 examples/wild-corpus/oil/test/gold.sh
 examples/wild-corpus/oil/test/runtime-errors.sh
 examples/wild-corpus/shell/ast/src/cmd/INIT/ditto.sh

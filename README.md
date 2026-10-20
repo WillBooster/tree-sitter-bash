@@ -17,12 +17,12 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 2.0.0 or later, a peer dependency.
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 2.x, a peer dependency.
 The parser carries the ABI number of WillBooster/tree-sitter (`0x57420001`), so only that runtime loads it; the
-original tree-sitter runtime rejects it, and so does `@willbooster/web-tree-sitter` 1.x:
+original tree-sitter runtime and other major versions of `@willbooster/web-tree-sitter` reject it:
 
 ```sh
-npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter
+npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter@^2.0.0
 ```
 
 In Node.js and Bun, load the grammar from its path:
