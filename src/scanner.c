@@ -151,13 +151,15 @@ typedef enum { RUN_LEAVES_NEXT, RUN_ESCAPES_NEXT, RUN_REMOVES_LAST } BackslashRu
 // backslash before `$`, a backquote, or a backslash removed (and before `"` where the backquotes are inside
 // double quotes), and then parses what is left. So inside backquotes a run before `$` (or such a `"`) is
 // halved and loses its last odd backslash: `\$` leaves the `$` unescaped (RUN_REMOVES_LAST), and `\\$`
-// escapes it. Any other run escapes the next character if it is odd.
+// escapes it. Before other non-newline characters, each backslash pair loses one backslash before parsing.
 static BackslashRun classify_backslash_run(Scanner *scanner, uint32_t count, int32_t next) {
-    bool removable = scanner->backtick_depth > 0 && (next == '$' || (next == '"' && scanner->backtick_in_string));
+    // Delimiter backquotes use source parity; line continuations have separate scanner state.
+    bool backquoted = scanner->backtick_depth > 0 && next != '`' && next != '\n';
+    bool removable = backquoted && (next == '$' || (next == '"' && scanner->backtick_in_string));
     if (removable && count % 4 == 1) {
         return RUN_REMOVES_LAST;
     }
-    uint32_t left = removable ? count / 2 : count;
+    uint32_t left = backquoted ? (count + !removable) / 2 : count;
     return left % 2 == 1 ? RUN_ESCAPES_NEXT : RUN_LEAVES_NEXT;
 }
 
@@ -190,6 +192,7 @@ static BackquotedRun read_word_backslashes(Scanner *scanner, TSLexer *lexer, uin
     if (run == RUN_REMOVES_LAST) {
         return count == 1 ? TEXT_ENDS_AT_RUN : TEXT_ENDS;
     }
+    *rewritten |= run == RUN_LEAVES_NEXT && count % 2 != 0;
     if (run == RUN_ESCAPES_NEXT) {
         // A backslash-newline continues the line; the word token handles that.
         if (lexer->eof(lexer) || lexer->lookahead == '\n') {
