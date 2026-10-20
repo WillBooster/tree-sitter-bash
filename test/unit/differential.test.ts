@@ -35,6 +35,20 @@ test('uses bash 5.2 or later as the oracle', () => {
   expect(Number.parseFloat(version), `${bash} is bash ${version}; run \`mise install\``).toBeGreaterThanOrEqual(5.2);
 });
 
+test('preserves command and word boundaries after backquote escape removal', () => {
+  for (const quoted of [false, true]) {
+    for (const count of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const suffixes = [' b', '; c second', '| c second', '& c second'];
+      if (count % 2 === 0) suffixes.push('');
+      for (const suffix of suffixes) {
+        const substitution = `x\`c inner a${'\\'.repeat(count)}${suffix}\``;
+        const script = `c outer ${quoted ? `"${substitution}"` : substitution}\n`;
+        expect(oracle.compare(script), script).toEqual({ kind: 'match' });
+      }
+    }
+  }
+});
+
 test('parses generated scripts into the commands bash runs', () => {
   const mismatches: string[] = [];
   let invalid = 0;
