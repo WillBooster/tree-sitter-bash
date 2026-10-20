@@ -163,11 +163,10 @@ static BackslashRun classify_backslash_run(Scanner *scanner, uint32_t count, int
     return left % 2 == 1 ? RUN_ESCAPES_NEXT : RUN_LEAVES_NEXT;
 }
 
-// Reads a run of backslashes after the `count` already read, marking the end before each one, so that a token
-// can end before the last.
-static uint32_t read_backslash_run(TSLexer *lexer, uint32_t count) {
+// Reads a run after the `count` backslashes already read; optional marks let a token end before the last.
+static uint32_t read_backslash_run(TSLexer *lexer, uint32_t count, bool mark) {
     while (lexer->lookahead == '\\' && !lexer->eof(lexer)) {
-        lexer->mark_end(lexer);
+        if (mark) lexer->mark_end(lexer);
         advance(lexer);
         count++;
     }
@@ -185,10 +184,10 @@ static bool awaits_deferred_body(Scanner *scanner);
 
 // Bash removes source continuations while reading backquotes, then the resulting command text can
 // contain another continuation. A remaining backslash can instead escape the next physical line's first character.
-static BackquotedBackslashes read_backquoted_run(Scanner *scanner, TSLexer *lexer, uint32_t count, bool join_lines) {
-    count = read_backslash_run(lexer, count);
+static BackquotedBackslashes read_backquoted_run(Scanner *scanner, TSLexer *lexer, uint32_t count, bool join_lines, bool mark) {
+    count = read_backslash_run(lexer, count, mark);
     BackquotedBackslashes result = {.run = classify_backslash_run(scanner, count, lexer->lookahead), .count = count};
-    if (!join_lines || scanner->backtick_depth == 0 || count < 2 || lexer->lookahead != '\n') {
+    if (!join_lines || scanner->backtick_depth == 0 || lexer->lookahead != '\n') {
         return result;
     }
     uint32_t carried = 0;
@@ -207,9 +206,9 @@ static BackquotedBackslashes read_backquoted_run(Scanner *scanner, TSLexer *lexe
             carried = 0;
         }
         advance(lexer);
-        lexer->mark_end(lexer);
+        if (mark) lexer->mark_end(lexer);
         result.joined = true;
-        count = read_backslash_run(lexer, 0);
+        count = read_backslash_run(lexer, 0, mark);
     }
     // Each retained slash represents a source pair for the shared classifier.
     result.run = classify_backslash_run(scanner, 2 * carried + count, lexer->lookahead);
@@ -234,7 +233,7 @@ static bool finish_backquote_escape(TSLexer *lexer, const bool *valid_symbols) {
 // marked.
 static BackquotedRun read_word_backslashes(Scanner *scanner, TSLexer *lexer, uint32_t count, bool *rewritten) {
     BackquotedBackslashes result = read_backquoted_run(scanner, lexer, count,
-                                                       scanner->joined_line || !awaits_deferred_body(scanner));
+                                                       scanner->joined_line || !awaits_deferred_body(scanner), true);
     count = result.count;
     BackslashRun run = result.run;
     *rewritten |= result.joined || (run == RUN_LEAVES_NEXT && count % 2 != 0);
@@ -259,7 +258,7 @@ static BackquotedRun read_word_backslashes(Scanner *scanner, TSLexer *lexer, uin
 // Like read_word_backslashes for double-quoted text, in which a newline that starts a deferred body is not escaped;
 // the text ends at the run only where it would be empty.
 static BackquotedRun read_string_backslashes(Scanner *scanner, TSLexer *lexer, bool line_breaks, bool did_advance) {
-    BackquotedBackslashes result = read_backquoted_run(scanner, lexer, 0, !line_breaks);
+    BackquotedBackslashes result = read_backquoted_run(scanner, lexer, 0, !line_breaks, true);
     BackslashRun run = result.run;
     if (run == RUN_REMOVES_LAST) {
         return result.count == 1 && !result.joined && !did_advance ? TEXT_ENDS_AT_RUN : TEXT_ENDS;
@@ -2783,6 +2782,16 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             if (lexer->eof(lexer)) {
                 lexer->mark_end(lexer);
                 lexer->result_symbol = LINE_CONTINUATION;
+                return true;
+            }
+            if (scanner->backtick_depth > 0 && !regex &&
+                (scanner->joined_line || !awaits_deferred_body(scanner))) {
+                BackquotedBackslashes run = read_backquoted_run(scanner, lexer, 1, true, false);
+                if (run.joined && run.empty) {
+                    lexer->mark_end(lexer);
+                    return finish_word_continuations(scanner, lexer, concat, false);
+                }
+                lexer->result_symbol = concat;
                 return true;
             }
             if (lexer->lookahead != '\n') {
