@@ -73,8 +73,10 @@ Inside backquotes, the text of a node is the source text: consumers that read th
 remove a backslash before `$`, a backquote, or a backslash (and before `"` when the backquotes are inside double quotes)
 before they remove quotes and escapes as usual. Ordinary word and double-quoted string scanning account for those
 removals when recognizing expansions, quotes, blanks, and shell operators. Backquotes that delimit the substitution
-retain their source escape parity. Line continuations, heredoc bodies, parameter-expansion text, regexes, nested
-backquotes, and PID expansions split by a removed escape retain their existing parsing limitations.
+retain their source escape parity. Source continuations inside ordinary words and double-quoted strings are removed
+before the resulting command text is parsed. Continuations around deferred heredoc bodies, heredoc text, parameter
+expansions, regexes, nested backquotes, and PID expansions split by a removed escape retain their existing parsing
+limitations.
 
 ## Development
 
