@@ -217,13 +217,15 @@ function literalValue(node: Node): string | undefined {
 }
 
 // Bash removes the backslash before `$`, a backquote, and a backslash, and also before `"` where the backquotes are
-// inside double quotes, when it reads the text of backquotes.
+// inside double quotes, when it reads the text of backquotes. Source continuations disappear in that first pass.
 function backquotedText(node: Node, text: string): string {
   let result = text;
   for (let ancestor = node.parent; ancestor; ancestor = ancestor.parent) {
     if (ancestor.type !== 'command_substitution' || !ancestor.text.startsWith('`')) continue;
     const quoted = ancestor.parent?.type === 'string' || ancestor.parent?.type === 'translated_string';
-    result = result.replaceAll(quoted ? /\\([$`\\"])/gu : /\\([$`\\])/gu, '$1');
+    result = result.replaceAll(quoted ? /\\([$`\\"\n])/gu : /\\([$`\\\n])/gu, (_, next: string) =>
+      next === '\n' ? '' : next
+    );
   }
   return result;
 }

@@ -27,7 +27,14 @@ testCommand('reparses the corpus consistently after random edits', ['script/fuzz
 const subshellBefore = 'value="$(printf x) && printf y)"\nprintf \'%s\\n\' "$value"\n';
 const arithmeticBefore = 'value="$((true))"\nprintf \'%s\\n\' "$value"\n';
 const nestedArithmeticBefore = 'value="$((1+$((true))))"\nprintf \'%s\\n\' "$value"\n';
+const backquoteBefore = "value=`printf '%s' a" + '\\'.repeat(2) + '\n b`\n';
 const edits = [
+  {
+    name: 'backquote preprocessing retains the next line after a changed backslash run',
+    before: backquoteBefore,
+    position: backquoteBefore.indexOf('\\'),
+    text: '\\',
+  },
   {
     name: 'an inner command fallback invalidates an enclosing arithmetic decision',
     before: nestedArithmeticBefore,
