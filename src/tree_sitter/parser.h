@@ -41,9 +41,16 @@ typedef struct {
   bool visible;
   bool named;
   bool supertype;
+  bool immediate;
 } TSSymbolMetadata;
 
 typedef struct TSLexer TSLexer;
+
+typedef struct {
+  uint32_t bytes;
+  uint32_t row;
+  uint32_t column;
+} TSLexerPosition;
 
 struct TSLexer {
   int32_t lookahead;
@@ -54,6 +61,11 @@ struct TSLexer {
   bool (*is_at_included_range_start)(const TSLexer *);
   bool (*eof)(const TSLexer *);
   void (*log)(const TSLexer *, const char *, ...);
+  void (*get_position)(const TSLexer *, TSLexerPosition *);
+  void (*mark_start)(TSLexer *, const TSLexerPosition *);
+  void (*mark_end_at)(TSLexer *, const TSLexerPosition *);
+  void (*get_mark_end)(const TSLexer *, TSLexerPosition *);
+  uint32_t (*get_display_column)(TSLexer *, uint32_t tab_width);
 };
 
 typedef enum {
@@ -61,6 +73,7 @@ typedef enum {
   TSParseActionTypeReduce,
   TSParseActionTypeAccept,
   TSParseActionTypeRecover,
+  TSParseActionTypeReduceExtra,
 } TSParseActionType;
 
 typedef union {
@@ -82,7 +95,9 @@ typedef union {
 
 typedef struct {
   uint16_t lex_state;
+  uint16_t lex_state_after_extra;
   uint16_t external_lex_state;
+  uint16_t external_lex_state_after_extra;
   uint16_t reserved_word_set_id;
 } TSLexerMode;
 
@@ -262,16 +277,22 @@ static inline bool set_contains(const TSCharacterRange *ranges, uint32_t len, in
     }                                 \
   }}
 
-#define REDUCE(symbol_name, children, precedence, prod_id) \
-  {{                                                       \
-    .reduce = {                                            \
-      .type = TSParseActionTypeReduce,                     \
-      .symbol = symbol_name,                               \
-      .child_count = children,                             \
-      .dynamic_precedence = precedence,                    \
-      .production_id = prod_id                             \
-    },                                                     \
+#define REDUCE_ACTION(action_type, symbol_name, children, precedence, prod_id)\
+  {{                                                                          \
+    .reduce = {                                                               \
+      .type = action_type,                                                    \
+      .symbol = symbol_name,                                                  \
+      .child_count = children,                                                \
+      .dynamic_precedence = precedence,                                       \
+      .production_id = prod_id                                                \
+    },                                                                        \
   }}
+
+#define REDUCE(symbol_name, children, precedence, prod_id) \
+  REDUCE_ACTION(TSParseActionTypeReduce, symbol_name, children, precedence, prod_id)
+
+#define REDUCE_EXTRA(symbol_name, children, precedence, prod_id) \
+  REDUCE_ACTION(TSParseActionTypeReduceExtra, symbol_name, children, precedence, prod_id)
 
 #define RECOVER()                    \
   {{                                 \

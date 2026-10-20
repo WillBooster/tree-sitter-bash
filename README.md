@@ -17,9 +17,10 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 2.0.0 or later, a peer dependency.
-The parser carries the ABI number of WillBooster/tree-sitter (`0x57420001`), so only that runtime loads it; the
-original tree-sitter runtime rejects it, and so does `@willbooster/web-tree-sitter` 1.x:
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 7.0.5 or later in the 7.x series,
+a peer dependency.
+The parser carries the ABI number of WillBooster/tree-sitter (`0x57420006`), so only that runtime loads it; the
+original tree-sitter runtime rejects it, and earlier WillBooster runtime ABIs do too:
 
 ```sh
 npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter
@@ -66,12 +67,9 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
-When upgrading from 3.x, upgrade `@willbooster/web-tree-sitter` to 2.x in the same change: each major of this package
-loads only with the runtime major it was generated for. Scripts that parse without errors get the same syntax trees as
-with 3.x, except where backslashes inside backquotes precede `$` (or `"` when the backquotes are inside double quotes):
-like bash, the parser removes one level of those backslashes before it parses the text, so `` `echo \$x` `` holds an
-expansion and `` `echo \\$x` `` a literal `$x`. Recovery trees for malformed scripts can differ from every earlier
-major, so review consumers that depend on the exact shape of `ERROR` nodes.
+Upgrade `@willbooster/web-tree-sitter` to 7.0.5 or later in the 7.x series when upgrading this package. Recovery trees
+for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
+`ERROR` nodes.
 
 Inside backquotes, the text of a node is the source text: consumers that read the value of a word or a string there
 remove a backslash before `$`, a backquote, or a backslash (and before `"` when the backquotes are inside double quotes)
