@@ -1377,9 +1377,7 @@ b # c` d
       (command
         name: (command_name
           (word))
-        argument: (concatenation
-          (word)
-          (word))))
+        argument: (word)))
     argument: (word))
   (command
     name: (command_name

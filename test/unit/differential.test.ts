@@ -35,6 +35,60 @@ test('uses bash 5.2 or later as the oracle', () => {
   expect(Number.parseFloat(version), `${bash} is bash ${version}; run \`mise install\``).toBeGreaterThanOrEqual(5.2);
 });
 
+test('preserves command and word boundaries after backquote escape removal', () => {
+  for (const quoted of [false, true]) {
+    for (const count of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const suffixes = [' b', '; c second', '| c second', '& c second'];
+      if (count % 2 === 0) suffixes.push('');
+      for (const suffix of suffixes) {
+        const substitution = `x\`c inner a${'\\'.repeat(count)}${suffix}\``;
+        const script = `c outer ${quoted ? `"${substitution}"` : substitution}\n`;
+        expect(oracle.compare(script), script).toEqual({ kind: 'match' });
+      }
+    }
+  }
+});
+
+test('preserves words and expansions across backquote line preprocessing', () => {
+  for (const quoted of [false, true]) {
+    for (const count of [1, 2, 3, 4, 5, 6, 7, 8]) {
+      const bodies = [
+        `a${'\\'.repeat(count)}\n c second`,
+        `a${'\\'.repeat(count)}\nc second`,
+        `${'\\'.repeat(count)}\n c second`,
+        `"a${'\\'.repeat(count)}\n$(c second)"`,
+        `a${'\\'.repeat(count)}\n\nc second`,
+        `"a${'\\'.repeat(count)}\n\\$(c second)"`,
+      ];
+      if (count % 4 !== 0) bodies.push(`a${'\\'.repeat(count)}\n${'\\'.repeat(count)}\n c second`);
+      for (const body of bodies) {
+        const substitution = `x\`c inner ${body}\``;
+        const script = `c outer ${quoted ? `"${substitution}"` : substitution}\n`;
+        expect(oracle.compare(script), script).toEqual({ kind: 'match' });
+      }
+    }
+  }
+}, 30_000);
+
+test('keeps structured word prefixes separate across disappearing backquote continuations', () => {
+  const prefixes = ['"a"', "'a'", 'a$x', 'a${x}', 'a$(c prefix)', '"a$x"', 'a$((1))'];
+  for (const quoted of [false, true]) {
+    for (const prefix of prefixes) {
+      for (const count of [1, 2, 3, 4, 5, 6, 7, 8]) {
+        const suffixes = [' c second', 'c second', '\tc second'];
+        if (count % 4 !== 0) suffixes.push('; c second');
+        for (const suffix of suffixes) {
+          for (const leading of ['', '\\\n']) {
+            const substitution = `x\`c inner ${prefix}${leading}${'\\'.repeat(count)}\n${suffix}\``;
+            const script = `c outer ${quoted ? `"${substitution}"` : substitution}\n`;
+            expect(oracle.compare(script), script).toEqual({ kind: 'match' });
+          }
+        }
+      }
+    }
+  }
+}, 60_000);
+
 test('parses generated scripts into the commands bash runs', () => {
   const mismatches: string[] = [];
   let invalid = 0;

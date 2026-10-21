@@ -17,13 +17,13 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 7.0.12 or later in the 7.x series,
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 7.0.17 or later in the 7.x series,
 a peer dependency.
 The parser carries the ABI number of WillBooster/tree-sitter (`0x57420006`), so only that runtime loads it; the
 original tree-sitter runtime rejects it, and earlier WillBooster runtime ABIs do too:
 
 ```sh
-npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter
+npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter@^7.0.17
 ```
 
 In Node.js and Bun, load the grammar from its path:
@@ -67,16 +67,18 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
-Upgrade `@willbooster/web-tree-sitter` to 7.0.12 or later in the 7.x series when upgrading this package. Recovery trees
+Upgrade `@willbooster/web-tree-sitter` to 7.0.17 or later in the 7.x series when upgrading this package. Recovery trees
 for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
 `ERROR` nodes.
 
 Inside backquotes, the text of a node is the source text: consumers that read the value of a word or a string there
 remove a backslash before `$`, a backquote, or a backslash (and before `"` when the backquotes are inside double quotes)
-before they remove quotes and escapes as usual. The parser normalizes runs before `$`, and before `"` when the
-backquotes opened inside double quotes, only in ordinary word and double-quoted string scanning. Runs before other
-characters (including whitespace and metacharacters), heredoc bodies, parameter-expansion text, regexes, nested
-backquotes, and PID expansions split by a removed escape retain their existing parsing limitations.
+before they remove quotes and escapes as usual. Ordinary word and double-quoted string scanning account for those
+removals when recognizing expansions, quotes, blanks, and shell operators. Backquotes that delimit the substitution
+retain their source escape parity. Source continuations inside ordinary words and double-quoted strings are removed
+before the resulting command text is parsed. Continuations around deferred heredoc bodies, heredoc text, parameter
+expansions, regexes, nested backquotes, and PID expansions split by a removed escape retain their existing parsing
+limitations.
 
 ## Development
 
