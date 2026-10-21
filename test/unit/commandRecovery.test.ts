@@ -4,7 +4,7 @@ import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 const cases = [
-  ['echo (if\n', '(program (command name: (command_name (word))) (ERROR))'],
+  ['echo (if\n', '(program (ERROR (word)))'],
   [
     'for i in a; do\necho\n;;\nesac\ndone\n',
     '(program (for_statement variable: (variable_name) value: (word) body: (do_group (command name: (command_name (word))) (ERROR) (command name: (command_name (word))))))',

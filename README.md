@@ -17,7 +17,7 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 7.0.5 or later in the 7.x series,
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 7.0.12 or later in the 7.x series,
 a peer dependency.
 The parser carries the ABI number of WillBooster/tree-sitter (`0x57420006`), so only that runtime loads it; the
 original tree-sitter runtime rejects it, and earlier WillBooster runtime ABIs do too:
@@ -67,7 +67,7 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
-Upgrade `@willbooster/web-tree-sitter` to 7.0.5 or later in the 7.x series when upgrading this package. Recovery trees
+Upgrade `@willbooster/web-tree-sitter` to 7.0.12 or later in the 7.x series when upgrading this package. Recovery trees
 for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
 `ERROR` nodes.
 
@@ -85,53 +85,13 @@ mise install
 bun install --frozen-lockfile
 bun playwright install chromium
 bun run build/ci
+bun run verify
 bun run test
-script/parse-examples
 ```
 
-The scripts and tests generate, build, test, and parse with `script/tree-sitter`, the tree-sitter CLI of the
-WillBooster/tree-sitter runtime version that `package.json` pins as `@willbooster/web-tree-sitter`, since the generator
-and the runtime of upstream's CLI are not the ones this package ships with. Its first run downloads that CLI from the
-runtime's GitHub Release, or builds it with `cargo` (whose build runs the CMake that `mise.toml` pins) when the download fails or the release has no
-binary that runs here. Run other CLI commands through it as well (e.g. `script/tree-sitter parse script.sh`).
+- [Parser generation and validation](docs/development.md): read before changing grammar inputs, refreshing examples, or reproducing a fuzz or differential failure.
 
-`bun run generate` records a fresh generation profile from the applicable `test/corpus` cases and Git-tracked
-files in `examples/`, then generates compact parser tables. The parser also embeds metadata from `tree-sitter.json`. After changing a grammar,
-`tree-sitter.json`, a corpus case, or a tracked example,
-regenerate and commit `src/`. Stage added or removed examples with `git add -A examples` before generation so the profile uses the intended file list.
-Profiles in `.tmp/generation-profiles/` are temporary and must not be committed. `bun run build-wasm`, `bun run build/ci`,
-and the release build regenerate the parsers before compiling them.
-
-`bun run test` runs:
-
-- the corpus in `test/corpus`, with the native build and with the Wasm build (the first run downloads the WASI SDK);
-- an incremental-parsing check (`test/unit/incremental.test.ts`): `script/fuzz-corpus` runs `tree-sitter fuzz`, which
-  edits each corpus case at random, reparses it, undoes the edits, and reparses again. `TREE_SITTER_SEED`,
-  `TREE_SITTER_ITERATIONS`, and `TREE_SITTER_EDITS` run other or more edits. It also applies edits that random ones
-  rarely reach and compares each incremental reparse with a fresh parse;
-- a check that real-world scripts cloned into `examples/` fail to parse exactly as listed in
-  `script/known-failures.txt`. The first run clones them, which takes a few minutes. The example repositories are
-  pinned to commits in `script/parse-examples`. After a grammar change or a moved pin alters that list,
-  `script/parse-examples` rewrites it; review its diff before committing;
-- a differential test (`test/unit/differential.test.ts`, with helpers in `test/helpers/differential`) that generates
-  scripts and runs them with the bash that `mise.toml` pins. It checks that the syntax tree shows exactly the commands
-  bash runs, with as many words and the same value for each word without expansions, and that the tree has no
-  `ERROR` or `MISSING` node for a script bash accepts. A failure prints the seed; `DIFFERENTIAL_SEED` and
-  `DIFFERENTIAL_CASES` run other or more scripts. It loads the Wasm build through @willbooster/web-tree-sitter, which
-  `bun run build/ci` rebuilds after regenerating the parser;
-- a performance check (`test/unit/performance.test.ts`) that a long line parses in linear time, since consumers
-  parse untrusted scripts;
-- checks that the Wasm build parses in Chromium (`test/unit/web.browser.test.ts`) and in Cloudflare Workers with and
-  without Node.js compatibility (`test/unit/workers.test.ts`, with the Worker in `test/fixtures/worker`), loading it as
-  the Usage section shows.
-
-The tests and `script/parse-examples` compile the parser into `.tmp/tree-sitter-lib` rather than the CLI's cache shared
-by every checkout; `script/fuzz-corpus` and the targeted edits of the incremental check build a parser of their own
-for each run and delete it afterwards.
-
-CI also fuzzes the parser with libFuzzer and sanitizers (`.github/workflows/robustness.yml`).
-
-### References
+## References
 
 - [Bash man page](http://man7.org/linux/man-pages/man1/bash.1.html#SHELL_GRAMMAR)
 - [Shell command language specification](http://pubs.opengroup.org/onlinepubs/9699919799/utilities/V3_chap02.html)

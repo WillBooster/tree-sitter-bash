@@ -1413,7 +1413,7 @@ echo "$((printf x) && printf y)"
 
 --------------------------------------------------------------------------------
 
-(program (command name: (command_name (word))) (ERROR) (command name: (command_name (word)) argument: (command_substitution (list left: (subshell (command name: (command_name (word)) argument: (word))) right: (command name: (command_name (word)) argument: (word))))) (command name: (command_name (word)) argument: (string (command_substitution (list left: (subshell (command name: (command_name (word)) argument: (word))) right: (command name: (command_name (word)) argument: (word)))))))
+(program (command name: (command_name (word))) (ERROR (ERROR)) (command name: (command_name (word)) argument: (command_substitution (list left: (subshell (command name: (command_name (word)) argument: (word))) right: (command name: (command_name (word)) argument: (word))))) (command name: (command_name (word)) argument: (string (command_substitution (list left: (subshell (command name: (command_name (word)) argument: (word))) right: (command name: (command_name (word)) argument: (word)))))))
 
 ================================================================================
 Comments after shell groups retain arithmetic and word suffixes
@@ -1734,7 +1734,7 @@ printf '%s\n' complete
 
 ---
 
-(program (command name: (command_name (word)) argument: (arithmetic_expansion (ERROR) (command_substitution (command name: (command_name (word)) argument: (word))))) (command name: (command_name (word)) argument: (raw_string) argument: (word)))
+(program (command name: (command_name (word)) argument: (arithmetic_expansion (ERROR (number)) (command_substitution (command name: (command_name (word)) argument: (word))))) (command name: (command_name (word)) argument: (raw_string) argument: (word)))
 
 ============================
 Parameterless expansion syntax retains command substitutions
