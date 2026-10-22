@@ -677,19 +677,32 @@ echo "(())"
 
 --------------------------------------------------------------------------------
 
-(program
-  (ERROR
-    (command
-      name: (command_name (word))
-      argument: (string (string_content))
-      argument: (string (string_content)))
-    (command_name (concatenation (word) (string (string_content)) (word)))
-    argument: (expansion parameter: (variable_name))
-    (word)
-    (string (string_content))
-    (word)
-    (command
-      name: (command_name
-        (concatenation (simple_expansion (variable_name)) (string (string_content)))))
-    (MISSING ";")
-    (arithmetic_command)))
+(ERROR
+  (command
+    name: (command_name
+      (word))
+    argument: (string
+      (string_content))
+    argument: (string
+      (string_content)))
+  (command_name
+    (concatenation
+      (word)
+      (string
+        (string_content))
+      (word)))
+  argument: (expansion
+    parameter: (variable_name))
+  (word)
+  (string
+    (string_content))
+  (word)
+  (command
+    name: (command_name
+      (concatenation
+        (simple_expansion
+          (variable_name))
+        (string
+          (string_content)))))
+  (MISSING ";")
+  (arithmetic_command))

@@ -2667,26 +2667,58 @@ printf '%s\n' "$value"
 
 (program
   (ERROR
-    (command (variable_assignment (variable_name) (word)))
+    (command
+      (variable_assignment
+        (variable_name)
+        (word)))
     (function_definition
       (word)
-      (compound_statement (command (command_name (word)) (word))))
+      (compound_statement
+        (command
+          (command_name
+            (word))
+          (word))))
     (variable_name)
     (command
-      (command_name (word))
-      (file_redirect (word))
-      (heredoc_redirect (heredoc_start)))
-    (heredoc_body (heredoc_content) (heredoc_end))
+      (command_name
+        (word))
+      (file_redirect
+        (word))
+      (heredoc_redirect
+        (heredoc_start)))
+    (heredoc_body
+      (heredoc_content)
+      (heredoc_end))
     (word)
-    (case_item (word) (command (command_name (word))))
-    (case_item (word) (command (command_name (word))))
-    (ERROR (concatenation (word) (word)) (comment) (word))
+    (case_item
+      (word)
+      (command
+        (command_name
+          (word))))
+    (case_item
+      (word)
+      (command
+        (command_name
+          (word))))
+    (ERROR
+      (concatenation
+        (word)
+        (word))
+      (comment)
+      (word))
     (word)
-    (command (command_name (word)) (word)))
-  (command
-    (command_name (word))
-    (raw_string)
-    (string (simple_expansion (variable_name)))))
+    (command
+      (command_name
+        (word))
+      (word))
+    (ERROR)
+    (command
+      (command_name
+        (word))
+      (raw_string)
+      (string
+        (simple_expansion
+          (variable_name))))))
 
 ================================================================================
 An unterminated assignment subscript preserves command names during recovery
@@ -2698,7 +2730,16 @@ printf '%s\n' after
 
 --------------------------------------------------------------------------------
 
-(program (ERROR (command_name (word)) (command_name (word)) (word) (variable_name) (word) (raw_string) (word)))
+(ERROR
+  (command_name
+    (word))
+  (command_name
+    (word))
+  (word)
+  (variable_name)
+  (word)
+  (raw_string)
+  (word))
 
 ================================================================================
 Timed and coprocess substitutions consume nested command output
