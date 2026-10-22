@@ -2566,6 +2566,7 @@ static bool scan_closer_line_string_content(Scanner *scanner, TSLexer *lexer, bo
 }
 
 static bool scan_comment(TSLexer *lexer, bool backquotes);
+static bool can_start_redirect_destination(TSLexer *lexer);
 
 static bool scan_redirect_destination_start(TSLexer *lexer) {
     for (;;) {
@@ -2580,7 +2581,7 @@ static bool scan_redirect_destination_start(TSLexer *lexer) {
             skip(lexer);
         } else {
             lexer->mark_end(lexer);
-            if (lexer->eof(lexer) || lexer->lookahead == '\n' || lexer->lookahead == '#') {
+            if (!can_start_redirect_destination(lexer)) {
                 return false;
             }
             break;
@@ -2588,6 +2589,18 @@ static bool scan_redirect_destination_start(TSLexer *lexer) {
     }
     lexer->result_symbol = REDIRECT_DESTINATION_START;
     return true;
+}
+
+static bool can_start_redirect_destination(TSLexer *lexer) {
+    int32_t first = lexer->lookahead;
+    if (lexer->eof(lexer) || first == '\n' || first == '#') {
+        return false;
+    }
+    if (first == '<' || first == '>') {
+        advance(lexer);
+        return lexer->lookahead == '(';
+    }
+    return !is_metacharacter(first);
 }
 
 static bool scan_dollar_or_substitution_start(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
