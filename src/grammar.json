@@ -1201,6 +1201,10 @@
                   }
                 },
                 {
+                  "type": "SYMBOL",
+                  "name": "_redirect_destination_start"
+                },
+                {
                   "type": "FIELD",
                   "name": "destination",
                   "content": {
@@ -1266,6 +1270,10 @@
               "value": "<<<"
             }
           }
+        },
+        {
+          "type": "SYMBOL",
+          "name": "_redirect_destination_start"
         },
         {
           "type": "FIELD",
@@ -5653,6 +5661,10 @@
     {
       "type": "SYMBOL",
       "name": "_backquote_escape"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_redirect_destination_start"
     }
   ],
   "inline": [
