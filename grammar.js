@@ -153,6 +153,7 @@ module.exports = grammar({
     sym('_timing_option'),
     sym('_timing_terminator'),
     sym('_backquote_escape'),
+    sym('_redirect_destination_start'),
   ],
 
   // Bash removes the backslash before `$` (and before `"` where the backquotes are inside double quotes)
@@ -377,6 +378,7 @@ module.exports = grammar({
                 token.nonkeyword('>&')
               )
             ),
+            sym('_redirect_destination_start'),
             field('destination', $._argument)
           ),
           field('operator', choice(token.nonkeyword('<&-'), token.nonkeyword('>&-')))
@@ -387,6 +389,7 @@ module.exports = grammar({
       seq(
         optional(field('descriptor', sym('file_descriptor'))),
         field('operator', token.nonkeyword('<<<')),
+        sym('_redirect_destination_start'),
         field('value', $._argument)
       ),
 

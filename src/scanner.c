@@ -47,6 +47,7 @@ enum TokenType {
     TIMING_OPTION,
     TIMING_TERMINATOR,
     BACKQUOTE_ESCAPE,
+    REDIRECT_DESTINATION_START,
 };
 
 enum { COMMAND_CLOSER_PENDING = 1, ARITHMETIC_DISTANCE = 0x80, ARITHMETIC_DISTANCE_MASK = 0x7f };
@@ -2566,6 +2567,29 @@ static bool scan_closer_line_string_content(Scanner *scanner, TSLexer *lexer, bo
 
 static bool scan_comment(TSLexer *lexer, bool backquotes);
 
+static bool scan_redirect_destination_start(TSLexer *lexer) {
+    for (;;) {
+        if (is_blank(lexer->lookahead)) {
+            skip(lexer);
+        } else if (lexer->lookahead == '\\') {
+            lexer->mark_end(lexer);
+            advance(lexer);
+            if (lexer->lookahead != '\n') {
+                break;
+            }
+            skip(lexer);
+        } else {
+            lexer->mark_end(lexer);
+            if (lexer->eof(lexer) || lexer->lookahead == '\n' || lexer->lookahead == '#') {
+                return false;
+            }
+            break;
+        }
+    }
+    lexer->result_symbol = REDIRECT_DESTINATION_START;
+    return true;
+}
+
 static bool scan_dollar_or_substitution_start(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     lexer->mark_end(lexer);
     advance(lexer);
@@ -2709,6 +2733,10 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     if (error_recovery) {
         return false;
+    }
+
+    if (valid_symbols[REDIRECT_DESTINATION_START]) {
+        return scan_redirect_destination_start(lexer);
     }
 
     // The right side of `=~` joins its parts with a concatenation of its own, since `(` and `|` continue
