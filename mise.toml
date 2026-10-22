@@ -1,6 +1,6 @@
 [tools]
 node = "24.22.1"
-bun = "1.4.3"
+bun = "1.4.4"
 # script/tree-sitter builds the CLI with the `wasm` feature when no released binary runs here; wasmtime's build runs cmake.
 cmake = "4.4.4"
 "conda:bash" = "5.2.37"
