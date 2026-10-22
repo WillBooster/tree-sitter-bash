@@ -41,23 +41,34 @@ test.each(['>', '<', '>>', '>|', '<>', '&>', '&>>', '<&', '>&', '2>', '3<>', '<<
   }
 );
 
-test.each(['> \t\n', '> # no destination\n', '>\\\n\n', '<path>\n'])(
-  'keeps a missing destination before %j separate from the next command',
-  async (redirect) => {
-    const parser = await createParser();
+test.each([
+  '> \t\n',
+  '> # no destination\n',
+  '>\\\n\n',
+  '<path>\n',
+  '>;\n',
+  '>&;\n',
+  '<<<;\n',
+  '> )\n',
+  '> &\n',
+  '> | cat\n',
+  '> (\n',
+  '> <file\n',
+  '> >file\n',
+])('keeps a missing destination before %j separate from the next command', async (redirect) => {
+  const parser = await createParser();
+  try {
+    const tree = parser.parse(`echo ${redirect}printf FOLLOWING\n`)!;
     try {
-      const tree = parser.parse(`echo ${redirect}printf FOLLOWING\n`)!;
-      try {
-        expect(tree.rootNode.hasError).toBe(true);
-        expect(tree.rootNode.descendantsOfType('command').map((node) => node.text)).toContain('printf FOLLOWING');
-      } finally {
-        tree.delete();
-      }
+      expect(tree.rootNode.hasError).toBe(true);
+      expect(tree.rootNode.descendantsOfType('command').map((node) => node.text)).toContain('printf FOLLOWING');
     } finally {
-      parser.delete();
+      tree.delete();
     }
+  } finally {
+    parser.delete();
   }
-);
+});
 
 test.each([
   'echo "$(echo >\nprintf FOLLOWING\n)"\n',
@@ -91,6 +102,14 @@ test.each([
   'echo >&-\nprintf FOLLOWING\n',
   'echo <<<\\\ninput\nprintf FOLLOWING\n',
   'cat <<EOF >file\nbody\nEOF\nprintf FOLLOWING\n',
+  'echo > <(printf file)\nprintf FOLLOWING\n',
+  'echo > >(printf file)\nprintf FOLLOWING\n',
+  'echo > \\\n<(printf file)\nprintf FOLLOWING\n',
+  'echo > \\\n\\\n>(printf file)\nprintf FOLLOWING\n',
+  'echo <<< <(printf file)\nprintf FOLLOWING\n',
+  "echo >';'\nprintf FOLLOWING\n",
+  'echo >\\;\nprintf FOLLOWING\n',
+  'echo >"&"\nprintf FOLLOWING\n',
 ])('keeps valid redirect boundaries in %j', async (source) => {
   const parser = await createParser();
   try {
@@ -114,52 +133,58 @@ test.each([
   }
 });
 
-test('matches fresh parsing when an edit moves a redirect destination across a newline', async () => {
-  const parser = await createParser();
-  const source = 'echo >file\nprintf FOLLOWING\n';
-  const position = source.indexOf('file');
-  const changed = source.slice(0, position) + '\n' + source.slice(position);
-  const tree = parser.parse(source)!;
-  try {
-    tree.edit(
-      new Edit({
-        startIndex: position,
-        oldEndIndex: position,
-        newEndIndex: position + 1,
-        startPosition: { row: 0, column: position },
-        oldEndPosition: { row: 0, column: position },
-        newEndPosition: { row: 1, column: 0 },
-      })
-    );
-    const incremental = parser.parse(changed, tree)!;
+test.each(['\n', ';\n', ')\n'])(
+  'matches fresh parsing when %j is inserted before a redirect destination',
+  async (text) => {
+    const parser = await createParser();
+    const source = 'echo >file\nprintf FOLLOWING\n';
+    const position = source.indexOf('file');
+    const changed = source.slice(0, position) + text + source.slice(position);
+    const tree = parser.parse(source)!;
     try {
-      expect(incremental.rootNode.hasError).toBe(true);
-      expectFresh(parser, changed, incremental);
-      incremental.edit(
+      tree.edit(
         new Edit({
           startIndex: position,
-          oldEndIndex: position + 1,
-          newEndIndex: position,
+          oldEndIndex: position,
+          newEndIndex: position + text.length,
           startPosition: { row: 0, column: position },
-          oldEndPosition: { row: 1, column: 0 },
-          newEndPosition: { row: 0, column: position },
+          oldEndPosition: { row: 0, column: position },
+          newEndPosition: { row: 1, column: 0 },
         })
       );
-      const restored = parser.parse(source, incremental)!;
+      const incremental = parser.parse(changed, tree)!;
       try {
-        expect(restored.rootNode.hasError).toBe(false);
-        expectFresh(parser, source, restored);
+        expect(incremental.rootNode.hasError).toBe(true);
+        expect(incremental.rootNode.descendantsOfType('command').map((node) => node.text)).toEqual(
+          expect.arrayContaining(['file', 'printf FOLLOWING'])
+        );
+        expectFresh(parser, changed, incremental);
+        incremental.edit(
+          new Edit({
+            startIndex: position,
+            oldEndIndex: position + text.length,
+            newEndIndex: position,
+            startPosition: { row: 0, column: position },
+            oldEndPosition: { row: 1, column: 0 },
+            newEndPosition: { row: 0, column: position },
+          })
+        );
+        const restored = parser.parse(source, incremental)!;
+        try {
+          expect(restored.rootNode.hasError).toBe(false);
+          expectFresh(parser, source, restored);
+        } finally {
+          restored.delete();
+        }
       } finally {
-        restored.delete();
+        incremental.delete();
       }
     } finally {
-      incremental.delete();
+      tree.delete();
+      parser.delete();
     }
-  } finally {
-    tree.delete();
-    parser.delete();
   }
-});
+);
 
 async function createParser(): Promise<Parser> {
   await Parser.init();
