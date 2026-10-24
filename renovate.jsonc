@@ -8,5 +8,11 @@
       "matchPackageNames": ["@willbooster/web-tree-sitter"],
       "groupName": "tree-sitter",
     },
+    {
+      "matchManagers": ["mise"],
+      "matchDatasources": ["conda"],
+      "matchPackageNames": ["bash"],
+      "enabled": false,
+    },
   ],
 }
