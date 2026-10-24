@@ -2575,22 +2575,11 @@ printf '%s\n' done
 
 (program
   (ERROR
-    (command
-      (command_name
-        (word))
-      (raw_string)
-      (ERROR
-        (variable_name))
-      (word))
-    (comment)
-    (word)
-    (word))
-  (command
-    (command_name
-      (word))
-    (raw_string)
-    (word)))
-
+    (program
+      (command (command_name (word)) (raw_string) (ERROR (variable_name)) (word))
+      (comment)))
+  (command (command_name (word)) (word))
+  (ERROR (word) (word)))
 
 =============================
 Special parameters retain arithmetic before a case pattern
@@ -2711,13 +2700,13 @@ printf '%s\n' "$value"
       (command
         (command_name
           (word))))
-    (concatenation
-      (word)
-      (ERROR
+    (ERROR
+      (concatenation
         (word)
-        (comment)
         (word))
+      (comment)
       (word))
+    (word)
     (command
       (command_name
         (word))
@@ -2741,7 +2730,16 @@ printf '%s\n' after
 
 --------------------------------------------------------------------------------
 
-(ERROR (command_name (word)) (command_name (word)) (word) (variable_name) (word) (raw_string) (word))
+(ERROR
+  (command_name
+    (word))
+  (command_name
+    (word))
+  (word)
+  (variable_name)
+  (word)
+  (raw_string)
+  (word))
 
 ================================================================================
 Timed and coprocess substitutions consume nested command output
