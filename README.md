@@ -17,13 +17,13 @@ As a result, its syntax trees differ from the original grammar's; review your qu
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 13.0.0 or later in the 13.x series,
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 14.0.0 or later in the 14.x series,
 a peer dependency.
-The parser carries the ABI number of WillBooster/tree-sitter (`0x57420009`), so only that runtime loads it; the
+The parser carries the ABI number of WillBooster/tree-sitter (`0x5742000a`), so only that runtime loads it; the
 original tree-sitter runtime rejects it, and earlier WillBooster runtime ABIs do too:
 
 ```sh
-npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter@^13.0.0
+npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter@^14.0.0
 ```
 
 In Node.js and Bun, load the grammar from its path:
@@ -68,7 +68,7 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
-Upgrade `@willbooster/web-tree-sitter` to 13.0.0 or later in the 13.x series when upgrading this package. Recovery trees
+Upgrade `@willbooster/web-tree-sitter` to 14.0.0 or later in the 14.x series when upgrading this package. Recovery trees
 for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
 `ERROR` nodes.
 

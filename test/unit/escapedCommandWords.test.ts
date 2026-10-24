@@ -319,13 +319,17 @@ test('preserves case substitution recovery while closing an unfinished expansion
       tree.delete();
       tree = edited;
     }
+    const unfinished = 'x=$(( $(case a in a) :;; esac ))';
     for (const suffix of [' \\\n', '\n\\\n', ' \\\n \\\n']) {
-      const continuedSource = 'x=$(( $(case a in a) :;; esac ))' + suffix;
+      const continuedSource = unfinished + suffix;
       const continued = parser.parse(continuedSource)!;
       try {
         expect(continued.rootNode.descendantsOfType('subshell')).toHaveLength(0);
         expect(continued.rootNode.descendantsOfType('command_substitution')[0]!.parent!.type).toBe('ERROR');
-        expect(continued.rootNode.descendantsOfType('ERROR').at(-1)!.endIndex).toBe(continuedSource.length);
+        expect(continued.rootNode.descendantsOfType('ERROR').map((error) => error.endIndex)).toEqual([
+          unfinished.length,
+        ]);
+        expect(continued.rootNode.endIndex).toBe(continuedSource.length);
       } finally {
         continued.delete();
       }
