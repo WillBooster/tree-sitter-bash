@@ -3,17 +3,17 @@
   "version": "0.0.0-semantically-released",
   "description": "Bash grammar for tree-sitter",
   "keywords": [
+    "bash",
     "incremental",
     "parsing",
-    "tree-sitter",
-    "bash"
+    "tree-sitter"
   ],
+  "license": "MIT",
+  "author": "WillBooster Inc.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/WillBooster/tree-sitter-bash.git"
   },
-  "license": "MIT",
-  "author": "WillBooster Inc.",
   "files": [
     "grammar.js",
     "tree-sitter.json",
@@ -21,6 +21,10 @@
     "src/node-types.json",
     "*.wasm"
   ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build-wasm": "script/generate --build-wasm",
     "build/ci": "bun run build-wasm",
@@ -43,18 +47,15 @@
     "@tsconfig/bun": "1.0.11",
     "@types/bun": "1.4.3",
     "@vitest/browser-playwright": "5.0.5",
-    "@willbooster/oxfmt-config": "1.2.2",
-    "@willbooster/oxlint-config": "1.4.8",
-    "@willbooster/wb": "22.26.2",
+    "@willbooster/oxlint-config": "1.4.9",
+    "@willbooster/wb": "22.29.1",
     "@willbooster/web-tree-sitter": "13.0.0",
     "conventional-changelog-conventionalcommits": "10.4.1",
     "lefthook": "2.2.2",
-    "oxfmt": "0.73.0",
     "oxlint": "1.88.0",
     "oxlint-tsgolint": "7.0.2004",
     "playwright": "1.64.0",
     "semantic-release": "25.0.9",
-    "sort-package-json": "4.1.0",
     "vite": "8.3.4",
     "vitest": "5.0.5",
     "wrangler": "4.149.0"
@@ -66,9 +67,5 @@
     "@willbooster/web-tree-sitter": {
       "optional": true
     }
-  },
-  "publishConfig": {
-    "access": "public",
-    "registry": "https://registry.npmjs.org/"
   }
 }

@@ -5490,12 +5490,7 @@
       "name": "_backquote_escape"
     }
   ],
-  "conflicts": [
-    [
-      "_statements",
-      "_last_case_item"
-    ]
-  ],
+  "conflicts": [["_statements", "_last_case_item"]],
   "precedences": [],
   "externals": [
     {
@@ -5667,14 +5662,7 @@
       "name": "_redirect_destination_start"
     }
   ],
-  "inline": [
-    "_terminator",
-    "_command_statement",
-    "_compound_command"
-  ],
-  "supertypes": [
-    "_statement",
-    "_arithmetic_expression"
-  ],
+  "inline": ["_terminator", "_command_statement", "_compound_command"],
+  "supertypes": ["_statement", "_arithmetic_expression"],
   "reserved": {}
 }
