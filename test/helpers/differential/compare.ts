@@ -3,9 +3,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { generationInputMtime } from '../generationInputs.js';
-
 import { Language, type Node, Parser, type Tree } from '@willbooster/web-tree-sitter';
+
+import { generationInputMtime } from '../generationInputs.js';
 
 const Root = path.join(import.meta.dirname, '../../..');
 // The Wasm build is the one the package ships.
