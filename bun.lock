@@ -22,7 +22,7 @@
         "wrangler": "4.151.1",
       },
       "peerDependencies": {
-        "@willbooster/web-tree-sitter": "^13.0.0 || ^14.0.0",
+        "@willbooster/web-tree-sitter": "^14.0.0",
       },
       "optionalPeers": [
         "@willbooster/web-tree-sitter",
