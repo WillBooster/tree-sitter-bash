@@ -4,9 +4,12 @@
   "packageRules": [
     {
       // script/tree-sitter generates, builds, and tests the parser with the CLI of the runtime version pinned as
-      // @willbooster/web-tree-sitter, so a runtime update also regenerates the parser.
+      // @willbooster/web-tree-sitter, so a runtime update needs a regenerated parser and usually a release whose type
+      // matches the runtime's change. Renovate's automerge would squash such a fixed branch under its own `chore(deps)`
+      // message, which semantic-release does not release.
       "matchPackageNames": ["@willbooster/web-tree-sitter"],
       "groupName": "tree-sitter",
+      "automerge": false,
     },
   ],
 }
