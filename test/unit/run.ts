@@ -1,6 +1,7 @@
-import { expect, test } from 'vitest';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
+
+import { expect, test } from 'vitest';
 
 export const repositoryRoot = path.resolve(import.meta.dirname, '../..');
 // The CLI caches compiled parsers by language name in a directory shared by every checkout and reuses one that is newer

@@ -1,6 +1,7 @@
-import { afterAll, expect, test } from 'vitest';
 import assert from 'node:assert';
 import { spawnSync } from 'node:child_process';
+
+import { afterAll, expect, test } from 'vitest';
 
 import { isWasmStale, Oracle } from '../helpers/differential/compare.js';
 import { generateScript } from '../helpers/differential/generate.js';
