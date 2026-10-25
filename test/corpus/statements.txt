@@ -706,3 +706,58 @@ echo "(())"
           (string_content)))))
   (MISSING ";")
   (arithmetic_command))
+
+================================================================================
+Recover quotes after a malformed for prefix
+================================================================================
+
+for 'a'
+echo hi
+
+--------------------------------------------------------------------------------
+
+(program
+  (ERROR)
+  (command name: (command_name (raw_string)))
+  (command name: (command_name (word)) argument: (word)))
+
+================================================================================
+Recover quotes after a malformed function prefix
+================================================================================
+
+function 'a'
+echo hi
+
+--------------------------------------------------------------------------------
+
+(program
+  (ERROR)
+  (command name: (command_name (raw_string)))
+  (command name: (command_name (word)) argument: (word)))
+
+================================================================================
+Recover quotes after a malformed parenthesis
+================================================================================
+
+echo ( 'a b'
+echo 'c d'
+
+--------------------------------------------------------------------------------
+
+(program
+  (command name: (command_name (word)) (ERROR) argument: (raw_string))
+  (command name: (command_name (word)) argument: (raw_string)))
+
+================================================================================
+Recover quotes after an invalid opener spanning a newline
+================================================================================
+
+o('
+"'
+printf end
+
+--------------------------------------------------------------------------------
+
+(program
+  (command name: (command_name (concatenation (word) (ERROR) (raw_string))))
+  (command name: (command_name (word)) argument: (word)))

@@ -66,6 +66,116 @@ test('queries both delimiters of literal strings without interpreting their cont
   }
 });
 
+test('queries ordinary quote pairs across command, assignment, pattern, and regex contexts', () => {
+  const parser = new Parser().setLanguage(language);
+  const query = new Query(language, `(raw_string . "'" @open "'" @close .)`);
+  const sources = [
+    "value='a'\nprintf '%s' 'tail'\n",
+    "'command' 'argument'\n",
+    "case 'a' in 'a') printf '%s' 'tail';; esac\n",
+    "[[ 'a' =~ 'a' ]]\n",
+  ];
+  try {
+    for (const source of sources) {
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(false);
+        const strings = tree.rootNode.descendantsOfType('raw_string');
+        expect(strings.length, source).toBeGreaterThan(0);
+        expect(captureRanges(query, tree)).toEqual(
+          strings.flatMap((node) => [
+            ['open', node.startIndex, node.startIndex + 1],
+            ['close', node.endIndex - 1, node.endIndex],
+          ])
+        );
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    query.delete();
+    parser.delete();
+  }
+});
+
+test('preserves following quoted commands and their query ranges through malformed prefixes and edit undo', () => {
+  const parser = new Parser().setLanguage(language);
+  const query = new Query(language, `(raw_string . "'" @open "'" @close .)`);
+  const prefixes = [
+    "for 'a'",
+    "function 'a'",
+    "select 'a'",
+    "echo ( 'a b'",
+    "o('\n\"'",
+    "for ''",
+    "for 'a\nb'",
+    String.raw`function 'literal\'`,
+    String.raw`for 'it'\''s'`,
+    "f( 'a'",
+  ];
+  try {
+    for (const prefix of prefixes) {
+      const source = `${prefix}\nprintf '%s' 'tail'\n`;
+      const tree = parser.parse(source)!;
+      try {
+        expect(tree.rootNode.hasError, source).toBe(true);
+        const command = tree.rootNode.namedChildren.at(-1)!;
+        expect(command.type, source).toBe('command');
+        expect(command.childForFieldName('name')?.text, source).toBe('printf');
+        expect(command.childrenForFieldName('argument').map((node) => node.text)).toEqual(["'%s'", "'tail'"]);
+        expect(query.matches(command), source).toHaveLength(2);
+        const originalTree = tree.rootNode.toString();
+        const originalRanges = captureRanges(query, tree);
+        const index = source.indexOf('tail') + 2;
+        const position = { row: prefix.split('\n').length, column: 15 };
+        const changed = source.slice(0, index) + "'x'" + source.slice(index);
+        tree.edit(
+          new Edit({
+            startIndex: index,
+            oldEndIndex: index,
+            newEndIndex: index + 3,
+            startPosition: position,
+            oldEndPosition: position,
+            newEndPosition: { row: position.row, column: position.column + 3 },
+          })
+        );
+        const edited = parser.parse(changed, tree)!;
+        const fresh = parser.parse(changed)!;
+        try {
+          expect(edited.rootNode.toString(), source).toBe(fresh.rootNode.toString());
+          expect(captureRanges(query, edited), source).toEqual(captureRanges(query, fresh));
+          expect(query.matches(edited.rootNode.namedChildren.at(-1)!), source).toHaveLength(3);
+          edited.edit(
+            new Edit({
+              startIndex: index,
+              oldEndIndex: index + 3,
+              newEndIndex: index,
+              startPosition: position,
+              oldEndPosition: { row: position.row, column: position.column + 3 },
+              newEndPosition: position,
+            })
+          );
+          const undone = parser.parse(source, edited)!;
+          try {
+            expect(undone.rootNode.toString(), source).toBe(originalTree);
+            expect(captureRanges(query, undone), source).toEqual(originalRanges);
+          } finally {
+            undone.delete();
+          }
+        } finally {
+          edited.delete();
+          fresh.delete();
+        }
+      } finally {
+        tree.delete();
+      }
+    }
+  } finally {
+    query.delete();
+    parser.delete();
+  }
+});
+
 test('keeps newlines inside literal arguments before pending heredoc bodies', () => {
   const parser = new Parser().setLanguage(language);
   try {

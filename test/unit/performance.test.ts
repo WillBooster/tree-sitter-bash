@@ -8,7 +8,7 @@ test('uses a Wasm build of the current parser', () => {
   expect(isWasmStale(), 'generation inputs or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
 });
 
-// These concatenation, line-continuation and plain nested-arithmetic and unfinished-opener shapes should grow proportionally: ten times the
+// These inputs should grow proportionally: ten times the
 // input takes about ten times as long, against a hundred times for a quadratic scanner. The ratio holds on
 // slow CI runners. The parses are timed in the CPU time of the thread that runs them: wall-clock time is inflated
 // unevenly by other processes, and the process's CPU time also counts the engine's background threads, which compile
@@ -24,6 +24,11 @@ test.each([
     },
   ],
   ['unfinished arithmetic openers', (words: number) => 'echo $((1+\n'.repeat(words / 4) + '1\n', true],
+  [
+    'malformed prefixes before complete quotes',
+    (words: number) => "for 'a'\nprintf '%s' 'tail'\n".repeat(words / 4),
+    true,
+  ],
   ['words that concatenate with strings', (words: number) => `echo ${'a"b"; '.repeat(words)}\n`],
   ['a line after a line continuation', (words: number) => `x \\\n${'a"b" '.repeat(words)}\n`],
 ])('parses large %s inputs with proportional growth', { timeout: 60_000 }, (_, script, expectedError = false) => {

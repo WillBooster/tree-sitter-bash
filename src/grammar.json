@@ -3336,6 +3336,10 @@
       "type": "CHOICE",
       "members": [
         {
+          "type": "PATTERN",
+          "value": "'[^']*'"
+        },
+        {
           "type": "SEQ",
           "members": [
             {

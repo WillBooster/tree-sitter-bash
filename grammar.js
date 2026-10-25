@@ -718,6 +718,7 @@ module.exports = grammar({
     // quoted text around the continuations and the bodies.
     raw_string: () =>
       choice(
+        /'[^']*'/,
         seq(
           alias(sym('_raw_string_start'), "'"),
           optional(sym('_raw_string_content')),
