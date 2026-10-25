@@ -154,6 +154,9 @@ module.exports = grammar({
     sym('_timing_terminator'),
     sym('_backquote_escape'),
     sym('_redirect_destination_start'),
+    sym('_raw_string_start'),
+    sym('_raw_string_content'),
+    sym('_raw_string_end'),
   ],
 
   // Bash removes the backslash before `$` (and before `"` where the backquotes are inside double quotes)
@@ -715,9 +718,13 @@ module.exports = grammar({
     // quoted text around the continuations and the bodies.
     raw_string: () =>
       choice(
-        /'[^']*'/,
         seq(
-          sym('_closer_line_raw_string_start'),
+          alias(sym('_raw_string_start'), "'"),
+          optional(sym('_raw_string_content')),
+          alias(sym('_raw_string_end'), "'")
+        ),
+        seq(
+          alias(sym('_closer_line_raw_string_start'), "'"),
           repeat(alias(sym('_closer_line_raw_string_content'), sym('string_content'))),
           token.nonkeyword("'")
         )

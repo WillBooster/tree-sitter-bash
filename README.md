@@ -68,6 +68,13 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
 
+Single-quoted strings expose their opening and closing apostrophes as anonymous children. Editor bracket queries
+can match the delimiters with:
+
+```scheme
+(raw_string . "'" @open "'" @close .)
+```
+
 Upgrade `@willbooster/web-tree-sitter` to 15.0.0 or later in the 15.x series when upgrading this package. Recovery trees
 for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
 `ERROR` nodes.

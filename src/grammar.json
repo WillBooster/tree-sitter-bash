@@ -3336,15 +3336,51 @@
       "type": "CHOICE",
       "members": [
         {
-          "type": "PATTERN",
-          "value": "'[^']*'"
+          "type": "SEQ",
+          "members": [
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_raw_string_start"
+              },
+              "named": false,
+              "value": "'"
+            },
+            {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_raw_string_content"
+                },
+                {
+                  "type": "BLANK"
+                }
+              ]
+            },
+            {
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_raw_string_end"
+              },
+              "named": false,
+              "value": "'"
+            }
+          ]
         },
         {
           "type": "SEQ",
           "members": [
             {
-              "type": "SYMBOL",
-              "name": "_closer_line_raw_string_start"
+              "type": "ALIAS",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_closer_line_raw_string_start"
+              },
+              "named": false,
+              "value": "'"
             },
             {
               "type": "REPEAT",
@@ -5665,6 +5701,18 @@
     {
       "type": "SYMBOL",
       "name": "_redirect_destination_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_raw_string_start"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_raw_string_content"
+    },
+    {
+      "type": "SYMBOL",
+      "name": "_raw_string_end"
     }
   ],
   "inline": [

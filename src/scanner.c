@@ -48,6 +48,9 @@ enum TokenType {
     TIMING_TERMINATOR,
     BACKQUOTE_ESCAPE,
     REDIRECT_DESTINATION_START,
+    RAW_STRING_START,
+    RAW_STRING_CONTENT,
+    RAW_STRING_END,
 };
 
 enum { COMMAND_CLOSER_PENDING = 1, ARITHMETIC_DISTANCE = 0x80, ARITHMETIC_DISTANCE_MASK = 0x7f };
@@ -2034,6 +2037,8 @@ static bool scan_heredoc_arrow(Scanner *scanner, TSLexer *lexer, const bool *val
     return scan_heredoc_arrow_after_first(scanner, lexer, valid_symbols);
 }
 
+static bool scan_complete_raw_string_part(TSLexer *lexer, enum TokenType token);
+
 // The literal text of the right side of `=~`, which, like bash, reads `(` and `|` as regex characters
 // and a parenthesized group, blanks and metacharacters included, as part of the word up to its matching
 // `)`. Quotes and expansions are separate parts, so the group depth is kept for the text after them.
@@ -2043,6 +2048,9 @@ static bool scan_regex(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
         while (is_blank(lexer->lookahead)) {
             skip(lexer);
         }
+    }
+    if (lexer->lookahead == '\'' && valid_symbols[RAW_STRING_START]) {
+        return scan_complete_raw_string_part(lexer, RAW_STRING_START);
     }
     bool did_advance = false;
     for (;;) {
@@ -2722,8 +2730,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         }
         // A newline inside a string is part of it, so bodies start only outside strings, except for a
         // deferred body, which bash reads right after its line wherever that line ends.
-        bool in_quotes = valid_symbols[STRING_CONTENT] || valid_symbols[CLOSER_LINE_RAW_STRING_CONTENT] ||
-                         valid_symbols[CLOSER_LINE_ANSI_C_STRING_CONTENT];
+        bool in_quotes = valid_symbols[STRING_CONTENT] || valid_symbols[RAW_STRING_CONTENT] ||
+                         valid_symbols[CLOSER_LINE_RAW_STRING_CONTENT] || valid_symbols[CLOSER_LINE_ANSI_C_STRING_CONTENT];
         if (next >= 0 && valid_symbols[HEREDOC_BODY_START] && (!in_regex_group || deferred) &&
             (deferred || (!in_quotes && !scanner->split_continuation))) {
             while (is_blank(lexer->lookahead) && !in_quotes) {
@@ -2746,6 +2754,15 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     if (error_recovery) {
         return false;
+    }
+
+    if (valid_symbols[RAW_STRING_END] && lexer->lookahead == '\'') {
+        advance(lexer);
+        lexer->result_symbol = RAW_STRING_END;
+        return true;
+    }
+    if (valid_symbols[RAW_STRING_CONTENT] && lexer->lookahead != '\'') {
+        return scan_complete_raw_string_part(lexer, RAW_STRING_CONTENT);
     }
 
     if (valid_symbols[REDIRECT_DESTINATION_START]) {
@@ -3028,7 +3045,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     // and then reports the unterminated quote when it runs the substitution. So a quote that the next
     // backquote cuts short closes the substitution there when it may close, and otherwise is skipped
     // up to the backquote, which then cannot be parsed; the quote never hides the text after it.
-    if (scanner->backtick_depth > 0 && lexer->lookahead == '\'') {
+    if (scanner->backtick_depth > 0 &&
+        (valid_symbols[CLOSER_LINE_RAW_STRING_START] || valid_symbols[RAW_STRING_START]) && lexer->lookahead == '\'') {
         advance(lexer);
         lexer->mark_end(lexer);
         // A deferred body starts at the newline that ends the line, so what follows it is read later.
@@ -3051,7 +3069,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
                 lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
                 return true;
             }
-            return false;
+            lexer->result_symbol = RAW_STRING_START;
+            return valid_symbols[RAW_STRING_START] && lexer->lookahead == '\'';
         }
         if (valid_symbols[BACKTICK_CLOSE]) {
             advance(lexer);
@@ -3066,6 +3085,10 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         lexer->mark_end(lexer);
         lexer->result_symbol = LINE_CONTINUATION;
         return true;
+    }
+
+    if (valid_symbols[RAW_STRING_START] && lexer->lookahead == '\'') {
+        return scan_complete_raw_string_part(lexer, RAW_STRING_START);
     }
 
     if ((valid_symbols[BACKTICK_OPEN] || valid_symbols[BACKTICK_CLOSE]) && lexer->lookahead == '`') {
@@ -3148,6 +3171,21 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         look_past_split_continuation(lexer);
     }
     return false;
+}
+
+static bool scan_complete_raw_string_part(TSLexer *lexer, enum TokenType token) {
+    if (token == RAW_STRING_START) {
+        advance(lexer);
+        lexer->mark_end(lexer);
+    }
+    while (!lexer->eof(lexer) && lexer->lookahead != '\'') {
+        advance(lexer);
+    }
+    if (token == RAW_STRING_CONTENT) {
+        lexer->mark_end(lexer);
+    }
+    lexer->result_symbol = token;
+    return lexer->lookahead == '\'';
 }
 
 void *tree_sitter_bash_external_scanner_create(void) {
