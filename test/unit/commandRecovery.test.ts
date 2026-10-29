@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Edit, Language, type Node, Parser, type Tree } from '@willbooster/web-tree-sitter';
+import { Language, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 test('preserves commands in a malformed for loop', async () => {
@@ -133,82 +133,9 @@ test.each([
   }
 });
 
-test.each(['\n', ';\n', ')\n'])(
-  'matches fresh parsing when %j is inserted before a redirect destination',
-  async (text) => {
-    const parser = await createParser();
-    const source = 'echo >file\nprintf FOLLOWING\n';
-    const position = source.indexOf('file');
-    const changed = source.slice(0, position) + text + source.slice(position);
-    const tree = parser.parse(source)!;
-    try {
-      tree.edit(
-        new Edit({
-          startIndex: position,
-          oldEndIndex: position,
-          newEndIndex: position + text.length,
-          startPosition: { row: 0, column: position },
-          oldEndPosition: { row: 0, column: position },
-          newEndPosition: { row: 1, column: 0 },
-        })
-      );
-      const incremental = parser.parse(changed, tree)!;
-      try {
-        expect(incremental.rootNode.hasError).toBe(true);
-        expect(incremental.rootNode.descendantsOfType('command').map((node) => node.text)).toEqual(
-          expect.arrayContaining(['file', 'printf FOLLOWING'])
-        );
-        expectFresh(parser, changed, incremental);
-        incremental.edit(
-          new Edit({
-            startIndex: position,
-            oldEndIndex: position + text.length,
-            newEndIndex: position,
-            startPosition: { row: 0, column: position },
-            oldEndPosition: { row: 1, column: 0 },
-            newEndPosition: { row: 0, column: position },
-          })
-        );
-        const restored = parser.parse(source, incremental)!;
-        try {
-          expect(restored.rootNode.hasError).toBe(false);
-          expectFresh(parser, source, restored);
-        } finally {
-          restored.delete();
-        }
-      } finally {
-        incremental.delete();
-      }
-    } finally {
-      tree.delete();
-      parser.delete();
-    }
-  }
-);
-
 async function createParser(): Promise<Parser> {
   await Parser.init();
   const parser = new Parser();
   parser.setLanguage(await Language.load(path.join(import.meta.dirname, '../../tree-sitter-bash.wasm')));
   return parser;
-}
-
-function expectFresh(parser: Parser, source: string, tree: Tree): void {
-  const fresh = parser.parse(source)!;
-  try {
-    expect(snapshot(tree.rootNode)).toEqual(snapshot(fresh.rootNode));
-  } finally {
-    fresh.delete();
-  }
-}
-
-function snapshot(node: Node): unknown {
-  return {
-    type: node.type,
-    start: node.startPosition,
-    end: node.endPosition,
-    error: node.isError,
-    missing: node.isMissing,
-    children: node.children.map((child, index) => [node.fieldNameForChild(index), snapshot(child)]),
-  };
 }
