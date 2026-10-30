@@ -14,6 +14,13 @@ This fork aims to parse scripts exactly as bash runs them, so that tools can tel
 scripts. It fixes parsing bugs and raises conformance with bash, checked by differential tests against bash itself.
 As a result, its syntax trees differ from the original grammar's; review your queries when migrating.
 
+## Support Scope
+
+This fork maintains only full parsing: valid input yields a correct tree, and invalid input yields `ERROR` or `MISSING`
+nodes without crashing, hanging, or taking more than linear time. Incremental parsing works as in upstream tree-sitter
+but is not tested here, and no queries (highlights, locals, injections, tags) are shipped. Node types, field names, and
+the trees that error recovery produces may change; such changes are released as new major versions.
+
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm` for
@@ -66,7 +73,7 @@ const parser = new Parser();
 parser.setLanguage(await Language.load(bash));
 ```
 
-The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
+The package also ships the node types in `src/node-types.json`.
 
 Upgrade `@willbooster/web-tree-sitter` to 15.0.0 or later in the 15.x series when upgrading this package. Recovery trees
 for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
