@@ -4,7 +4,7 @@
 [![license](https://img.shields.io/npm/l/@willbooster/tree-sitter-bash.svg)](https://www.npmjs.com/package/@willbooster/tree-sitter-bash)
 [![Test](https://github.com/WillBooster/tree-sitter-bash/actions/workflows/test.yml/badge.svg)](https://github.com/WillBooster/tree-sitter-bash/actions/workflows/test.yml)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
-[![wbfy](https://img.shields.io/badge/wbfy-20.49.0-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
+[![wbfy](https://img.shields.io/badge/wbfy-20.51.1-1e90ff.svg)](https://github.com/WillBooster/shared/tree/main/packages/wbfy)
 
 Bash grammar for [tree-sitter](https://github.com/tree-sitter/tree-sitter), forked from
 [tree-sitter/tree-sitter-bash](https://github.com/tree-sitter/tree-sitter-bash). We are grateful to its authors and
@@ -13,6 +13,13 @@ contributors. This is not an official release of that project.
 This fork aims to parse scripts exactly as bash runs them, so that tools can tell code from data in untrusted
 scripts. It fixes parsing bugs and raises conformance with bash, checked by differential tests against bash itself.
 As a result, its syntax trees differ from the original grammar's; review your queries when migrating.
+
+## Support Scope
+
+This fork maintains only full parsing: valid input yields a correct tree, and invalid input yields `ERROR` or `MISSING`
+nodes without crashing, hanging, or taking more than linear time. Incremental parsing works as in upstream tree-sitter
+but is not tested here, and no queries (highlights, locals, injections, tags) are shipped. Node types, field names, and
+the trees that error recovery produces may change; such changes are released as new major versions.
 
 ## Usage
 
@@ -66,7 +73,7 @@ const parser = new Parser();
 parser.setLanguage(await Language.load(bash));
 ```
 
-The package also ships the queries in `queries/` and the node types in `src/node-types.json`.
+The package also ships the node types in `src/node-types.json`.
 
 Upgrade `@willbooster/web-tree-sitter` to 15.0.0 or later in the 15.x series when upgrading this package. Recovery trees
 for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
