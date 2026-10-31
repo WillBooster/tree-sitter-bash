@@ -57,7 +57,7 @@
     "semantic-release": "25.0.9",
     "vite": "8.3.5",
     "vitest": "5.0.5",
-    "wrangler": "4.151.1"
+    "wrangler": "4.152.0"
   },
   "peerDependencies": {
     "@willbooster/web-tree-sitter": "^15.0.0"
