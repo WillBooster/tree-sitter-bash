@@ -11,10 +11,5 @@
       "groupName": "tree-sitter",
       "automerge": false,
     },
-    // 19.1.0: Version 19 removes Query, which test/unit/joinedTimingSubstitutions.test.ts imports and uses; adopting it requires changing the test. https://github.com/WillBooster/tree-sitter/pull/350
-    {
-      "matchPackageNames": ["@willbooster/web-tree-sitter"],
-      "allowedVersions": "!/^19\\.1\\.0$/",
-    },
   ],
 }

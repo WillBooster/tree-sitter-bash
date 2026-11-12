@@ -126,6 +126,8 @@ static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
 
 static inline void skip(TSLexer *lexer) { lexer->advance(lexer, true); }
 
+static inline bool at_eof(const TSLexer *lexer) { return lexer->lookahead == 0 && lexer->eof(lexer); }
+
 static inline bool is_metacharacter(int32_t c) {
     return c == '|' || c == '&' || c == ';' || c == '(' || c == ')' || c == '<' || c == '>';
 }
@@ -136,13 +138,23 @@ static inline bool is_blank(int32_t c) { return c == ' ' || c == '\t'; }
 
 static inline bool is_separator(int32_t c) { return is_blank(c) || c == '\n'; }
 
-static inline bool is_name_start(int32_t c) { return iswalpha(c) || c == '_'; }
+static inline bool is_ascii_digit(int32_t c) { return (uint32_t)(c - '0') < 10; }
 
-static inline bool is_name_char(int32_t c) { return iswalnum(c) || c == '_'; }
+static inline bool is_ascii_lower(int32_t c) { return (uint32_t)(c - 'a') < 26; }
+
+static inline bool is_ascii_alpha(int32_t c) { return ((uint32_t)(c | 0x20) - 'a') < 26; }
+
+static inline bool is_name_start(int32_t c) {
+    return (uint32_t)c < 0x80 ? is_ascii_alpha(c) || c == '_' : c >= 0x80 && iswalpha(c);
+}
+
+static inline bool is_name_char(int32_t c) {
+    return (uint32_t)c < 0x80 ? is_ascii_alpha(c) || is_ascii_digit(c) || c == '_' : c >= 0x80 && iswalnum(c);
+}
 
 // Whether `$` followed by `c` begins an expansion inside double quotes or a heredoc body.
 static inline bool starts_quoted_expansion(int32_t c) {
-    return is_name_start(c) || iswdigit(c) || c == '{' || c == '(' || c == '[' || c == '*' || c == '@' ||
+    return is_name_start(c) || is_ascii_digit(c) || c == '{' || c == '(' || c == '[' || c == '*' || c == '@' ||
            c == '#' || c == '?' || c == '$' || c == '!' || c == '-';
 }
 
@@ -166,7 +178,7 @@ static BackslashRun classify_backslash_run(Scanner *scanner, uint32_t count, int
 
 // Reads a run after the `count` backslashes already read; optional marks let a token end before the last.
 static uint32_t read_backslash_run(TSLexer *lexer, uint32_t count, bool mark) {
-    while (lexer->lookahead == '\\' && !lexer->eof(lexer)) {
+    while (lexer->lookahead == '\\') {
         if (mark) lexer->mark_end(lexer);
         advance(lexer);
         count++;
@@ -246,7 +258,7 @@ static BackquotedRun read_word_backslashes(Scanner *scanner, TSLexer *lexer, uin
     }
     if (run == RUN_ESCAPES_NEXT) {
         // A backslash-newline continues the line; the word token handles that.
-        if (lexer->eof(lexer) || lexer->lookahead == '\n') {
+        if (at_eof(lexer) || lexer->lookahead == '\n') {
             return TEXT_UNREADABLE;
         }
         // The word token would read an even run as leaving the character unescaped.
@@ -264,7 +276,7 @@ static BackquotedRun read_string_backslashes(Scanner *scanner, TSLexer *lexer, b
     if (run == RUN_REMOVES_LAST) {
         return result.count == 1 && !result.joined && !did_advance ? TEXT_ENDS_AT_RUN : TEXT_ENDS;
     }
-    if (run == RUN_ESCAPES_NEXT && !lexer->eof(lexer) && !(line_breaks && lexer->lookahead == '\n')) {
+    if (run == RUN_ESCAPES_NEXT && !at_eof(lexer) && !(line_breaks && lexer->lookahead == '\n')) {
         advance(lexer);
     }
     return TEXT_GOES_ON;
@@ -585,7 +597,7 @@ static inline int32_t probe_lookahead(SubstitutionProbeInput *input) {
 
 static inline bool probe_eof(SubstitutionProbeInput *input) {
     return (input->limit > 0 && input->position >= input->limit) ||
-           (input->position == input->buffered.size && input->lexer->eof(input->lexer));
+           (input->position == input->buffered.size && at_eof(input->lexer));
 }
 
 static inline void probe_advance(SubstitutionProbeInput *input) {
@@ -1512,16 +1524,21 @@ static bool probe_escape_eof(const TSLexer *lexer);
 
 static void probe_ansi_c_escape(SubstitutionProbeInput *input, CodePoints *out) {
     SubstitutionProbeLexer cursor = {
-        .lexer = {.lookahead = probe_lookahead(input), .advance = advance_probe_escape, .eof = probe_escape_eof},
+        .lexer = {
+            .lookahead = probe_eof(input) ? 0 : probe_lookahead(input),
+            .advance = advance_probe_escape,
+            .eof = probe_escape_eof,
+        },
         .input = input,
     };
     push_ansi_c_escape(&cursor.lexer, out, false);
 }
 
 static void advance_probe_escape(TSLexer *lexer, bool skip) {
+    (void)skip;
     SubstitutionProbeInput *input = ((SubstitutionProbeLexer *)lexer)->input;
     probe_advance(input);
-    lexer->lookahead = probe_lookahead(input);
+    lexer->lookahead = probe_eof(input) ? 0 : probe_lookahead(input);
 }
 
 static bool probe_escape_eof(const TSLexer *lexer) {
@@ -1529,7 +1546,6 @@ static bool probe_escape_eof(const TSLexer *lexer) {
 }
 
 static bool probe_word_is(SubstitutionProbeInput *input, uint32_t start, uint32_t end, const char *word) {
-    uint32_t size = strlen(word);
     uint32_t matched = 0;
     for (uint32_t i = start; i < end; i++) {
         int32_t c = *array_get(&input->buffered, i);
@@ -1537,11 +1553,11 @@ static bool probe_word_is(SubstitutionProbeInput *input, uint32_t start, uint32_
             i++;
             continue;
         }
-        if (matched == size || c != word[matched++]) {
+        if (word[matched] == '\0' || c != (unsigned char)word[matched++]) {
             return false;
         }
     }
-    return matched == size;
+    return word[matched] == '\0';
 }
 
 static bool probe_word_boundary(SubstitutionProbeInput *input) {
@@ -1675,9 +1691,9 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 } else if (lexer->lookahead == '\\' && !heredoc->is_raw) {
                     advance(lexer);
                     consumed = true;
-                    if (lexer->lookahead != '\n' || lexer->eof(lexer)) {
+                    if (lexer->lookahead != '\n') {
                         // An escape rather than a line continuation: the escaped character is content.
-                        if (!lexer->eof(lexer)) {
+                        if (!at_eof(lexer)) {
                             if (prefix_marked) {
                                 escaped_after_prefix = lexer->lookahead;
                             }
@@ -1687,7 +1703,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                         break;
                     }
                     advance(lexer);
-                } else if (matched < heredoc->delimiter.size && !lexer->eof(lexer) && lexer->lookahead != '\n' &&
+                } else if (matched < heredoc->delimiter.size && !at_eof(lexer) && lexer->lookahead != '\n' &&
                            lexer->lookahead == *array_get(&heredoc->delimiter, matched)) {
                     advance(lexer);
                     matched++;
@@ -1706,7 +1722,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             }
             // Inside a substitution, bash also ends the body at a delimiter directly followed by the
             // innermost substitution's closer (`)` or `}`) or a closing backquote.
-            bool ends_line = lexer->lookahead == '\n' || lexer->eof(lexer) ||
+            bool ends_line = lexer->lookahead == '\n' || at_eof(lexer) ||
                              (scanner->closers.size > 0 && lexer->lookahead == substitution_closer(*array_back(&scanner->closers))) ||
                              (lexer->lookahead == '`' && in_backquotes);
             if (!escaped && matched == heredoc->delimiter.size && ends_line) {
@@ -1730,10 +1746,10 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             if (prefix_marked) {
                 // The line is read after joining its backslash-newlines, as for the delimiter; any other
                 // escaped character is kept with its backslash, so a newline after it ends the line.
-                while (!lexer->eof(lexer) && lexer->lookahead != '\n' && lexer->lookahead != ')') {
+                while (!at_eof(lexer) && lexer->lookahead != '\n' && lexer->lookahead != ')') {
                     bool backslash = lexer->lookahead == '\\' && !heredoc->is_raw;
                     advance(lexer);
-                    if (backslash && !lexer->eof(lexer) && lexer->lookahead != ')') {
+                    if (backslash && !at_eof(lexer) && lexer->lookahead != ')') {
                         advance(lexer);
                     }
                 }
@@ -1752,7 +1768,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             continue;
         }
 
-        if (lexer->eof(lexer)) {
+        if (at_eof(lexer)) {
             lexer->mark_end(lexer);
             lexer->result_symbol = did_advance ? HEREDOC_CONTENT : HEREDOC_END;
             if (!did_advance) {
@@ -1772,7 +1788,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                 advance(lexer);
                 did_advance = true;
                 // Inside backquotes a backslash also hides a backquote from a quoted body's end.
-                if (!lexer->eof(lexer) &&
+                if (!at_eof(lexer) &&
                     (!heredoc->is_raw || (in_backquotes && lexer->lookahead == '`'))) {
                     // A backslash-newline joins lines before the delimiter comparison, while a
                     // backslash-CR escapes only the CR, so the LF after it still ends the line.
@@ -1829,7 +1845,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
 }
 
 static inline int32_t hex_value(int32_t c) {
-    return iswdigit(c) ? c - '0' : (c >= 'a' && c <= 'f') ? c - 'a' + 10 : (c >= 'A' && c <= 'F') ? c - 'A' + 10 : -1;
+    return is_ascii_digit(c) ? c - '0' : (c >= 'a' && c <= 'f') ? c - 'a' + 10 : (c >= 'A' && c <= 'F') ? c - 'A' + 10 : -1;
 }
 
 static int32_t read_number(TSLexer *lexer, int32_t base, int max_digits, bool *has_digits) {
@@ -2096,48 +2112,93 @@ static bool scan_regex(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
     return true;
 }
 
+typedef enum { STRING_CONTINUE, STRING_STOP, STRING_EMIT } StringStep;
+
+static StringStep step_string_special(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols, bool line_breaks,
+                                      bool *did_advance);
+static StringStep step_string_backslash(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols, bool line_breaks,
+                                        bool *did_advance);
+static StringStep step_string_dollar(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols, bool *did_advance);
+
 static bool scan_string_content(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     bool line_breaks = !scanner->joined_line && awaits_deferred_body(scanner);
     bool did_advance = false;
     for (;;) {
-        lexer->mark_end(lexer);
-        if (lexer->eof(lexer)) {
-            break;
-        }
         int32_t c = lexer->lookahead;
-        if (c == '"' || c == '`') {
+        if (at_eof(lexer) || c == '"' || c == '`') {
             break;
         }
-        if (c == '\n' && (scanner->joined_line || line_breaks)) {
-            // A deferred body starts right before the newline that ends the line.
-            if (did_advance) {
-                break;
-            }
-            scanner->joined_line = false;
-        }
-        if (c == '\\') {
-            BackquotedRun run = read_string_backslashes(scanner, lexer, line_breaks, did_advance);
-            if (run == TEXT_ENDS_AT_RUN) {
-                return finish_backquote_escape(lexer, valid_symbols);
-            }
-            did_advance = true;
-            if (run == TEXT_ENDS) {
-                break;
+        if (c == '\n' || c == '\\' || c == '$') {
+            StringStep step = step_string_special(scanner, lexer, valid_symbols, line_breaks, &did_advance);
+            if (step != STRING_CONTINUE) {
+                return step == STRING_EMIT;
             }
             continue;
         }
         advance(lexer);
-        if (c == '$' && starts_quoted_expansion(lexer->lookahead)) {
-            if (!did_advance && lexer->lookahead == '(' && (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START]) &&
-                scan_substitution_start_after_dollar(scanner, lexer, valid_symbols)) {
-                return true;
-            }
-            break;
-        }
         did_advance = true;
+    }
+    if (did_advance) {
+        lexer->mark_end(lexer);
     }
     lexer->result_symbol = STRING_CONTENT;
     return did_advance;
+}
+
+static StringStep step_string_special(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols, bool line_breaks,
+                                      bool *did_advance) {
+    int32_t c = lexer->lookahead;
+    if (c == '\\') {
+        return step_string_backslash(scanner, lexer, valid_symbols, line_breaks, did_advance);
+    }
+    if (c == '$') {
+        return step_string_dollar(scanner, lexer, valid_symbols, did_advance);
+    }
+    if (scanner->joined_line || line_breaks) {
+        // A deferred body starts right before the newline that ends the line.
+        if (*did_advance) {
+            lexer->mark_end(lexer);
+            lexer->result_symbol = STRING_CONTENT;
+            return STRING_EMIT;
+        }
+        scanner->joined_line = false;
+    }
+    advance(lexer);
+    *did_advance = true;
+    return STRING_CONTINUE;
+}
+
+static StringStep step_string_backslash(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols, bool line_breaks,
+                                        bool *did_advance) {
+    BackquotedRun run = read_string_backslashes(scanner, lexer, line_breaks, *did_advance);
+    if (run == TEXT_ENDS_AT_RUN) {
+        return finish_backquote_escape(lexer, valid_symbols) ? STRING_EMIT : STRING_STOP;
+    }
+    *did_advance = true;
+    if (run == TEXT_ENDS) {
+        lexer->result_symbol = STRING_CONTENT;
+        return STRING_EMIT;
+    }
+    return STRING_CONTINUE;
+}
+
+static StringStep step_string_dollar(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols, bool *did_advance) {
+    lexer->mark_end(lexer);
+    advance(lexer);
+    if (!starts_quoted_expansion(lexer->lookahead)) {
+        *did_advance = true;
+        return STRING_CONTINUE;
+    }
+    if (!*did_advance && lexer->lookahead == '(' &&
+        (valid_symbols[COMMAND_SUBSTITUTION_START] || valid_symbols[ARITHMETIC_SUBSTITUTION_START]) &&
+        scan_substitution_start_after_dollar(scanner, lexer, valid_symbols)) {
+        return STRING_EMIT;
+    }
+    if (*did_advance) {
+        lexer->result_symbol = STRING_CONTENT;
+        return STRING_EMIT;
+    }
+    return STRING_STOP;
 }
 
 static inline bool is_word_break(int32_t c) {
@@ -2159,20 +2220,21 @@ typedef enum { GROUP_LITERAL, GROUP_STRUCTURED, GROUP_UNSUPPORTED } GroupKind;
 // a deeper group is parsed as `extglob_pattern`.
 #define EXTGLOB_LITERAL_DEPTH 3
 
+static GroupKind scan_extglob_escape(TSLexer *lexer);
+
 static GroupKind scan_extglob_group(TSLexer *lexer) {
     uint32_t depth = 0;
-    while (!lexer->eof(lexer)) {
+    while (!at_eof(lexer)) {
         int32_t c = lexer->lookahead;
         if (c == '$' || c == '`' || c == '\'' || c == '"') {
             return GROUP_STRUCTURED;
         }
         advance(lexer);
         if (c == '\\') {
-            // The word token's literal groups cannot hold a line continuation.
-            if (lexer->eof(lexer) || lexer->lookahead == '\n') {
-                return lexer->eof(lexer) ? GROUP_UNSUPPORTED : GROUP_STRUCTURED;
+            GroupKind escaped = scan_extglob_escape(lexer);
+            if (escaped != GROUP_LITERAL) {
+                return escaped;
             }
-            advance(lexer);
         } else if (c == '(') {
             if (++depth > EXTGLOB_LITERAL_DEPTH) {
                 return GROUP_STRUCTURED;
@@ -2184,7 +2246,22 @@ static GroupKind scan_extglob_group(TSLexer *lexer) {
     return GROUP_UNSUPPORTED;
 }
 
+static GroupKind scan_extglob_escape(TSLexer *lexer) {
+    // The word token's literal groups cannot hold a line continuation.
+    if (at_eof(lexer)) {
+        return GROUP_UNSUPPORTED;
+    }
+    if (lexer->lookahead == '\n') {
+        return GROUP_STRUCTURED;
+    }
+    advance(lexer);
+    return GROUP_LITERAL;
+}
+
 static bool continue_word(Scanner *scanner, TSLexer *lexer, bool consumed, bool rewritten);
+static GroupKind scan_word_extglob_operator(TSLexer *lexer);
+static bool word_backslash_continues(BackquotedRun run);
+static bool finish_word_backslash_prefix(TSLexer *lexer, BackquotedRun run, bool consumed);
 
 // The literal text of a word up to a structured extglob group (`foo` in `foo@($x)`), which the
 // word token's longest match would otherwise run into.
@@ -2196,26 +2273,18 @@ static bool continue_extglob_prefix(Scanner *scanner, TSLexer *lexer, bool consu
 // or the whole word where the backquotes make its backslashes escape a character that the word token reads as
 // unescaped (`rewritten`).
 static bool continue_word(Scanner *scanner, TSLexer *lexer, bool consumed, bool rewritten) {
-    while (!lexer->eof(lexer)) {
+    while (!at_eof(lexer)) {
         int32_t c = lexer->lookahead;
         if (is_extglob_operator(c)) {
-            lexer->mark_end(lexer);
-            advance(lexer);
-            if (lexer->lookahead == '(') {
-                GroupKind kind = scan_extglob_group(lexer);
-                if (kind == GROUP_STRUCTURED) {
-                    lexer->result_symbol = EXTGLOB_PREFIX;
-                    return consumed;
-                }
-                if (kind == GROUP_UNSUPPORTED) {
-                    return false;
-                }
+            GroupKind kind = scan_word_extglob_operator(lexer);
+            if (kind != GROUP_LITERAL) {
+                lexer->result_symbol = EXTGLOB_PREFIX;
+                return kind == GROUP_STRUCTURED && consumed;
             }
         } else if (c == '\\') {
             BackquotedRun run = read_word_backslashes(scanner, lexer, 0, &rewritten);
-            if (run != TEXT_GOES_ON && run != TEXT_CONTINUED) {
-                lexer->result_symbol = EXTGLOB_PREFIX;
-                return run == TEXT_ENDS || run == TEXT_CONTINUED_END || (run == TEXT_ENDS_AT_RUN && consumed);
+            if (!word_backslash_continues(run)) {
+                return finish_word_backslash_prefix(lexer, run, consumed);
             }
         } else if (is_word_break(c)) {
             break;
@@ -2232,6 +2301,21 @@ static bool continue_word(Scanner *scanner, TSLexer *lexer, bool consumed, bool 
     return true;
 }
 
+static GroupKind scan_word_extglob_operator(TSLexer *lexer) {
+    lexer->mark_end(lexer);
+    advance(lexer);
+    return lexer->lookahead == '(' ? scan_extglob_group(lexer) : GROUP_LITERAL;
+}
+
+static bool word_backslash_continues(BackquotedRun run) {
+    return run == TEXT_GOES_ON || run == TEXT_CONTINUED;
+}
+
+static bool finish_word_backslash_prefix(TSLexer *lexer, BackquotedRun run, bool consumed) {
+    lexer->result_symbol = EXTGLOB_PREFIX;
+    return run == TEXT_ENDS || run == TEXT_CONTINUED_END || (run == TEXT_ENDS_AT_RUN && consumed);
+}
+
 // A leading `#` starts a comment except in an assignment value (`A=#@($x)`).
 static bool scan_extglob_prefix(Scanner *scanner, TSLexer *lexer, bool in_value) {
     return (lexer->lookahead != '#' || in_value) && continue_extglob_prefix(scanner, lexer, false);
@@ -2241,10 +2325,10 @@ static bool scan_extglob_prefix(Scanner *scanner, TSLexer *lexer, bool in_value)
 static void skip_quoted(TSLexer *lexer) {
     int32_t quote = lexer->lookahead;
     advance(lexer);
-    while (!lexer->eof(lexer) && lexer->lookahead != quote) {
+    while (!at_eof(lexer) && lexer->lookahead != quote) {
         if (lexer->lookahead == '\\' && quote != '\'') {
             advance(lexer);
-            if (lexer->eof(lexer)) {
+            if (at_eof(lexer)) {
                 return;
             }
         }
@@ -2256,7 +2340,7 @@ static void skip_quoted(TSLexer *lexer) {
 // Skips a parenthesized span such as a command substitution's, quotes included.
 static void skip_parenthesized(TSLexer *lexer) {
     uint32_t depth = 0;
-    while (!lexer->eof(lexer)) {
+    while (!at_eof(lexer)) {
         int32_t c = lexer->lookahead;
         if (c == '\'' || c == '"' || c == '`') {
             skip_quoted(lexer);
@@ -2413,12 +2497,13 @@ static bool scan_timing_word(Scanner *scanner, TSLexer *lexer, const bool *valid
     return !joined && valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(scanner, lexer, true);
 }
 
+static bool is_closing_reserved_word(const char word[4]);
+
 // Marks the current position and reports whether a reserved word that ends or continues a compound
 // command (`then`, `do`, `done`, `fi`, `esac`, `else`, `elif`, `}`) starts here.
 static bool at_closing_reserved_word(TSLexer *lexer) {
-    static const char *const words[] = {"then", "do", "done", "fi", "esac", "else", "elif", "}"};
     lexer->mark_end(lexer);
-    char word[5];
+    char word[5] = {0};
     uint32_t length = 0;
     for (;;) {
         if (lexer->lookahead == '\\') {
@@ -2428,7 +2513,7 @@ static bool at_closing_reserved_word(TSLexer *lexer) {
                 return false;
             }
             advance(lexer);
-        } else if (length < sizeof(word) && (iswlower(lexer->lookahead) || lexer->lookahead == '}')) {
+        } else if (length < sizeof(word) && (is_ascii_lower(lexer->lookahead) || lexer->lookahead == '}')) {
             word[length++] = (char)lexer->lookahead;
             advance(lexer);
         } else {
@@ -2436,11 +2521,16 @@ static bool at_closing_reserved_word(TSLexer *lexer) {
         }
     }
     if (length == 0 || length == sizeof(word) ||
-        !(lexer->eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
+        !(at_eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead))) {
         return false;
     }
+    return is_closing_reserved_word(word);
+}
+
+static bool is_closing_reserved_word(const char word[4]) {
+    static const char words[][5] = {"then", "do", "done", "fi", "esac", "else", "elif", "}"};
     for (size_t i = 0; i < sizeof(words) / sizeof(words[0]); i++) {
-        if (strlen(words[i]) == length && strncmp(words[i], word, length) == 0) {
+        if (word[0] == words[i][0] && word[1] == words[i][1] && word[2] == words[i][2] && word[3] == words[i][3]) {
             return true;
         }
     }
@@ -2654,7 +2744,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     // Tokens that must touch the previous one (concatenation, an empty assignment value) are decided
     // by the character right after it, even when blanks are skipped below to find a newline.
     int32_t first = lexer->lookahead;
-    bool at_eof = lexer->eof(lexer);
+    bool is_eof = at_eof(lexer);
     // Kept only if this call returns a token, so the flag lasts until the scanner's next token.
     bool after_line_break = scanner->after_line_break;
     scanner->after_line_break = false;
@@ -2786,7 +2876,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return scan_heredoc_start(scanner, lexer);
     }
 
-    if (regex && scanner->regex_depth > 0 && !at_eof && first != '\\') {
+    if (regex && scanner->regex_depth > 0 && !is_eof && first != '\\') {
         lexer->result_symbol = REGEX_CONCAT;
         return true;
     }
@@ -2812,7 +2902,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return false;
     }
 
-    if (can_concat && !at_eof && (!ends_word(first, regex) || (regex && scanner->regex_depth > 0)) &&
+    if (can_concat && !is_eof && (!ends_word(first, regex) || (regex && scanner->regex_depth > 0)) &&
         !after_separate_escape && !(after_line_break && lexer->get_column(lexer) == 0)) {
         int32_t c = first;
         if (c == '\\' && lexer->lookahead == '\\') {
@@ -2820,7 +2910,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->mark_end(lexer);
             advance(lexer);
             // Bash drops a backslash at the end of input like a continuation.
-            if (lexer->eof(lexer)) {
+            if (at_eof(lexer)) {
                 lexer->mark_end(lexer);
                 lexer->result_symbol = LINE_CONTINUATION;
                 return true;
@@ -2866,7 +2956,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->result_symbol = EMPTY_VALUE;
             return true;
         }
-        if (at_eof || is_separator(c) || c == ';' || c == '&' || c == '|' || c == ')' ||
+        if (is_eof || is_separator(c) || c == ';' || c == '&' || c == '|' || c == ')' ||
             (c == '`' && scanner->backtick_depth > 0)) {
             lexer->result_symbol = EMPTY_VALUE;
             return true;
@@ -2970,7 +3060,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
                                    first == '\\' && !valid_symbols[VARIABLE_NAME] && !valid_symbols[EMPTY_VALUE], false);
                 return true;
             }
-            if (lexer->lookahead == '\n' || lexer->eof(lexer)) {
+            if (lexer->lookahead == '\n' || at_eof(lexer)) {
                 advance(lexer);
                 lexer->mark_end(lexer);
                 scanner->after_line_break = true;
@@ -3033,7 +3123,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         lexer->mark_end(lexer);
         // A deferred body starts at the newline that ends the line, so what follows it is read later.
         bool breaks_line = awaits_deferred_body(scanner) && valid_symbols[CLOSER_LINE_RAW_STRING_START];
-        while (!lexer->eof(lexer) && lexer->lookahead != '\'' && lexer->lookahead != '`' &&
+        while (!at_eof(lexer) && lexer->lookahead != '\'' && lexer->lookahead != '`' &&
                !(breaks_line && lexer->lookahead == '\n')) {
             // A backslash escapes a backquote or a backslash for finding the end of the backquotes; the
             // quote itself stays literal, so `'\'` still ends at its second quote.
@@ -3046,7 +3136,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         if (lexer->lookahead != '`') {
             // A quote that the backquotes do not cut short scans its text itself where a deferred body may
             // start inside it.
-            if (!lexer->eof(lexer) && breaks_line) {
+            if (!at_eof(lexer) && breaks_line) {
                 scanner->closer_line_string_opened = true;
                 lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
                 return true;
@@ -3097,8 +3187,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     // Only one check that consumes input can run, so the prefix scan leaves names before a possible
     // assignment to their own check; digits are read once as a descriptor or a word prefix.
-    if (valid_symbols[FILE_DESCRIPTOR] && iswdigit(lexer->lookahead)) {
-        while (iswdigit(lexer->lookahead)) {
+    if (valid_symbols[FILE_DESCRIPTOR] && is_ascii_digit(lexer->lookahead)) {
+        while (is_ascii_digit(lexer->lookahead)) {
             advance(lexer);
         }
         lexer->mark_end(lexer);
@@ -3286,10 +3376,10 @@ void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *bu
 }
 
 static bool scan_comment(TSLexer *lexer, bool backquotes) {
-    while (!lexer->eof(lexer) && lexer->lookahead != '\n' && (!backquotes || lexer->lookahead != '`')) {
+    while (!at_eof(lexer) && lexer->lookahead != '\n' && (!backquotes || lexer->lookahead != '`')) {
         bool backslash = lexer->lookahead == '\\';
         advance(lexer);
-        if (backslash && !lexer->eof(lexer)) {
+        if (backslash && !at_eof(lexer)) {
             advance(lexer);
         }
     }
