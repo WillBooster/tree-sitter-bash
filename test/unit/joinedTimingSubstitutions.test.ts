@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { Language, type Node, Parser, Query } from '@willbooster/web-tree-sitter';
+import { Language, type Node, Parser } from '@willbooster/web-tree-sitter';
 import { expect, test } from 'vitest';
 
 await Parser.init();
@@ -19,10 +19,6 @@ const snapshot = (node: Node): unknown => [
 
 test('keeps joined timing options in arithmetic-looking command substitutions', () => {
   const parser = new Parser().setLanguage(language);
-  const query = new Query(
-    language,
-    '(variable_assignment value: (command_substitution (subshell))) @assignment (timed_command) @timed'
-  );
   try {
     for (const keyword of ['time', 'ti\\\nme']) {
       for (const options of ['-\\\np', '-\\\n-', '-\\\np --', '-p -\\\n-', '-\\\np -\\\n-', '-\\\n\\\np -\\\n\\\n-']) {
@@ -34,12 +30,17 @@ test('keeps joined timing options in arithmetic-looking command substitutions', 
           expect(tree.rootNode.hasError, source).toBe(false);
           expect(reference.rootNode.hasError, canonical).toBe(false);
           expect(snapshot(tree.rootNode), source).toEqual(snapshot(reference.rootNode));
-          const captures = query.captures(tree.rootNode);
+          const assignments = tree.rootNode.descendantsOfType('variable_assignment');
+          expect(assignments, source).toHaveLength(1);
+          const value = assignments[0]!.childForFieldName('value');
+          expect(value?.type, source).toBe('command_substitution');
           expect(
-            captures.filter(({ name }) => name === 'assignment'),
+            value?.namedChildren.filter((child) => child.type === 'subshell'),
             source
           ).toHaveLength(1);
-          const timed = captures.find(({ name }) => name === 'timed')!.node;
+          const timedCommands = tree.rootNode.descendantsOfType('timed_command');
+          expect(timedCommands, source).toHaveLength(1);
+          const timed = timedCommands[0]!;
           expect(timed.startIndex, source).toBe(source.indexOf(keyword));
           expect(timed.endIndex, source).toBe(source.indexOf('esac') + 4);
         } finally {
@@ -49,7 +50,6 @@ test('keeps joined timing options in arithmetic-looking command substitutions', 
       }
     }
   } finally {
-    query.delete();
     parser.delete();
   }
 });
