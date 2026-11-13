@@ -103,8 +103,7 @@ typedef struct {
     // token may be empty, so that it always has one and joining them gives its value.
     bool closer_line_string_opened;
     // The last token of this scanner was heredoc text that ended at the start of a line, where the next token
-    // of the body starts. The state, not the column, records this: tree-sitter may reuse a token lexed after
-    // an expansion in the middle of a line at a line start that an edit created before it.
+    // of the body starts, avoiding a backward column scan on each content check.
     bool heredoc_line_start;
     // A deferred body after the line that ended a body at the substitution's `)` ends at a line holding a `)`
     // too, so a terminator is owed after that `)`: the number of closers open up to and including it, or 0.
@@ -319,12 +318,21 @@ static unsigned decode_varint(const char *in, unsigned available, int32_t *c) {
     return 0;
 }
 
-// Serialized layout: backtick depth (with the in-string flag in its high bit), the separate-escape column (uint32), the closer
-// count when the backquotes opened (uint16), the owed-terminator, line-break, joined-line, split-continuation,
-// string-opened, and heredoc-line-start flags, the closer count owing a terminator after its `)`, the regex depth,
-// and the one saved when the backquotes opened (uint16 each), the closers of the open substitutions (uint16 count,
-// then one byte each, then their saved regex depths as uint16), and heredoc count, then per heredoc its flags,
-// depth (uint16), delimiter length (uint16), and the delimiter as varints.
+// Serialized layout: empty (0 bytes) when every field is at its reset value; otherwise the boolean flags byte, a
+// section mask byte, and the active sections in bit order: backquote saved depths (two uint16s), separate-escape
+// column (uint32), closer count owing a terminator (uint16), regex depth (uint16), open substitutions (uint16 count,
+// one byte each, then saved regex depths as uint16), and heredocs (uint8 count, then flags, uint16 depth, uint16
+// delimiter length, and varint code points). `SCANNER_HEADER_SIZE + 1` bounds the fixed overhead when all sections
+// are active so `serialized_size` never underestimates a later non-allocating state change.
+enum {
+    SECTION_BACKTICK = 1 << 0,
+    SECTION_BACKTICK_IN_STRING = 1 << 1,
+    SECTION_SEPARATE_ESCAPE = 1 << 2,
+    SECTION_OWED_CLOSERS = 1 << 3,
+    SECTION_REGEX_DEPTH = 1 << 4,
+    SECTION_CLOSERS = 1 << 5,
+    SECTION_HEREDOCS = 1 << 6,
+};
 #define SCANNER_HEADER_SIZE (2 + sizeof(uint32_t) + 5 * sizeof(uint16_t))
 #define CLOSER_SIZE (1 + sizeof(uint16_t))
 #define HEREDOC_HEADER_SIZE (3 + 2 * sizeof(uint16_t))
@@ -2589,23 +2597,6 @@ static void split_continuation(Scanner *scanner, TSLexer *lexer, bool in_word, b
     lexer->result_symbol = LINE_CONTINUATION;
 }
 
-// Before an operator that the parser lexes, looks past a line continuation right after it, which a deferred
-// body splits. Whether that continuation ends a word depends on the parse state after the operator, which a
-// reparse that reuses the statements up to the operator does not provide. What the scanner looks at counts
-// toward the operator token's lookahead, so an edit that makes the parser lex the continuation again also
-// makes it lex the operator again.
-static void look_past_split_continuation(TSLexer *lexer) {
-    while (lexer->lookahead == ';' || lexer->lookahead == '&' || lexer->lookahead == '|' || lexer->lookahead == '(') {
-        advance(lexer);
-    }
-    if (lexer->lookahead == '\\') {
-        advance(lexer);
-        if (lexer->lookahead == '\n') {
-            advance(lexer);
-        }
-    }
-}
-
 // After `$`, a bare dollar sign unless it begins an expansion or a quote.
 static bool finish_bare_dollar(TSLexer *lexer) {
     lexer->mark_end(lexer);
@@ -2656,6 +2647,7 @@ static bool scan_closer_line_string_content(Scanner *scanner, TSLexer *lexer, bo
 }
 
 static bool scan_comment(TSLexer *lexer, bool backquotes);
+static bool close_backtick(Scanner *scanner, TSLexer *lexer);
 static bool can_start_redirect_destination(TSLexer *lexer);
 
 static bool scan_redirect_destination_start(TSLexer *lexer) {
@@ -2848,9 +2840,6 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
     enum TokenType concat = regex ? REGEX_CONCAT : CONCAT;
     bool can_concat = valid_symbols[CONCAT] || regex;
 
-    // The word goes on after the body even where the parse state no longer allows a concatenation: that
-    // state comes from a reparse that reused the words before the body as a complete command, which the
-    // concatenation then breaks down again.
     if (scanner->split_continuation && lexer->lookahead == '\n') {
         scanner->split_continuation = false;
         advance(lexer);
@@ -2988,9 +2977,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
             return true;
         }
-        // A `#` begins a word, and so a comment, after a blank or an operator. Right after a word part, where
-        // another part may follow, it continues the word; a command may also start there, as after `;`, but
-        // a reparse may reuse the statements before it as a complete list, where no part may follow.
+        // A `#` begins a word, and so a comment, after a blank, where a command may start (as after `;` or `(`),
+        // or where no word part may follow (as after `(x)` in `(x)#c`); right after a word part it continues the word.
         bool in_word = valid_symbols[BARE_DOLLAR] && !valid_symbols[VARIABLE_NAME];
         if (lexer->lookahead == '#' && (is_blank(first) || !in_word) && scanner->joined_line &&
             valid_symbols[JOINED_COMMENT]) {
@@ -3053,11 +3041,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             // (`\foo@($x)`), and the word token handles it otherwise.
             advance(lexer);
             if (lexer->lookahead == '\n' && !scanner->joined_line && awaits_deferred_body(scanner)) {
-                // A reparse may reuse the words before the backslash as a complete command, where no
-                // concatenation is valid, so a backslash right after the previous token is taken to end a
-                // word unless a command or an assignment value may start there.
-                split_continuation(scanner, lexer,
-                                   first == '\\' && !valid_symbols[VARIABLE_NAME] && !valid_symbols[EMPTY_VALUE], false);
+                split_continuation(scanner, lexer, false, false);
                 return true;
             }
             if (lexer->lookahead == '\n' || at_eof(lexer)) {
@@ -3144,14 +3128,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             return false;
         }
         if (valid_symbols[BACKTICK_CLOSE]) {
-            advance(lexer);
-            lexer->mark_end(lexer);
-            scanner->backtick_depth--;
-            scanner->backtick_in_string = false;
-            scanner->regex_depth = scanner->backtick_regex_depth;
-            discard_unstarted_heredocs(scanner);
-            lexer->result_symbol = BACKTICK_CLOSE;
-            return true;
+            return close_backtick(scanner, lexer);
         }
         lexer->mark_end(lexer);
         lexer->result_symbol = LINE_CONTINUATION;
@@ -3160,14 +3137,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 
     if ((valid_symbols[BACKTICK_OPEN] || valid_symbols[BACKTICK_CLOSE]) && lexer->lookahead == '`') {
         if (scanner->backtick_depth > 0 && valid_symbols[BACKTICK_CLOSE]) {
-            advance(lexer);
-            lexer->mark_end(lexer);
-            scanner->backtick_depth--;
-            scanner->backtick_in_string = false;
-            scanner->regex_depth = scanner->backtick_regex_depth;
-            discard_unstarted_heredocs(scanner);
-            lexer->result_symbol = BACKTICK_CLOSE;
-            return true;
+            return close_backtick(scanner, lexer);
         }
         if (scanner->backtick_depth == 0 && valid_symbols[BACKTICK_OPEN]) {
             advance(lexer);
@@ -3234,9 +3204,6 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
         return true;
     }
 
-    if (!scanner->joined_line && awaits_deferred_body(scanner)) {
-        look_past_split_continuation(lexer);
-    }
     return false;
 }
 
@@ -3261,44 +3228,64 @@ bool tree_sitter_bash_external_scanner_scan(void *payload, TSLexer *lexer, const
     return scan((Scanner *)payload, lexer, valid_symbols);
 }
 
+static void write_bytes(char *buffer, unsigned *size, const void *src, unsigned count);
+static unsigned serialize_heredocs(Scanner *scanner, char *buffer, unsigned size);
+static bool deserialize_scalars(Scanner *scanner, uint8_t sections, const char *buffer, unsigned length, unsigned *size);
+static bool deserialize_closers(Scanner *scanner, const char *buffer, unsigned length, unsigned *size);
+static bool read_bytes(void *dest, unsigned count, const char *buffer, unsigned length, unsigned *size);
+static void deserialize_heredocs(Scanner *scanner, const char *buffer, unsigned length, unsigned size);
+
 unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer) {
     Scanner *scanner = (Scanner *)payload;
-    unsigned size = 0;
-    buffer[size++] = (char)(scanner->backtick_depth | scanner->backtick_in_string << 7);
-    memcpy(&buffer[size], &scanner->separate_escape_column, sizeof(scanner->separate_escape_column));
-    size += sizeof(scanner->separate_escape_column);
-    memcpy(&buffer[size], &scanner->backtick_closers, sizeof(scanner->backtick_closers));
-    size += sizeof(scanner->backtick_closers);
-    buffer[size++] = (char)(scanner->terminator_owed | scanner->after_line_break << 1 | scanner->joined_line << 2 |
-                            scanner->split_continuation << 3 | scanner->split_continuation_in_word << 4 |
-                            scanner->split_continuation_in_regex << 5 | scanner->closer_line_string_opened << 6 |
-                            scanner->heredoc_line_start << 7);
-    memcpy(&buffer[size], &scanner->terminator_owed_closers, sizeof(scanner->terminator_owed_closers));
-    size += sizeof(scanner->terminator_owed_closers);
-    memcpy(&buffer[size], &scanner->regex_depth, sizeof(scanner->regex_depth));
-    size += sizeof(scanner->regex_depth);
-    memcpy(&buffer[size], &scanner->backtick_regex_depth, sizeof(scanner->backtick_regex_depth));
-    size += sizeof(scanner->backtick_regex_depth);
-    uint16_t closer_count = (uint16_t)scanner->closers.size;
-    memcpy(&buffer[size], &closer_count, sizeof(closer_count));
-    size += sizeof(closer_count);
-    if (scanner->closers.size > 0) {
-        memcpy(&buffer[size], scanner->closers.contents, scanner->closers.size);
-        size += scanner->closers.size;
-        memcpy(&buffer[size], scanner->closer_regex_depths.contents, closer_count * sizeof(uint16_t));
-        size += closer_count * sizeof(uint16_t);
+    uint8_t flags = (uint8_t)(scanner->terminator_owed | scanner->after_line_break << 1 | scanner->joined_line << 2 |
+                              scanner->split_continuation << 3 | scanner->split_continuation_in_word << 4 |
+                              scanner->split_continuation_in_regex << 5 | scanner->closer_line_string_opened << 6 |
+                              scanner->heredoc_line_start << 7);
+    uint8_t sections = (scanner->backtick_depth > 0 ? SECTION_BACKTICK : 0) |
+                       (scanner->backtick_in_string ? SECTION_BACKTICK_IN_STRING : 0) |
+                       (scanner->separate_escape_column != 0 ? SECTION_SEPARATE_ESCAPE : 0) |
+                       (scanner->terminator_owed_closers != 0 ? SECTION_OWED_CLOSERS : 0) |
+                       (scanner->regex_depth != 0 ? SECTION_REGEX_DEPTH : 0) |
+                       (scanner->closers.size > 0 ? SECTION_CLOSERS : 0) |
+                       (scanner->heredocs.size > 0 ? SECTION_HEREDOCS : 0);
+    if (flags == 0 && sections == 0) {
+        return 0;
     }
+    unsigned size = 0;
+    buffer[size++] = (char)flags;
+    buffer[size++] = (char)sections;
+    if (sections & SECTION_BACKTICK) {
+        write_bytes(buffer, &size, &scanner->backtick_closers, sizeof(scanner->backtick_closers));
+        write_bytes(buffer, &size, &scanner->backtick_regex_depth, sizeof(scanner->backtick_regex_depth));
+    }
+    if (sections & SECTION_SEPARATE_ESCAPE) {
+        write_bytes(buffer, &size, &scanner->separate_escape_column, sizeof(scanner->separate_escape_column));
+    }
+    if (sections & SECTION_OWED_CLOSERS) {
+        write_bytes(buffer, &size, &scanner->terminator_owed_closers, sizeof(scanner->terminator_owed_closers));
+    }
+    if (sections & SECTION_REGEX_DEPTH) {
+        write_bytes(buffer, &size, &scanner->regex_depth, sizeof(scanner->regex_depth));
+    }
+    if (sections & SECTION_CLOSERS) {
+        uint16_t closer_count = (uint16_t)scanner->closers.size;
+        write_bytes(buffer, &size, &closer_count, sizeof(closer_count));
+        write_bytes(buffer, &size, scanner->closers.contents, closer_count);
+        write_bytes(buffer, &size, scanner->closer_regex_depths.contents, closer_count * sizeof(uint16_t));
+    }
+    return (sections & SECTION_HEREDOCS) ? serialize_heredocs(scanner, buffer, size) : size;
+}
+
+static unsigned serialize_heredocs(Scanner *scanner, char *buffer, unsigned size) {
     buffer[size++] = (char)scanner->heredocs.size;
     for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i);
         buffer[size++] = (char)heredoc->is_raw;
         buffer[size++] = (char)heredoc->allows_indent;
         buffer[size++] = (char)(heredoc->started | heredoc->deferred << 1);
-        memcpy(&buffer[size], &heredoc->depth, sizeof(heredoc->depth));
-        size += sizeof(heredoc->depth);
+        write_bytes(buffer, &size, &heredoc->depth, sizeof(heredoc->depth));
         uint16_t length = (uint16_t)heredoc->delimiter.size;
-        memcpy(&buffer[size], &length, sizeof(length));
-        size += sizeof(length);
+        write_bytes(buffer, &size, &length, sizeof(length));
         for (uint32_t j = 0; j < heredoc->delimiter.size; j++) {
             size += encode_varint(*array_get(&heredoc->delimiter, j), &buffer[size]);
         }
@@ -3306,48 +3293,88 @@ unsigned tree_sitter_bash_external_scanner_serialize(void *payload, char *buffer
     return size;
 }
 
+static void write_bytes(char *buffer, unsigned *size, const void *src, unsigned count) {
+    memcpy(&buffer[*size], src, count);
+    *size += count;
+}
+
 void tree_sitter_bash_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {
     Scanner *scanner = (Scanner *)payload;
     scanner_reset(scanner);
-    if (length < SCANNER_HEADER_SIZE) {
+    if (length < 2) {
         return;
     }
-    unsigned size = 0;
-    scanner->backtick_depth = (uint8_t)buffer[size] & 0x7f;
-    scanner->backtick_in_string = ((uint8_t)buffer[size++] & 0x80) != 0;
-    memcpy(&scanner->separate_escape_column, &buffer[size], sizeof(scanner->separate_escape_column));
-    size += sizeof(scanner->separate_escape_column);
-    memcpy(&scanner->backtick_closers, &buffer[size], sizeof(scanner->backtick_closers));
-    size += sizeof(scanner->backtick_closers);
-    scanner->terminator_owed = buffer[size] & 1;
-    scanner->after_line_break = (buffer[size] & 2) != 0;
-    scanner->joined_line = (buffer[size] & 4) != 0;
-    scanner->split_continuation = (buffer[size] & 8) != 0;
-    scanner->split_continuation_in_word = (buffer[size] & 16) != 0;
-    scanner->split_continuation_in_regex = (buffer[size] & 32) != 0;
-    scanner->closer_line_string_opened = (buffer[size] & 64) != 0;
-    scanner->heredoc_line_start = (buffer[size++] & 128) != 0;
-    memcpy(&scanner->terminator_owed_closers, &buffer[size], sizeof(scanner->terminator_owed_closers));
-    size += sizeof(scanner->terminator_owed_closers);
-    memcpy(&scanner->regex_depth, &buffer[size], sizeof(scanner->regex_depth));
-    size += sizeof(scanner->regex_depth);
-    memcpy(&scanner->backtick_regex_depth, &buffer[size], sizeof(scanner->backtick_regex_depth));
-    size += sizeof(scanner->backtick_regex_depth);
+    uint8_t flags = (uint8_t)buffer[0];
+    uint8_t sections = (uint8_t)buffer[1];
+    scanner->terminator_owed = (flags & 1) != 0;
+    scanner->after_line_break = (flags & 2) != 0;
+    scanner->joined_line = (flags & 4) != 0;
+    scanner->split_continuation = (flags & 8) != 0;
+    scanner->split_continuation_in_word = (flags & 16) != 0;
+    scanner->split_continuation_in_regex = (flags & 32) != 0;
+    scanner->closer_line_string_opened = (flags & 64) != 0;
+    scanner->heredoc_line_start = (flags & 128) != 0;
+    scanner->backtick_depth = (sections & SECTION_BACKTICK) != 0;
+    scanner->backtick_in_string = (sections & SECTION_BACKTICK_IN_STRING) != 0;
+    unsigned size = 2;
+    if (!deserialize_scalars(scanner, sections, buffer, length, &size)) {
+        return;
+    }
+    if ((sections & SECTION_CLOSERS) && !deserialize_closers(scanner, buffer, length, &size)) {
+        return;
+    }
+    if (sections & SECTION_HEREDOCS) {
+        deserialize_heredocs(scanner, buffer, length, size);
+    }
+}
+
+static bool deserialize_scalars(Scanner *scanner, uint8_t sections, const char *buffer, unsigned length, unsigned *size) {
+    if ((sections & SECTION_BACKTICK) &&
+        (!read_bytes(&scanner->backtick_closers, sizeof(scanner->backtick_closers), buffer, length, size) ||
+         !read_bytes(&scanner->backtick_regex_depth, sizeof(scanner->backtick_regex_depth), buffer, length, size))) {
+        return false;
+    }
+    if ((sections & SECTION_SEPARATE_ESCAPE) &&
+        !read_bytes(&scanner->separate_escape_column, sizeof(scanner->separate_escape_column), buffer, length, size)) {
+        return false;
+    }
+    if ((sections & SECTION_OWED_CLOSERS) &&
+        !read_bytes(&scanner->terminator_owed_closers, sizeof(scanner->terminator_owed_closers), buffer, length, size)) {
+        return false;
+    }
+    return !(sections & SECTION_REGEX_DEPTH) ||
+           read_bytes(&scanner->regex_depth, sizeof(scanner->regex_depth), buffer, length, size);
+}
+
+static bool deserialize_closers(Scanner *scanner, const char *buffer, unsigned length, unsigned *size) {
     uint16_t closer_count;
-    memcpy(&closer_count, &buffer[size], sizeof(closer_count));
-    size += sizeof(closer_count);
-    if (size + CLOSER_SIZE * closer_count >= length) {
-        return;
+    if (!read_bytes(&closer_count, sizeof(closer_count), buffer, length, size) || closer_count == 0 ||
+        *size + CLOSER_SIZE * closer_count > length) {
+        return false;
     }
-    if (closer_count > 0) {
-        array_reserve(&scanner->closers, closer_count);
-        memcpy(scanner->closers.contents, &buffer[size], closer_count);
-        scanner->closers.size = closer_count;
-        size += closer_count;
-        array_reserve(&scanner->closer_regex_depths, closer_count);
-        memcpy(scanner->closer_regex_depths.contents, &buffer[size], closer_count * sizeof(uint16_t));
-        scanner->closer_regex_depths.size = closer_count;
-        size += closer_count * sizeof(uint16_t);
+    array_reserve(&scanner->closers, closer_count);
+    memcpy(scanner->closers.contents, &buffer[*size], closer_count);
+    scanner->closers.size = closer_count;
+    *size += closer_count;
+    array_reserve(&scanner->closer_regex_depths, closer_count);
+    memcpy(scanner->closer_regex_depths.contents, &buffer[*size], closer_count * sizeof(uint16_t));
+    scanner->closer_regex_depths.size = closer_count;
+    *size += closer_count * sizeof(uint16_t);
+    return true;
+}
+
+static bool read_bytes(void *dest, unsigned count, const char *buffer, unsigned length, unsigned *size) {
+    if (*size + count > length) {
+        return false;
+    }
+    memcpy(dest, &buffer[*size], count);
+    *size += count;
+    return true;
+}
+
+static void deserialize_heredocs(Scanner *scanner, const char *buffer, unsigned length, unsigned size) {
+    if (size >= length) {
+        return;
     }
     uint8_t count = (uint8_t)buffer[size++];
     for (uint8_t i = 0; i < count && size + HEREDOC_HEADER_SIZE <= length; i++) {
@@ -3385,5 +3412,18 @@ static bool scan_comment(TSLexer *lexer, bool backquotes) {
     }
     lexer->mark_end(lexer);
     lexer->result_symbol = backquotes ? BACKTICK_COMMENT : JOINED_COMMENT;
+    return true;
+}
+
+static bool close_backtick(Scanner *scanner, TSLexer *lexer) {
+    advance(lexer);
+    lexer->mark_end(lexer);
+    scanner->backtick_depth--;
+    scanner->backtick_in_string = false;
+    scanner->regex_depth = scanner->backtick_regex_depth;
+    scanner->backtick_closers = 0;
+    scanner->backtick_regex_depth = 0;
+    discard_unstarted_heredocs(scanner);
+    lexer->result_symbol = BACKTICK_CLOSE;
     return true;
 }
