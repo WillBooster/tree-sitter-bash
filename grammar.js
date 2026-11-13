@@ -880,8 +880,8 @@ module.exports = grammar({
       ),
 
     // Text led by a blank outranks `}`: otherwise the lexer, having consumed the blank as the start of
-    // text, extends it into a `}` token that swallows the blank (`${x:- }`), which a reparse after an
-    // edit does not reproduce, and the blank, which bash expands, would be lost.
+    // text, extends it into a `}` token that swallows the blank (`${x:- }`), losing the blank that bash
+    // expands.
     _blank_expansion_text: () => token(prec(1, seq(/[ \t\n]/, repeat(choice(...expansionTextUnits()))))),
 
     // A `<` or `>` that the text above cannot end with, e.g. before `}`. A single character, so that a

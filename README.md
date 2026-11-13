@@ -17,20 +17,20 @@ As a result, its syntax trees differ from the original grammar's.
 ## Support Scope
 
 This fork maintains only full parsing: valid input yields a correct tree, and invalid input yields `ERROR` or `MISSING`
-nodes without crashing, hanging, or taking more than linear time. Incremental parsing works as in upstream tree-sitter
-but is not tested here, and no queries (highlights, locals, injections, tags) are shipped. Node types, field names, and
-the trees that error recovery produces may change; such changes are released as new major versions.
+nodes without crashing, hanging, or taking more than linear time. Incremental parsing is not supported, and no queries
+(highlights, locals, injections, tags) are shipped. Node types, field names, and the trees that error recovery produces
+may change; such changes are released as new major versions.
 
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm`, targeting and tested with
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 19.1.1 or later in the 19.x series,
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 20.0.0 or later in the 20.x series,
 a peer dependency.
 The parser carries the ABI number of WillBooster/tree-sitter (`0x5742000c`), so only that runtime loads it; the
 original tree-sitter runtime rejects it, and earlier WillBooster runtime ABIs do too:
 
 ```sh
-npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter@^19.1.1
+npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter@^20.0.0
 ```
 
 In Node.js and Bun, load the grammar from its path:
@@ -75,7 +75,7 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the node types in `src/node-types.json`.
 
-Upgrade `@willbooster/web-tree-sitter` to 19.1.1 or later in the 19.x series when upgrading this package. Recovery trees
+Upgrade `@willbooster/web-tree-sitter` to 20.0.0 or later in the 20.x series when upgrading this package. Recovery trees
 for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
 `ERROR` nodes.
 

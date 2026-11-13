@@ -32,14 +32,6 @@ jobs:
           ref: ${{ steps.runtime.outputs.ref }}
           path: .tmp/tree-sitter
           persist-credentials: false
-      # tree-sitter/fuzz-action can only build upstream's runtime, so only its harness is used. Its nonnull ignorelist
-      # masks empty scanner-array copies; omit it and make UBSan fatal so those regressions fail this job.
-      - uses: actions/checkout@v7.0.1
-        with:
-          repository: tree-sitter/fuzz-action
-          ref: v4
-          path: .tmp/fuzz-action
-          persist-credentials: false
       - run: |
           mkdir -p .tmp/fuzz-seeds
           script/fuzz-seeds .tmp/fuzz-seeds $(find test/corpus -name '*.txt' | LC_ALL=C sort)
@@ -53,12 +45,34 @@ jobs:
         run: |
           jq '.. | select((.type? == "STRING" or (.type? == "ALIAS" and .named? == false)) and .value? != "") | .value' \
             src/grammar.json | grep -v '\\' | iconv -c -f UTF-8 -t ASCII//TRANSLIT > .tmp/fuzz-dict
-          # Like tree-sitter/fuzz-action, only the grammar is instrumented, not the runtime.
+          cat << 'EOF' > .tmp/fuzzer.c
+          #include <assert.h>
+          #include <stddef.h>
+          #include <stdint.h>
+          #include <tree_sitter/api.h>
+
+          #ifndef TS_LANG
+          #error TS_LANG must be defined
+          #endif
+
+          const TSLanguage *TS_LANG(void);
+
+          int LLVMFuzzerTestOneInput(const uint8_t *data, const size_t len) {
+            TSParser *parser = ts_parser_new();
+            assert(ts_parser_set_language(parser, TS_LANG()));
+            TSTree *tree = ts_parser_parse_string(parser, (const char *)data, len);
+            ts_tree_delete(tree);
+            ts_parser_delete(parser);
+            return 0;
+          }
+          EOF
+          # Only the grammar is instrumented, not the runtime. Omit tree-sitter/fuzz-action's nonnull ignorelist, which
+          # masks empty scanner-array copies, and make UBSan fatal so those regressions fail this job.
           clang -std=c11 -Og -g -c -D_POSIX_C_SOURCE=200112L -D_DEFAULT_SOURCE -I.tmp/tree-sitter/lib/include \
             -I.tmp/tree-sitter/lib/src .tmp/tree-sitter/lib/src/lib.c -o .tmp/tree-sitter.o
           clang -std=c11 -Og -g -fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined \
             -I.tmp/tree-sitter/lib/include -Isrc \
-            -DTS_LANG="tree_sitter_$(jq -r .name src/grammar.json)" .tmp/fuzz-action/fuzzer.c src/parser.c \
+            -DTS_LANG="tree_sitter_$(jq -r .name src/grammar.json)" .tmp/fuzzer.c src/parser.c \
             $(ls src/scanner.c 2> /dev/null) .tmp/tree-sitter.o -o .tmp/fuzzer
       - name: Fuzz
         run: |
