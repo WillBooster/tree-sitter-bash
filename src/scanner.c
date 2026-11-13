@@ -2977,8 +2977,8 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
             lexer->result_symbol = CLOSER_LINE_RAW_STRING_START;
             return true;
         }
-        // A `#` begins a word, and so a comment, after a blank, an operator, or a compound command (`(x)#c`),
-        // where neither another word part nor a command may start; right after a word part it continues the word.
+        // A `#` begins a word, and so a comment, after a blank, where a command may start (as after `;` or `(`),
+        // or where no word part may follow (as after `(x)` in `(x)#c`); right after a word part it continues the word.
         bool in_word = valid_symbols[BARE_DOLLAR] && !valid_symbols[VARIABLE_NAME];
         if (lexer->lookahead == '#' && (is_blank(first) || !in_word) && scanner->joined_line &&
             valid_symbols[JOINED_COMMENT]) {
