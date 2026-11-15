@@ -26,6 +26,7 @@ test.each([
   ['unfinished arithmetic openers', (words: number) => 'echo $((1+\n'.repeat(words / 4) + '1\n', true],
   ['words that concatenate with strings', (words: number) => `echo ${'a"b"; '.repeat(words)}\n`],
   ['a line after a line continuation', (words: number) => `x \\\n${'a"b" '.repeat(words)}\n`],
+  ['open heredoc bodies with expansions', (words: number) => `cat <<EOF\n${'$x '.repeat(words)}\nEOF\n`],
 ])('parses large %s inputs with proportional growth', { timeout: 60_000 }, (_, script, expectedError = false) => {
   const small = script(4000);
   const large = script(40_000);

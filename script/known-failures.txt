@@ -29,6 +29,8 @@ examples/wild-corpus/freebsd-11.1/usr.bin/uudecode/tests/regress.sh
 examples/wild-corpus/freebsd-11.1/usr.bin/uuencode/tests/regress.sh
 examples/wild-corpus/freebsd-11.1/usr.bin/xargs/tests/regress.sh
 examples/wild-corpus/git/t/t0200/test.sh
+examples/wild-corpus/git/t/t4201-shortlog.sh
+examples/wild-corpus/git/t/t7813-grep-icase-iso.sh
 examples/wild-corpus/gnu/glibc-2.23/posix/globtest.sh
 examples/wild-corpus/gnu/glibc-2.23/posix/tst-getconf.sh
 examples/wild-corpus/hg-other/eigen/bench/perf_monitoring/gemm/run.sh
