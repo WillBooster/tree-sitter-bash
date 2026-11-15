@@ -66,11 +66,13 @@ typedef struct {
     // bash then reads this body right after that line, wherever the line ends.
     bool deferred;
     uint16_t depth;
-    CodePoints delimiter;
+    uint16_t delimiter_length;
+    uint32_t delimiter_offset;
 } Heredoc;
 
 typedef struct {
     Array(Heredoc) heredocs;
+    CodePoints heredoc_delimiters;
     // Inside backquotes an unescaped backquote always closes the substitution, so the depth decides
     // whether a backquote opens or closes one.
     uint8_t backtick_depth;
@@ -337,25 +339,26 @@ enum {
 #define CLOSER_SIZE (1 + sizeof(uint16_t))
 #define HEREDOC_HEADER_SIZE (3 + 2 * sizeof(uint16_t))
 
+static inline const int32_t *heredoc_delimiter(const Scanner *scanner, const Heredoc *heredoc) {
+    return heredoc->delimiter_length ? scanner->heredoc_delimiters.contents + heredoc->delimiter_offset : NULL;
+}
+
 static unsigned serialized_size(Scanner *scanner) {
     unsigned size = SCANNER_HEADER_SIZE + CLOSER_SIZE * scanner->closers.size + 1;
     for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i);
+        const int32_t *delimiter = heredoc_delimiter(scanner, heredoc);
         size += HEREDOC_HEADER_SIZE;
-        for (uint32_t j = 0; j < heredoc->delimiter.size; j++) {
-            size += varint_length(*array_get(&heredoc->delimiter, j));
+        for (uint16_t j = 0; j < heredoc->delimiter_length; j++) {
+            size += varint_length(delimiter[j]);
         }
     }
     return size;
 }
 
-static void heredoc_delete(Heredoc *heredoc) { array_delete(&heredoc->delimiter); }
-
 static void scanner_reset(Scanner *scanner) {
-    for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
-        heredoc_delete(array_get(&scanner->heredocs, i));
-    }
     array_clear(&scanner->heredocs);
+    array_clear(&scanner->heredoc_delimiters);
     scanner->backtick_depth = 0;
     scanner->backtick_in_string = false;
     scanner->separate_escape_column = 0;
@@ -408,7 +411,9 @@ static int32_t next_heredoc_index(Scanner *scanner) {
 }
 
 // An entry without a delimiter belongs to an operator whose delimiter was rejected.
-static inline bool is_rejected(Heredoc *heredoc) { return heredoc->delimiter.size == 0 && !heredoc->is_raw; }
+static inline bool is_rejected(const Heredoc *heredoc) { return heredoc->delimiter_length == 0 && !heredoc->is_raw; }
+
+static void remove_heredoc(Scanner *scanner, uint32_t index);
 
 // Drops the unstarted heredocs at the current depth, which were all queued on the line just ended.
 static void drop_unstarted_heredocs_at_depth(Scanner *scanner) {
@@ -416,15 +421,9 @@ static void drop_unstarted_heredocs_at_depth(Scanner *scanner) {
     for (uint32_t i = scanner->heredocs.size; i > 0; i--) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i - 1);
         if (!heredoc->started && !heredoc->deferred && heredoc->depth == depth) {
-            heredoc_delete(heredoc);
-            array_erase(&scanner->heredocs, i - 1);
+            remove_heredoc(scanner, i - 1);
         }
     }
-}
-
-static void remove_heredoc(Scanner *scanner, uint32_t index) {
-    heredoc_delete(array_get(&scanner->heredocs, index));
-    array_erase(&scanner->heredocs, index);
 }
 
 // Like bash, drop the heredocs of a substitution that closes before their bodies started.
@@ -438,77 +437,19 @@ static void discard_unstarted_heredocs(Scanner *scanner) {
     }
 }
 
+static void remove_heredoc(Scanner *scanner, uint32_t index) {
+    array_erase(&scanner->heredocs, index);
+    if (scanner->heredocs.size == 0) {
+        array_clear(&scanner->heredoc_delimiters);
+    }
+}
+
 typedef enum { LINE_CONTINUES_BODY, LINE_ENDS_BODY, LINE_ENDS_AT_CLOSER } LineEnd;
 
-// Reads a line of a deferred body in a substitution up to its newline, and reports whether, as in
-// `scan_heredoc_content`, it is the delimiter line or a line starting with the delimiter and holding a `)`.
-static LineEnd scan_deferred_body_line(TSLexer *lexer, Heredoc *heredoc) {
-    uint32_t matched = 0;
-    for (;;) {
-        if (matched == 0 && heredoc->allows_indent && lexer->lookahead == '\t') {
-            advance(lexer);
-        } else if (lexer->lookahead == '\\' && !heredoc->is_raw) {
-            advance(lexer);
-            if (lexer->lookahead != '\n') {
-                break;
-            }
-            advance(lexer);
-        } else if (matched < heredoc->delimiter.size && !lexer->eof(lexer) && lexer->lookahead != '\n' &&
-                   lexer->lookahead == *array_get(&heredoc->delimiter, matched)) {
-            advance(lexer);
-            matched++;
-        } else {
-            break;
-        }
-    }
-    bool prefix = matched == heredoc->delimiter.size;
-    if (prefix && (lexer->lookahead == '\n' || lexer->eof(lexer))) {
-        return LINE_ENDS_BODY;
-    }
-    bool closer = false;
-    while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
-        closer = closer || lexer->lookahead == ')';
-        bool backslash = lexer->lookahead == '\\' && !heredoc->is_raw;
-        advance(lexer);
-        if (backslash && !lexer->eof(lexer)) {
-            closer = closer || (prefix && lexer->lookahead == ')');
-            advance(lexer);
-        }
-    }
-    return prefix && closer && heredoc->delimiter.size > 0 ? LINE_ENDS_AT_CLOSER : LINE_CONTINUES_BODY;
-}
-
-// Looks from the rest of the line that ended a body at the substitution's `)` through the deferred bodies after
-// it, and reports whether one of them ends at a line holding a `)`.
-static bool deferred_body_ends_at_closer_line(Scanner *scanner, TSLexer *lexer) {
-    while (!lexer->eof(lexer) && lexer->lookahead != '\n') {
-        bool backslash = lexer->lookahead == '\\';
-        advance(lexer);
-        if (backslash && scanner->joined_line && lexer->lookahead == '\n') {
-            advance(lexer);
-        }
-    }
-    for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
-        Heredoc *heredoc = array_get(&scanner->heredocs, i);
-        if (!heredoc->deferred || heredoc->started) {
-            continue;
-        }
-        for (;;) {
-            if (lexer->eof(lexer)) {
-                return false;
-            }
-            advance(lexer);
-            LineEnd end = scan_deferred_body_line(lexer, heredoc);
-            if (end == LINE_ENDS_AT_CLOSER) {
-                return true;
-            }
-            if (end == LINE_ENDS_BODY) {
-                break;
-            }
-        }
-    }
-    return false;
-}
+static bool deferred_body_ends_at_closer_line(Scanner *scanner, TSLexer *lexer);
+static void skip_closer_line_remainder(const Scanner *scanner, TSLexer *lexer);
+static LineEnd scan_deferred_body_line(const Scanner *scanner, TSLexer *lexer, const Heredoc *heredoc);
+static uint32_t match_deferred_delimiter_prefix(const Scanner *scanner, TSLexer *lexer, const Heredoc *heredoc);
 
 // Ends a body at a line that holds the substitution's `)`. Like bash, the bodies still queued on the line
 // that began this one are then read right after that line, and the rest of the line is read without its
@@ -530,6 +471,85 @@ static void end_heredoc_at_closer_line(Scanner *scanner, TSLexer *lexer, uint32_
     scanner->terminator_owed_closers =
         in_parenthesized && deferred_body_ends_at_closer_line(scanner, lexer) ? (uint16_t)scanner->closers.size : 0;
     remove_heredoc(scanner, index);
+}
+
+// Looks from the rest of the line that ended a body at the substitution's `)` through the deferred bodies after
+// it, and reports whether one of them ends at a line holding a `)`.
+static bool deferred_body_ends_at_closer_line(Scanner *scanner, TSLexer *lexer) {
+    skip_closer_line_remainder(scanner, lexer);
+    for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
+        Heredoc *heredoc = array_get(&scanner->heredocs, i);
+        if (!heredoc->deferred || heredoc->started) {
+            continue;
+        }
+        for (;;) {
+            if (at_eof(lexer)) {
+                return false;
+            }
+            advance(lexer);
+            LineEnd end = scan_deferred_body_line(scanner, lexer, heredoc);
+            if (end == LINE_ENDS_AT_CLOSER) {
+                return true;
+            }
+            if (end == LINE_ENDS_BODY) {
+                break;
+            }
+        }
+    }
+    return false;
+}
+
+static void skip_closer_line_remainder(const Scanner *scanner, TSLexer *lexer) {
+    while (!at_eof(lexer) && lexer->lookahead != '\n') {
+        bool backslash = lexer->lookahead == '\\';
+        advance(lexer);
+        if (backslash && scanner->joined_line && lexer->lookahead == '\n') {
+            advance(lexer);
+        }
+    }
+}
+
+// Reads a line of a deferred body in a substitution up to its newline, and reports whether, as in
+// `scan_heredoc_content`, it is the delimiter line or a line starting with the delimiter and holding a `)`.
+static LineEnd scan_deferred_body_line(const Scanner *scanner, TSLexer *lexer, const Heredoc *heredoc) {
+    bool prefix = match_deferred_delimiter_prefix(scanner, lexer, heredoc) == heredoc->delimiter_length;
+    if (prefix && (lexer->lookahead == '\n' || at_eof(lexer))) {
+        return LINE_ENDS_BODY;
+    }
+    bool closer = false;
+    while (!at_eof(lexer) && lexer->lookahead != '\n') {
+        closer = closer || lexer->lookahead == ')';
+        bool backslash = lexer->lookahead == '\\' && !heredoc->is_raw;
+        advance(lexer);
+        if (backslash && !at_eof(lexer)) {
+            closer = closer || (prefix && lexer->lookahead == ')');
+            advance(lexer);
+        }
+    }
+    return prefix && closer && heredoc->delimiter_length > 0 ? LINE_ENDS_AT_CLOSER : LINE_CONTINUES_BODY;
+}
+
+static uint32_t match_deferred_delimiter_prefix(const Scanner *scanner, TSLexer *lexer, const Heredoc *heredoc) {
+    const int32_t *delimiter = heredoc_delimiter(scanner, heredoc);
+    uint32_t matched = 0;
+    for (;;) {
+        if (matched == 0 && heredoc->allows_indent && lexer->lookahead == '\t') {
+            advance(lexer);
+        } else if (lexer->lookahead == '\\' && !heredoc->is_raw) {
+            advance(lexer);
+            if (lexer->lookahead != '\n') {
+                break;
+            }
+            advance(lexer);
+        } else if (matched < heredoc->delimiter_length && !at_eof(lexer) && lexer->lookahead != '\n' &&
+                   lexer->lookahead == delimiter[matched]) {
+            advance(lexer);
+            matched++;
+        } else {
+            break;
+        }
+    }
+    return matched;
 }
 
 // Whether a deferred body waits for the end of the line that ended a body at the substitution's `)`. That
@@ -1665,6 +1685,7 @@ static bool scan_substitution_start_after_dollar(Scanner *scanner, TSLexer *lexe
 // expansion so that the parser can read it.
 static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t index, bool at_line_start, const bool *valid_symbols) {
     Heredoc *heredoc = array_get(&scanner->heredocs, index);
+    const int32_t *delimiter = heredoc_delimiter(scanner, heredoc);
     // Bash reads a deferred body from the input after its line, never from the text of backquotes that the
     // line opened, so a backquote in it is literal.
     bool in_backquotes = scanner->backtick_depth > 0 && !heredoc->deferred;
@@ -1711,11 +1732,11 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
                         break;
                     }
                     advance(lexer);
-                } else if (matched < heredoc->delimiter.size && !at_eof(lexer) && lexer->lookahead != '\n' &&
-                           lexer->lookahead == *array_get(&heredoc->delimiter, matched)) {
+                } else if (matched < heredoc->delimiter_length && !at_eof(lexer) && lexer->lookahead != '\n' &&
+                           lexer->lookahead == delimiter[matched]) {
                     advance(lexer);
                     matched++;
-                    if (matched == heredoc->delimiter.size && in_parenthesized) {
+                    if (matched == heredoc->delimiter_length && in_parenthesized) {
                         if (did_advance) {
                             scanner->heredoc_line_start = true;
                             lexer->result_symbol = HEREDOC_CONTENT;
@@ -1733,7 +1754,7 @@ static bool scan_heredoc_content(Scanner *scanner, TSLexer *lexer, uint32_t inde
             bool ends_line = lexer->lookahead == '\n' || at_eof(lexer) ||
                              (scanner->closers.size > 0 && lexer->lookahead == substitution_closer(*array_back(&scanner->closers))) ||
                              (lexer->lookahead == '`' && in_backquotes);
-            if (!escaped && matched == heredoc->delimiter.size && ends_line) {
+            if (!escaped && matched == heredoc->delimiter_length && ends_line) {
                 if (did_advance) {
                     scanner->heredoc_line_start = true;
                     lexer->result_symbol = HEREDOC_CONTENT;
@@ -1916,7 +1937,7 @@ static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool literal_inv
     }
     if (c == 'c') {
         advance(lexer);
-        if (!lexer->eof(lexer)) {
+        if (!at_eof(lexer)) {
             array_push(out, lexer->lookahead & 0x1F);
             advance(lexer);
         }
@@ -1925,9 +1946,19 @@ static void push_ansi_c_escape(TSLexer *lexer, CodePoints *out, bool literal_inv
     array_push(out, '\\');
 }
 
+static void scan_quoted_heredoc_delimiter(Scanner *scanner, TSLexer *lexer, int32_t *quote, bool ansi_c);
+static bool scan_unquoted_heredoc_delimiter(Scanner *scanner, TSLexer *lexer, Heredoc *heredoc, int32_t *quote,
+                                            bool *ansi_c);
+static bool reject_heredoc_start(Scanner *scanner, Heredoc *heredoc, uint32_t offset);
+
 static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
     Heredoc *heredoc = array_back(&scanner->heredocs);
-    array_clear(&heredoc->delimiter);
+    if (heredoc->delimiter_offset + heredoc->delimiter_length == scanner->heredoc_delimiters.size) {
+        scanner->heredoc_delimiters.size = heredoc->delimiter_offset;
+    }
+    uint32_t offset = scanner->heredoc_delimiters.size;
+    heredoc->delimiter_offset = offset;
+    heredoc->delimiter_length = 0;
     heredoc->is_raw = false;
 
     while (is_blank(lexer->lookahead)) {
@@ -1936,87 +1967,101 @@ static bool scan_heredoc_start(Scanner *scanner, TSLexer *lexer) {
 
     int32_t quote = 0;
     bool ansi_c = false;
-    while (!lexer->eof(lexer)) {
-        int32_t c = lexer->lookahead;
+    while (!at_eof(lexer)) {
         if (quote) {
-            advance(lexer);
-            if (c == quote) {
-                quote = 0;
-                continue;
-            }
-            if (scanner->joined_line && c == '\\' && lexer->lookahead == '\n') {
-                advance(lexer);
-                continue;
-            }
-            if (scanner->joined_line && quote == '\'' && !ansi_c && c == '\\' && lexer->lookahead != '\'' &&
-                !lexer->eof(lexer)) {
-                // The character after a backslash is kept as it is, so it cannot begin a line continuation.
-                array_push(&heredoc->delimiter, c);
-                c = lexer->lookahead;
-                advance(lexer);
-            } else if (ansi_c && c == '\\') {
-                if (!lexer->eof(lexer)) {
-                    push_ansi_c_escape(lexer, &heredoc->delimiter, true);
-                }
-                continue;
-            }
-            // Inside double quotes a backslash-newline still only continues the line.
-            if (quote == '"' && c == '\\' && lexer->lookahead == '\n') {
-                advance(lexer);
-                continue;
-            }
-            if (quote == '"' && c == '\\' &&
-                (lexer->lookahead == '$' || lexer->lookahead == '`' || lexer->lookahead == '"' ||
-                 lexer->lookahead == '\\')) {
-                c = lexer->lookahead;
-                advance(lexer);
-            }
-            array_push(&heredoc->delimiter, c);
-            continue;
-        }
-        // Inside backquotes an unquoted backquote closes the substitution; at top level it is part of
-        // the word (`<<EO`true`F`).
-        if (is_separator(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
+            scan_quoted_heredoc_delimiter(scanner, lexer, &quote, ansi_c);
+        } else if (!scan_unquoted_heredoc_delimiter(scanner, lexer, heredoc, &quote, &ansi_c)) {
             break;
         }
-        advance(lexer);
-        if (c == '$' && (lexer->lookahead == '\'' || lexer->lookahead == '"')) {
-            // `$'...'` and `$"..."` are quoting constructs, so their `$` is not part of the word.
-            c = lexer->lookahead;
-            advance(lexer);
-            quote = c;
-            ansi_c = c == '\'';
-            heredoc->is_raw = true;
-        } else if (c == '\'' || c == '"') {
-            quote = c;
-            ansi_c = false;
-            heredoc->is_raw = true;
-        } else if (c == '\\') {
-            // A backslash-newline only continues the line; any other backslash quotes the delimiter.
-            if (lexer->lookahead == '\n') {
-                advance(lexer);
-            } else if (!lexer->eof(lexer)) {
-                heredoc->is_raw = true;
-                array_push(&heredoc->delimiter, lexer->lookahead);
-                advance(lexer);
-            }
-        } else {
-            // Bash counts a backquote in the delimiter word as quoting, so the body stays literal.
-            if (c == '`') {
-                heredoc->is_raw = true;
-            }
-            array_push(&heredoc->delimiter, c);
+        if (scanner->heredoc_delimiters.size - offset > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
+            return reject_heredoc_start(scanner, heredoc, offset);
         }
     }
 
+    heredoc->delimiter_length = (uint16_t)(scanner->heredoc_delimiters.size - offset);
     // A heredoc whose state cannot be serialized in full is rejected, so the parse shows an error
     // rather than comparing against a partial delimiter.
-    if ((heredoc->delimiter.size == 0 && !heredoc->is_raw) ||
+    if ((heredoc->delimiter_length == 0 && !heredoc->is_raw) ||
         serialized_size(scanner) > TREE_SITTER_SERIALIZATION_BUFFER_SIZE) {
-        return false;
+        return reject_heredoc_start(scanner, heredoc, offset);
     }
     lexer->mark_end(lexer);
     lexer->result_symbol = HEREDOC_START;
+    return true;
+}
+
+static bool reject_heredoc_start(Scanner *scanner, Heredoc *heredoc, uint32_t offset) {
+    scanner->heredoc_delimiters.size = offset;
+    heredoc->delimiter_length = 0;
+    heredoc->is_raw = false;
+    return false;
+}
+
+static void scan_quoted_heredoc_delimiter(Scanner *scanner, TSLexer *lexer, int32_t *quote, bool ansi_c) {
+    int32_t c = lexer->lookahead;
+    advance(lexer);
+    if (c == *quote) {
+        *quote = 0;
+        return;
+    }
+    if (c == '\\' && (scanner->joined_line || *quote == '"') && lexer->lookahead == '\n') {
+        advance(lexer);
+        return;
+    }
+    if (scanner->joined_line && *quote == '\'' && !ansi_c && c == '\\' && lexer->lookahead != '\'' && !at_eof(lexer)) {
+        // The character after a backslash is kept as it is, so it cannot begin a line continuation.
+        array_push(&scanner->heredoc_delimiters, c);
+        c = lexer->lookahead;
+        advance(lexer);
+    } else if (ansi_c && c == '\\') {
+        if (!at_eof(lexer)) {
+            push_ansi_c_escape(lexer, &scanner->heredoc_delimiters, true);
+        }
+        return;
+    } else if (*quote == '"' && c == '\\' &&
+               (lexer->lookahead == '$' || lexer->lookahead == '`' || lexer->lookahead == '"' ||
+                lexer->lookahead == '\\')) {
+        c = lexer->lookahead;
+        advance(lexer);
+    }
+    array_push(&scanner->heredoc_delimiters, c);
+}
+
+static bool scan_unquoted_heredoc_delimiter(Scanner *scanner, TSLexer *lexer, Heredoc *heredoc, int32_t *quote,
+                                            bool *ansi_c) {
+    int32_t c = lexer->lookahead;
+    // Inside backquotes an unquoted backquote closes the substitution; at top level it is part of
+    // the word (`<<EO`true`F`).
+    if (is_separator(c) || is_metacharacter(c) || (c == '`' && scanner->backtick_depth > 0)) {
+        return false;
+    }
+    advance(lexer);
+    if (c == '$' && (lexer->lookahead == '\'' || lexer->lookahead == '"')) {
+        // `$'...'` and `$"..."` are quoting constructs, so their `$` is not part of the word.
+        *quote = lexer->lookahead;
+        *ansi_c = *quote == '\'';
+        advance(lexer);
+        heredoc->is_raw = true;
+    } else if (c == '\'' || c == '"') {
+        *quote = c;
+        *ansi_c = false;
+        heredoc->is_raw = true;
+    } else if (c == '\\') {
+        // A backslash-newline only continues the line; any other backslash quotes the delimiter.
+        if (lexer->lookahead == '\n') {
+            advance(lexer);
+        } else if (!at_eof(lexer)) {
+            heredoc->is_raw = true;
+            array_push(&scanner->heredoc_delimiters, lexer->lookahead);
+            advance(lexer);
+        }
+    } else {
+        // Bash counts a backquote in the delimiter word as quoting, so the body stays literal.
+        if (c == '`') {
+            heredoc->is_raw = true;
+        }
+        array_push(&scanner->heredoc_delimiters, c);
+    }
     return true;
 }
 
@@ -2046,7 +2091,6 @@ static bool scan_heredoc_arrow_after_first(Scanner *scanner, TSLexer *lexer, con
         .allows_indent = allows_indent,
         .started = false,
         .depth = current_depth(scanner),
-        .delimiter = array_new(),
     };
     array_push(&scanner->heredocs, heredoc);
     lexer->result_symbol = allows_indent ? HEREDOC_ARROW_DASH : HEREDOC_ARROW;
@@ -2071,7 +2115,7 @@ static bool scan_regex(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
     bool did_advance = false;
     for (;;) {
         lexer->mark_end(lexer);
-        if (lexer->eof(lexer)) {
+        if (at_eof(lexer)) {
             break;
         }
         int32_t c = lexer->lookahead;
@@ -2100,7 +2144,7 @@ static bool scan_regex(Scanner *scanner, TSLexer *lexer, const bool *valid_symbo
                 break;
             }
         } else if (c == '\\') {
-            if (!lexer->eof(lexer)) {
+            if (!at_eof(lexer)) {
                 advance(lexer);
             }
         } else if (c == '(') {
@@ -2397,7 +2441,7 @@ static bool scan_name_or_extglob_prefix(Scanner *scanner, TSLexer *lexer, const 
         // Like bash, the subscript extends to the matching `]` across lines; without one the name
         // still starts an assignment, so the parse reports the missing `]`.
         uint32_t depth = 0;
-        while (!lexer->eof(lexer)) {
+        while (!at_eof(lexer)) {
             int32_t c = lexer->lookahead;
             if (c == '[') {
                 depth++;
@@ -2440,7 +2484,7 @@ static bool scan_timing_word(Scanner *scanner, TSLexer *lexer, const bool *valid
         while (lexer->lookahead == '\\') {
             advance(lexer);
             if (lexer->lookahead != '\n') {
-                if (joined || lexer->eof(lexer)) return false;
+                if (joined || at_eof(lexer)) return false;
                 advance(lexer);
                 return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(scanner, lexer, true);
             }
@@ -2454,7 +2498,7 @@ static bool scan_timing_word(Scanner *scanner, TSLexer *lexer, const bool *valid
         if (lexer->lookahead == '\\') {
             advance(lexer);
             if (lexer->lookahead != '\n') {
-                if (joined || lexer->eof(lexer)) return false;
+                if (joined || at_eof(lexer)) return false;
                 advance(lexer);
                 return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(scanner, lexer, true);
             }
@@ -2476,7 +2520,7 @@ static bool scan_timing_word(Scanner *scanner, TSLexer *lexer, const bool *valid
     while (lexer->lookahead == '\\') {
         advance(lexer);
         if (lexer->lookahead != '\n') {
-            if (joined || lexer->eof(lexer)) return false;
+            if (joined || at_eof(lexer)) return false;
             advance(lexer);
             return valid_symbols[EXTGLOB_PREFIX] && continue_extglob_prefix(scanner, lexer, true);
         }
@@ -2484,7 +2528,7 @@ static bool scan_timing_word(Scanner *scanner, TSLexer *lexer, const bool *valid
         joined = true;
     }
     if (!*word && valid_symbols[symbol] &&
-        (lexer->eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead) ||
+        (at_eof(lexer) || is_separator(lexer->lookahead) || is_metacharacter(lexer->lookahead) ||
          (lexer->lookahead == '`' && scanner->backtick_depth > 0))) {
         if (lexer->lookahead == '<' || lexer->lookahead == '>') {
             advance(lexer);
@@ -2545,19 +2589,39 @@ static bool is_closing_reserved_word(const char word[4]) {
     return false;
 }
 
+static bool consume_further_word_continuations(TSLexer *lexer, enum TokenType concat);
+
 // After a line continuation inside a word: bash removes every backslash-newline before it splits words, so
 // further continuations right after this one are part of the token (`a\` + `\` + `b` is `ab`), which is a
 // concatenation if the word continues on the next line. Otherwise the continuations themselves are the token,
 // so that whatever follows them is lexed as it would be without them.
 static bool finish_word_continuations(Scanner *scanner, TSLexer *lexer, enum TokenType concat, bool regex) {
-    int32_t c;
-    for (;;) {
-        c = lexer->lookahead;
-        if (c != '\\') {
-            break;
-        }
+    if (consume_further_word_continuations(lexer, concat)) {
+        return true;
+    }
+    int32_t c = lexer->lookahead;
+    if (c == '<' || c == '>') {
         advance(lexer);
-        if (lexer->eof(lexer)) {
+        if (lexer->lookahead == '(') {
+            lexer->result_symbol = concat;
+            return true;
+        }
+        scanner->after_line_break = true;
+        lexer->result_symbol = LINE_CONTINUATION;
+    } else if (at_eof(lexer) || (ends_word(c, regex) && !(regex && scanner->regex_depth > 0)) ||
+               (c == '`' && scanner->backtick_depth > 0)) {
+        scanner->after_line_break = true;
+        lexer->result_symbol = LINE_CONTINUATION;
+    } else {
+        lexer->result_symbol = concat;
+    }
+    return true;
+}
+
+static bool consume_further_word_continuations(TSLexer *lexer, enum TokenType concat) {
+    while (lexer->lookahead == '\\') {
+        advance(lexer);
+        if (at_eof(lexer)) {
             lexer->mark_end(lexer);
             lexer->result_symbol = LINE_CONTINUATION;
             return true;
@@ -2569,22 +2633,7 @@ static bool finish_word_continuations(Scanner *scanner, TSLexer *lexer, enum Tok
         advance(lexer);
         lexer->mark_end(lexer);
     }
-    if ((c == '<' || c == '>')) {
-        advance(lexer);
-        if (lexer->lookahead == '(') {
-            lexer->result_symbol = concat;
-            return true;
-        }
-        scanner->after_line_break = true;
-        lexer->result_symbol = LINE_CONTINUATION;
-    } else if (lexer->eof(lexer) || (ends_word(c, regex) && !(regex && scanner->regex_depth > 0)) ||
-               (c == '`' && scanner->backtick_depth > 0)) {
-        scanner->after_line_break = true;
-        lexer->result_symbol = LINE_CONTINUATION;
-    } else {
-        lexer->result_symbol = concat;
-    }
-    return true;
+    return false;
 }
 
 // Ends a line continuation's token at its backslash, since its newline ends the line after which a deferred
@@ -2602,8 +2651,11 @@ static bool finish_bare_dollar(TSLexer *lexer) {
     lexer->mark_end(lexer);
     int32_t c = lexer->lookahead;
     lexer->result_symbol = BARE_DOLLAR;
-    return lexer->eof(lexer) || !(starts_quoted_expansion(c) || c == '\'' || c == '"');
+    return at_eof(lexer) || !(starts_quoted_expansion(c) || c == '\'' || c == '"');
 }
+
+static StringStep step_closer_line_string_char(Scanner *scanner, TSLexer *lexer, int32_t c, bool ansi_c,
+                                               bool *line_open, bool did_advance);
 
 // The text of a single-quoted string on a line that ended a body at the substitution's `)`. Where the line
 // is joined, the text is split at its line continuations, which are tokens of their own, and, as when bash
@@ -2616,34 +2668,42 @@ static bool scan_closer_line_string_content(Scanner *scanner, TSLexer *lexer, bo
     scanner->closer_line_string_opened = false;
     for (;;) {
         lexer->mark_end(lexer);
-        if (lexer->eof(lexer) || lexer->lookahead == '\'') {
-            break;
-        }
         int32_t c = lexer->lookahead;
-        // A deferred body starts right before the newline that ends the line.
-        if (c == '\n' && line_open && did_advance) {
+        if (at_eof(lexer) || c == '\'' || (c == '\n' && line_open && did_advance)) {
             break;
         }
-        advance(lexer);
-        if (c == '\\' && scanner->joined_line && lexer->lookahead == '\n') {
-            if (did_advance) {
-                break;
-            }
-            advance(lexer);
-            lexer->mark_end(lexer);
-            lexer->result_symbol = LINE_CONTINUATION;
+        StringStep step = step_closer_line_string_char(scanner, lexer, c, ansi_c, &line_open, did_advance);
+        if (step == STRING_EMIT) {
             return true;
         }
-        if (c == '\\' && !lexer->eof(lexer) && lexer->lookahead != '\n' && (ansi_c || lexer->lookahead != '\'')) {
-            advance(lexer);
-        } else if (c == '\n') {
-            scanner->joined_line = false;
-            line_open = false;
+        if (step == STRING_STOP) {
+            break;
         }
         did_advance = true;
     }
     lexer->result_symbol = ansi_c ? CLOSER_LINE_ANSI_C_STRING_CONTENT : CLOSER_LINE_RAW_STRING_CONTENT;
     return did_advance;
+}
+
+static StringStep step_closer_line_string_char(Scanner *scanner, TSLexer *lexer, int32_t c, bool ansi_c,
+                                               bool *line_open, bool did_advance) {
+    advance(lexer);
+    if (c == '\\' && scanner->joined_line && lexer->lookahead == '\n') {
+        if (did_advance) {
+            return STRING_STOP;
+        }
+        advance(lexer);
+        lexer->mark_end(lexer);
+        lexer->result_symbol = LINE_CONTINUATION;
+        return STRING_EMIT;
+    }
+    if (c == '\\' && !at_eof(lexer) && lexer->lookahead != '\n' && (ansi_c || lexer->lookahead != '\'')) {
+        advance(lexer);
+    } else if (c == '\n') {
+        scanner->joined_line = false;
+        *line_open = false;
+    }
+    return STRING_CONTINUE;
 }
 
 static bool scan_comment(TSLexer *lexer, bool backquotes);
@@ -2675,7 +2735,7 @@ static bool scan_redirect_destination_start(TSLexer *lexer) {
 
 static bool can_start_redirect_destination(TSLexer *lexer) {
     int32_t first = lexer->lookahead;
-    if (lexer->eof(lexer) || first == '\n' || first == '#') {
+    if (at_eof(lexer) || first == '\n' || first == '#') {
         return false;
     }
     if (first == '<' || first == '>') {
@@ -3210,6 +3270,7 @@ static bool scan(Scanner *scanner, TSLexer *lexer, const bool *valid_symbols) {
 void *tree_sitter_bash_external_scanner_create(void) {
     Scanner *scanner = ts_calloc(1, sizeof(Scanner));
     array_init(&scanner->heredocs);
+    array_init(&scanner->heredoc_delimiters);
     array_init(&scanner->closers);
     array_init(&scanner->closer_regex_depths);
     return scanner;
@@ -3217,8 +3278,8 @@ void *tree_sitter_bash_external_scanner_create(void) {
 
 void tree_sitter_bash_external_scanner_destroy(void *payload) {
     Scanner *scanner = (Scanner *)payload;
-    scanner_reset(scanner);
     array_delete(&scanner->heredocs);
+    array_delete(&scanner->heredoc_delimiters);
     array_delete(&scanner->closers);
     array_delete(&scanner->closer_regex_depths);
     ts_free(scanner);
@@ -3280,14 +3341,14 @@ static unsigned serialize_heredocs(Scanner *scanner, char *buffer, unsigned size
     buffer[size++] = (char)scanner->heredocs.size;
     for (uint32_t i = 0; i < scanner->heredocs.size; i++) {
         Heredoc *heredoc = array_get(&scanner->heredocs, i);
+        const int32_t *delimiter = heredoc_delimiter(scanner, heredoc);
         buffer[size++] = (char)heredoc->is_raw;
         buffer[size++] = (char)heredoc->allows_indent;
         buffer[size++] = (char)(heredoc->started | heredoc->deferred << 1);
         write_bytes(buffer, &size, &heredoc->depth, sizeof(heredoc->depth));
-        uint16_t length = (uint16_t)heredoc->delimiter.size;
-        write_bytes(buffer, &size, &length, sizeof(length));
-        for (uint32_t j = 0; j < heredoc->delimiter.size; j++) {
-            size += encode_varint(*array_get(&heredoc->delimiter, j), &buffer[size]);
+        write_bytes(buffer, &size, &heredoc->delimiter_length, sizeof(heredoc->delimiter_length));
+        for (uint16_t j = 0; j < heredoc->delimiter_length; j++) {
+            size += encode_varint(delimiter[j], &buffer[size]);
         }
     }
     return size;
@@ -3377,8 +3438,9 @@ static void deserialize_heredocs(Scanner *scanner, const char *buffer, unsigned 
         return;
     }
     uint8_t count = (uint8_t)buffer[size++];
+    array_reserve(&scanner->heredocs, count);
     for (uint8_t i = 0; i < count && size + HEREDOC_HEADER_SIZE <= length; i++) {
-        Heredoc heredoc = {.delimiter = array_new()};
+        Heredoc heredoc = {0};
         heredoc.is_raw = buffer[size++];
         heredoc.allows_indent = buffer[size++];
         heredoc.started = buffer[size] & 1;
@@ -3388,17 +3450,22 @@ static void deserialize_heredocs(Scanner *scanner, const char *buffer, unsigned 
         uint16_t delimiter_length;
         memcpy(&delimiter_length, &buffer[size], sizeof(delimiter_length));
         size += sizeof(delimiter_length);
-        array_reserve(&heredoc.delimiter, delimiter_length);
-        for (uint16_t j = 0; j < delimiter_length; j++) {
+        uint32_t offset = scanner->heredoc_delimiters.size;
+        heredoc.delimiter_offset = offset;
+        array_reserve(&scanner->heredoc_delimiters, offset + delimiter_length);
+        uint16_t decoded = 0;
+        for (; decoded < delimiter_length; decoded++) {
             int32_t c;
             unsigned consumed = decode_varint(&buffer[size], length - size, &c);
             if (consumed == 0) {
                 break;
             }
             size += consumed;
-            array_push(&heredoc.delimiter, c);
+            scanner->heredoc_delimiters.contents[offset + decoded] = c;
         }
-        array_push(&scanner->heredocs, heredoc);
+        scanner->heredoc_delimiters.size = offset + decoded;
+        heredoc.delimiter_length = decoded;
+        scanner->heredocs.contents[scanner->heredocs.size++] = heredoc;
     }
 }
 

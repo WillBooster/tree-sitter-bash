@@ -24,13 +24,13 @@ may change; such changes are released as new major versions.
 ## Usage
 
 The npm package ships `tree-sitter-bash.wasm`, targeting and tested with
-[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 20.0.0 or later in the 20.x series,
+[@willbooster/web-tree-sitter](https://www.npmjs.com/package/@willbooster/web-tree-sitter) 23.0.0 or later in the 23.x series,
 a peer dependency.
-The parser carries the ABI number of WillBooster/tree-sitter (`0x5742000c`), so only that runtime loads it; the
-original tree-sitter runtime rejects it, and earlier WillBooster runtime ABIs do too:
+The parser carries the ABI number of WillBooster/tree-sitter (`0x5742000d`), so only that runtime loads it; the
+original tree-sitter runtime and WillBooster runtimes prior to 22.0.0 reject it:
 
 ```sh
-npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter@^20.0.0
+npm install @willbooster/tree-sitter-bash @willbooster/web-tree-sitter@^23.0.0
 ```
 
 In Node.js and Bun, load the grammar from its path:
@@ -75,7 +75,7 @@ parser.setLanguage(await Language.load(bash));
 
 The package also ships the node types in `src/node-types.json`.
 
-Upgrade `@willbooster/web-tree-sitter` to 20.0.0 or later in the 20.x series when upgrading this package. Recovery trees
+Upgrade `@willbooster/web-tree-sitter` to 23.0.0 or later in the 23.x series when upgrading this package. Recovery trees
 for malformed scripts can differ across runtime versions, so review consumers that depend on the exact shape of
 `ERROR` nodes.
 
