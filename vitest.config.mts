@@ -12,6 +12,8 @@ export default defineConfig({
         extends: true,
         test: {
           name: 'node',
+          // Wasm tier-up during timing samples makes the performance tests compare different compiler tiers.
+          execArgv: ['--no-liftoff'],
           globalSetup: 'test/helpers/installCli.ts',
           include: ['test/unit/**/*.test.ts'],
           exclude: [BrowserTests],
