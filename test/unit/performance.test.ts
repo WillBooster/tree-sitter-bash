@@ -8,13 +8,6 @@ test('uses a Wasm build of the current parser', () => {
   expect(isWasmStale(), 'generation inputs or src/ changed after the Wasm build; run `bun run build/ci`').toBe(false);
 });
 
-// These concatenation, line-continuation and plain nested-arithmetic and unfinished-opener shapes should grow proportionally: ten times the
-// input takes about ten times as long, against a hundred times for a quadratic scanner. The ratio holds on
-// slow CI runners. The parses are timed in the CPU time of the thread that runs them: wall-clock time is inflated
-// unevenly by other processes, and the process's CPU time also counts the engine's background threads, which compile
-// the Wasm build and collect garbage during the parses. The small and large scripts are measured after warm-up parses and
-// in alternation, each keeping its fastest run; their ratio is 10 to 13 locally, and 18 leaves a margin over that
-// while failing for growth faster than about n^1.25.
 test.each([
   [
     'nested arithmetic substitutions',
@@ -43,10 +36,19 @@ test.each([
 
 function parseCpuTime(script: string, expectedError = false): number {
   const start = process.threadCpuUsage();
-  const tree = parse(script);
-  const { system, user } = process.threadCpuUsage(start);
-  const { hasError } = tree.rootNode;
-  tree.delete();
-  expect(hasError).toBe(expectedError);
-  return system + user;
+  let parses = 0;
+  let elapsed = 0;
+  let mismatches = 0;
+  // Linux thread CPU accounting can advance in millisecond steps. Batch short parses so the fastest
+  // sample cannot win by falling between accounting updates and distort the growth ratio.
+  do {
+    const tree = parse(script);
+    if (tree.rootNode.hasError !== expectedError) mismatches++;
+    tree.delete();
+    parses++;
+    const { system, user } = process.threadCpuUsage(start);
+    elapsed = system + user;
+  } while (elapsed < 50_000);
+  expect(mismatches).toBe(0);
+  return elapsed / parses;
 }
