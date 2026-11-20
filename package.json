@@ -51,7 +51,7 @@
     "conventional-changelog-conventionalcommits": "10.4.1",
     "lefthook": "2.2.2",
     "oxlint": "1.93.0",
-    "oxlint-tsgolint": "7.0.2006",
+    "oxlint-tsgolint": "7.0.2007",
     "playwright": "1.65.0",
     "semantic-release": "25.0.9",
     "vite": "8.3.7",
